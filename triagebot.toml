@@ -1,0 +1,125 @@
+###############################################
+# TRIAGEBOT CONFIG FOR adobe
+###############################################
+
+# ─────────────────────────────────────────────
+# RELABEL
+# ─────────────────────────────────────────────
+[relabel]
+allow-unauthenticated = [
+    "bug",
+    "invalid",
+    "question",
+    "enhancement",
+    "documentation",
+]
+
+# ─────────────────────────────────────────────
+# ASSIGN / CLAIM
+# ─────────────────────────────────────────────
+[assign]
+allow-unauthenticated = true
+auto_assign_on_mention = true
+warn_on_unused_assign = true
+assignable = [
+    "nilotpal-n7",
+    "aditya-samal"
+]
+
+# ─────────────────────────────────────────────
+# PING GROUPS
+# ─────────────────────────────────────────────
+[ping]
+allowed_users = ["nilotpal-n7", "aditya-samal"]
+
+[ping.flutter]
+aliases = ["flutter-team"]
+user_list = ["nilotpal-n7", "aditya-samal"]
+message = """\
+Flutter: please review this issue/PR.
+"""
+
+[ping.python]
+aliases = ["python-team"]
+user_list = ["nilotpal-n7", "aditya-samal"]
+message = """\
+Python/WASM team ping.
+"""
+
+[ping.android]
+aliases = ["android-team"]
+user_list = ["nilotpal-n7", "aditya-samal"]
+message = """\
+Android integration team ping.
+"""
+
+# ─────────────────────────────────────────────
+# MAJOR CHANGE PROCESS
+# ─────────────────────────────────────────────
+[major-change]
+enabling_label = "major-change"
+meeting_label = "to-announce"
+second_label = "final-comment-period"
+concerns_label = "has-concerns"
+accept_label = "major-change-accepted"
+waiting_period = 1
+auto_closing = true
+
+zulip_stream = 1
+zulip_ping = "team"
+
+[major-change.tracking-issue-template]
+repository = "adobe"
+title = "Tracking issue for MCP#${mcp_number}"
+labels = ["major-change", "tracking"]
+body = """
+Tracking issue for MCP ${mcp_issue}: ${mcp_title}
+
+Created by ${mcp_author}
+"""
+
+# ─────────────────────────────────────────────
+# CONCERN SYSTEM
+# ─────────────────────────────────────────────
+[concern]
+labels = ["has-concerns"]
+
+# ─────────────────────────────────────────────
+# NOTE SYSTEM
+# ─────────────────────────────────────────────
+[note]
+
+# ─────────────────────────────────────────────
+# REVIEW CHANGES SINCE
+# ─────────────────────────────────────────────
+[review-changes-since]
+
+# ─────────────────────────────────────────────
+# AUTO LABEL
+# ─────────────────────────────────────────────
+[autolabel."lib/**"]
+labels = ["flutter"]
+
+[autolabel."android/**"]
+labels = ["android"]
+
+[autolabel."python_env/**"]
+labels = ["python"]
+
+[autolabel."build/**"]
+labels = ["ci"]
+
+# ─────────────────────────────────────────────
+# ZULIP NOTIFY ON LABELS
+# ─────────────────────────────────────────────
+[notify-zulip.labels.flutter]
+zulip_stream = 1
+topic = "flutter"
+
+[notify-zulip.labels.python]
+zulip_stream = 1
+topic = "python"
+
+[notify-zulip.labels.ci]
+zulip_stream = 1
+topic = "ci"
