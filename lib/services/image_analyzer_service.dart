@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 
@@ -18,10 +19,10 @@ class ImageAnalyzerService {
       }
       return null;
     } on PlatformException catch (e) {
-      print("Error analyzing image: ${e.message}");
+      debugPrint("Error analyzing image: ${e.message}");
       return {'success': false, 'error': e.message ?? 'Unknown error occurred'};
     } catch (e) {
-      print("Unexpected error: $e");
+      debugPrint("Unexpected error: $e");
       return {'success': false, 'error': e.toString()};
     }
   }

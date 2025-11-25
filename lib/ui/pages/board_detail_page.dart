@@ -293,7 +293,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.8),
+                            color: Colors.green.withValues(alpha: 0.8),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(

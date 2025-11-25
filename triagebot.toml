@@ -1,0 +1,166 @@
+###############################################
+# TRIAGEBOT CONFIG FOR adobe (Flutter + Python)
+###############################################
+
+# ─────────────────────────────────────────────
+# GENERAL REPO SETTINGS
+# ─────────────────────────────────────────────
+
+[include]
+# Paths triagebot should watch (all by default)
+paths = ["*"]
+
+# ─────────────────────────────────────────────
+# RELABEL: Allow contributors to relabel issues
+# ─────────────────────────────────────────────
+[relabel]
+allow-unauthenticated = [
+    "bug",
+    "invalid",
+    "question",
+    "enhancement",
+    "documentation",
+]
+
+# ─────────────────────────────────────────────
+# CLAIM / ASSIGN: Allow contributors to self-assign
+# ─────────────────────────────────────────────
+[assign]
+allow-unauthenticated = true  # Anyone can do @bot claim
+auto_assign_on_mention = true
+warn_on_unused_assign = true
+
+# Optional, define who is auto-assignable:
+assignable = [
+    "nilotpal-n7",  # ← replace with your GitHub username
+    "aditya-samal",
+]
+
+# ─────────────────────────────────────────────
+# REVIEWERS: Auto reviewer assignment groups
+# ─────────────────────────────────────────────
+[reviewers]
+# reviewers = ["user1", "user2"]   # optional root list
+
+# group: flutter
+[reviewers.groups.flutter]
+reviewers = ["nilotpal-n7"]
+
+# group: android
+[reviewers.groups.android]
+reviewers = ["nilotpal-n7"]
+
+# group: python
+[reviewers.groups.python]
+reviewers = ["nilotpal-n7"]
+
+# group: ci
+[reviewers.groups.ci]
+reviewers = ["nilotpal-n7"]
+
+# Path → reviewer group routing
+[reviewers.paths."lib/**"]
+groups = ["flutter"]
+
+[reviewers.paths."android/**"]
+groups = ["android"]
+
+[reviewers.paths."ios/**"]
+groups = ["flutter"]
+
+[reviewers.paths."web/**"]
+groups = ["flutter"]
+
+[reviewers.paths."python_env/**"]
+groups = ["python"]
+
+[reviewers.paths."build/**"]
+groups = ["ci"]
+
+# Auto-assign reviewers when PR touches certain paths
+paths."lib/**"        = ["flutter"]
+paths."android/**"    = ["android"]
+paths."ios/**"        = ["flutter"]
+paths."web/**"        = ["flutter"]
+paths."python_env/**" = ["python"]
+paths."build/**"      = ["ci"]
+
+# ─────────────────────────────────────────────
+# PING SYSTEM: Easily notify groups
+# ─────────────────────────────────────────────
+[ping]
+allowed_users = ["nilotpal-n7"]
+
+[ping.flutter]
+message = """\
+Flutter team: please review this issue/PR.
+"""
+aliases = ["flutter-team"]
+user_list = ["nilotpal-n7"]
+
+[ping.python]
+message = """\
+Python/WASM integration group ping.
+"""
+aliases = ["python-team"]
+user_list = ["nilotpal-n7"]
+
+[ping.android]
+message = """\
+Android integration maintainers ping.
+"""
+aliases = ["android-team"]
+user_list = ["nilotpal-n7"]
+
+# ─────────────────────────────────────────────
+# MAJOR CHANGE PROCESS (MCP)
+# ─────────────────────────────────────────────
+[major-change]
+enabling_label = "major-change"
+meeting_label = "to-announce"
+second_label = "final-comment-period"
+concerns_label = "has-concerns"
+accept_label = "major-change-accepted"
+waiting_period = 1
+auto_closing = true
+
+# Optional: Replace with your zulip/discord stream ID
+zulip_stream = 1
+zulip_ping = "team"
+
+# ─────────────────────────────────────────────
+# MCP: Tracking issue template (auto-generated)
+# ─────────────────────────────────────────────
+[major-change.tracking-issue-template]
+repository = "adobe"
+title = "Tracking issue for MCP#${mcp_number}"
+body = """
+This issue tracks MCP ${mcp_issue}: ${mcp_title}
+
+Created by ${mcp_author}
+"""
+labels = ["major-change", "tracking"]
+
+# ─────────────────────────────────────────────
+# CONCERN SYSTEM
+# ─────────────────────────────────────────────
+[concern]
+labels = ["has-concerns"]
+
+# ─────────────────────────────────────────────
+# NOTE SYSTEM: Allows @bot note "text"
+# ─────────────────────────────────────────────
+[note]
+
+# ─────────────────────────────────────────────
+# REVIEW-CHANGES-SINCE
+# ─────────────────────────────────────────────
+[review-changes-since]
+
+# ─────────────────────────────────────────────
+# AUTO-NOTIFY LABELS (Optional)
+# ─────────────────────────────────────────────
+[labels.notify]
+"flutter" = ["nilotpal-n7"]
+"python"  = ["nilotpal-n7"]
+"ci"      = ["nilotpal-n7"]

@@ -280,7 +280,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
               ),
             ),
             Text(
-              (score * 100).toStringAsFixed(1) + '%',
+              '${(score * 100).toStringAsFixed(1)}%',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
