@@ -36,6 +36,13 @@ subprojects {
             jvmTarget = "17"
         }
     }
+    
+    // Set Kotlin JVM target for all projects
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        kotlinOptions {
+            jvmTarget = "17"
+        }
+    }
 }
 
 // Ensure Kotlin compilation across all modules targets a supported JVM version.
