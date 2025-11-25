@@ -12,7 +12,7 @@ class InstagramDownloadService {
   final _repo = ImageRepository();
   final _uuid = const Uuid();
 
-  Future<String?> downloadInstagramImage(String url) async {
+  Future<List<String>?> downloadInstagramImage(String url) async {
     try {
       // Get output directory
       final dir = await getApplicationDocumentsDirectory();
@@ -31,26 +31,35 @@ class InstagramDownloadService {
         final Map<String, dynamic> jsonResult = json.decode(result);
 
         if (jsonResult['success'] == true) {
-          final downloadedPath = jsonResult['file_path'] as String;
+          final List<dynamic> paths = jsonResult['file_paths'];
+          final List<String> savedImageIds = [];
 
-          // Copy to images directory
           final imagesDir = Directory('${dir.path}/images');
           if (!await imagesDir.exists()) {
             await imagesDir.create(recursive: true);
           }
 
-          final String imageId = _uuid.v4();
-          final extension = downloadedPath.split('.').last;
-          final String targetPath = '${imagesDir.path}/$imageId.$extension';
+          // Iterate through all downloaded files
+          for (var path in paths) {
+            final String sourcePath = path as String;
+            
+            final String imageId = _uuid.v4();
+            final extension = sourcePath.split('.').last;
+            final String targetPath = '${imagesDir.path}/$imageId.$extension';
 
-          // Copy file
-          final sourceFile = File(downloadedPath);
-          await sourceFile.copy(targetPath);
+            // Copy file
+            final sourceFile = File(sourcePath);
+            if (await sourceFile.exists()) {
+              await sourceFile.copy(targetPath);
 
-          // Save to database
-          await _repo.insertImage(imageId, targetPath);
+              // Save to database
+              await _repo.insertImage(imageId, targetPath);
+              
+              savedImageIds.add(imageId);
+            }
+          }
 
-          return imageId;
+          return savedImageIds.isNotEmpty ? savedImageIds : null;
         } else {
           throw Exception(jsonResult['error'] ?? 'Unknown error');
         }

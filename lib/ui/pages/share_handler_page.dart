@@ -29,7 +29,7 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
   final _imageRepo = ImageRepository();
   final _uuid = const Uuid();
 
-  String? _downloadedImageId;
+  List<String> _downloadedImageIds = []; 
   bool _isDownloading = true;
   bool _hasError = false;
   String? _errorMessage;
@@ -54,7 +54,7 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
         final id = await _handleDirectImage(sharedPath);
         if (mounted) {
           setState(() {
-            _downloadedImageId = id;
+            if (id != null) _downloadedImageIds = [id];
             _isDownloading = false;
             if (id == null) {
               _hasError = true;
@@ -82,12 +82,12 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
         // Check if it's an Instagram URL
         if (url.contains('instagram.com')) {
           try {
-            final id = await _instagramService.downloadInstagramImage(url);
+            final ids = await _instagramService.downloadInstagramImage(url);
             if (mounted) {
               setState(() {
-                _downloadedImageId = id;
+                if (ids != null) _downloadedImageIds = ids;
                 _isDownloading = false;
-                if (id == null) {
+                if (ids == null || ids.isEmpty) {
                   _hasError = true;
                   _errorMessage = "Failed to download from Instagram";
                 }
@@ -107,7 +107,7 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
           final id = await _downloadService.downloadAndSaveImage(url);
           if (mounted) {
             setState(() {
-              _downloadedImageId = id;
+              if (id != null) _downloadedImageIds = [id]; // Wrap single ID in list
               _isDownloading = false;
               if (id == null) {
                 _hasError = true;
@@ -151,29 +151,33 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
   }
 
   Future<void> _saveToBoard(int boardId) async {
-    if (_downloadedImageId == null) return;
+    if (_downloadedImageIds.isEmpty) return;
 
-    await _boardImageRepo.saveToBoard(boardId, _downloadedImageId!);
+    for (final id in _downloadedImageIds) {
+      await _boardImageRepo.saveToBoard(boardId, id);
+    }
 
-    // Get image path and trigger analysis
     final images = await _imageRepo.getAllImages();
-    final imageData = images.firstWhere(
-      (img) => img['id'] == _downloadedImageId,
-      orElse: () => <String, dynamic>{},
-    );
-
-    if (imageData.isNotEmpty && imageData['filePath'] != null) {
-      _analyzeImageInBackground(
-        _downloadedImageId!,
-        imageData['filePath'] as String,
+    
+    for (final id in _downloadedImageIds) {
+      final imageData = images.firstWhere(
+        (img) => img['id'] == id,
+        orElse: () => <String, dynamic>{},
       );
+
+      if (imageData.isNotEmpty && imageData['filePath'] != null) {
+        _analyzeImageInBackground(
+          id,
+          imageData['filePath'] as String,
+        );
+      }
     }
 
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Saved to board! Analysis will run in background."),
+      SnackBar(
+        content: Text("Saved ${_downloadedImageIds.length} image(s) to board! Analysis running."),
       ),
     );
 
@@ -235,7 +239,7 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text("Downloading image..."),
+            Text("Downloading image(s)..."),
           ],
         ),
       );
@@ -246,9 +250,21 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
       children: [
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Text(
-            "Select a board",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          child: Column(
+            children: [
+              Text(
+                "Select a board",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              if (_downloadedImageIds.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    "(${_downloadedImageIds.length} images found)",
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ),
+            ],
           ),
         ),
         Expanded(
