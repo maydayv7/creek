@@ -1,6 +1,19 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://chaquo.com/maven") }
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.7.0")
+        classpath("com.chaquo.python:gradle:15.0.1")
+    }
+}
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
+    id("com.chaquo.python")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -28,6 +41,11 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        ndk {
+            // On Apple silicon, you can omit x86_64.
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     buildTypes {
@@ -35,6 +53,19 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        version = "3.8"
+        buildPython(file("../../python_env/bin/python").absolutePath)
+        pip {
+            install("pillow")
+            install("numpy")
+            install("opencv-python-headless")
+            install("instaloader")
         }
     }
 }

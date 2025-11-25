@@ -17,13 +17,14 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // Incremented version to trigger migration
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE images (
             id TEXT PRIMARY KEY,
             filePath TEXT,
-            createdAt TEXT
+            createdAt TEXT,
+            analysis_data TEXT
           )
         ''');
 
@@ -43,6 +44,22 @@ class AppDatabase {
             createdAt TEXT
           )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        // Migrate from version 1 to version 2: Add analysis_data column
+        if (oldVersion < 2) {
+          // Check if column exists before adding
+          final tableInfo = await db.rawQuery('PRAGMA table_info(images)');
+          final hasAnalysisData = tableInfo.any(
+            (column) => column['name'] == 'analysis_data',
+          );
+
+          if (!hasAnalysisData) {
+            await db.execute('''
+              ALTER TABLE images ADD COLUMN analysis_data TEXT
+            ''');
+          }
+        }
       },
     );
   }

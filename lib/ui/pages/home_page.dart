@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:adobe/data/repos/board_repo.dart';
 import 'package:adobe/data/models/board_model.dart';
 import 'package:adobe/ui/pages/board_detail_page.dart';
+import 'package:adobe/ui/pages/image_analysis_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -36,6 +37,18 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text("My Boards"),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.analytics),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ImageAnalysisPage()),
+              );
+            },
+            tooltip: 'Image Analysis',
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateBoardDialog,
@@ -61,7 +74,7 @@ class _HomePageState extends State<HomePage> {
             }
 
             final boards = snapshot.data!;
-            
+
             return GridView.builder(
               padding: const EdgeInsets.all(12),
               itemCount: boards.length,
@@ -88,9 +101,7 @@ class _HomePageState extends State<HomePage> {
         // Navigate to the details of this board
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => BoardDetailPage(board: board),
-          ),
+          MaterialPageRoute(builder: (_) => BoardDetailPage(board: board)),
         ).then((_) => _refreshBoards()); // Refresh when coming back
       },
       child: Container(
@@ -102,7 +113,7 @@ class _HomePageState extends State<HomePage> {
               color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 5,
               offset: const Offset(0, 4),
-            )
+            ),
           ],
         ),
         child: Column(
@@ -112,10 +123,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 8),
             Text(
               board.name,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
@@ -133,27 +141,31 @@ class _HomePageState extends State<HomePage> {
     final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (c) => AlertDialog(
-        title: const Text("New Board"),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: "Board Name"),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () async {
-              if (controller.text.isNotEmpty) {
-                await _boardRepo.createBoard(controller.text);
-                if (c.mounted) Navigator.pop(c);
-                _refreshBoards();
-              }
-            },
-            child: const Text("Create"),
-          )
-        ],
-      ),
+      builder:
+          (c) => AlertDialog(
+            title: const Text("New Board"),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(hintText: "Board Name"),
+              autofocus: true,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(c),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (controller.text.isNotEmpty) {
+                    await _boardRepo.createBoard(controller.text);
+                    if (c.mounted) Navigator.pop(c);
+                    _refreshBoards();
+                  }
+                },
+                child: const Text("Create"),
+              ),
+            ],
+          ),
     );
   }
 }

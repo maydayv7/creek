@@ -1,16 +1,56 @@
 # adobe
 
-A new Flutter project.
+A Flutter project with Python image analysis using Chaquopy.
 
-## Getting Started
+## Prerequisites
 
-This project is a starting point for a Flutter application.
+- Flutter SDK
+- Python 3.11 (for build-time)
+- Android SDK
 
-A few resources to get you started if this is your first Flutter project:
+## Setup
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### 1. Install Python 3.11
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+**macOS:**
+
+```bash
+brew install python@3.11
+```
+
+**Linux:**
+
+```bash
+sudo apt-get install python3.11 python3.11-venv
+```
+
+**Windows:**
+Download from [python.org](https://www.python.org/downloads/)
+
+### 2. Set up Python Virtual Environment
+
+Run the setup script to create a Python virtual environment in the repository:
+
+```bash
+./setup_python_env.sh
+```
+
+This creates a `python_env` directory with Python 3.11, which will be used by the build system. This ensures all developers use the same Python version.
+
+### 3. Build the APK
+
+```bash
+flutter build apk --release
+```
+
+## Project Structure
+
+- `android/app/src/main/python/` - Python code (image analysis)
+- `python_env/` - Python virtual environment (created by setup script)
+- `lib/` - Flutter/Dart code
+
+## Notes
+
+- The Python runtime version (embedded in the app) is **3.8** (configured in `android/app/build.gradle.kts`)
+- The build-time Python version is **3.11** (from the virtual environment)
+- The virtual environment is used only during build, not at runtime

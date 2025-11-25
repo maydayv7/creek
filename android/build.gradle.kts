@@ -29,6 +29,26 @@ subprojects {
             compileOptions.javaClass.getMethod("setTargetCompatibility", JavaVersion::class.java).invoke(compileOptions, JavaVersion.VERSION_17)
         }
     }
+    
+    // Set Kotlin JVM target for all projects
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        kotlinOptions {
+            jvmTarget = "17"
+        }
+    }
+}
+
+// Ensure Kotlin compilation across all modules targets a supported JVM version.
+subprojects {
+    pluginManager.withPlugin("kotlin-android") {
+        try {
+            tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java).configureEach {
+                kotlinOptions.jvmTarget = "17"
+            }
+        } catch (e: Exception) {
+            // If Kotlin plugin is not available at evaluation time, ignore and allow modules to set their own target.
+        }
+    }
 }
 
 // Ensure Kotlin compilation across all modules targets a supported JVM version.

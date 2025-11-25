@@ -26,20 +26,25 @@ class _MyAppState extends State<MyApp> {
     super.initState();
 
     // 1. LISTEN: App is running in memory
-    _intentSub = ReceiveSharingIntent.instance.getMediaStream().listen((List<SharedMediaFile> value) {
-      if (value.isNotEmpty) {
-        // The URL or Text is inside the 'path' property
-        _navigateToSharePage(value.first.path);
-      }
-    }, onError: (err) {
-      debugPrint("Share Error: $err");
-    });
+    _intentSub = ReceiveSharingIntent.instance.getMediaStream().listen(
+      (List<SharedMediaFile> value) {
+        if (value.isNotEmpty) {
+          // The URL, Text, or file path is inside the 'path' property
+          _navigateToSharePage(value.first.path);
+        }
+      },
+      onError: (err) {
+        debugPrint("Share Error: $err");
+      },
+    );
 
     // 2. LISTEN: App is closed and opened via Share
-    ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile> value) {
+    ReceiveSharingIntent.instance.getInitialMedia().then((
+      List<SharedMediaFile> value,
+    ) {
       if (value.isNotEmpty) {
         _navigateToSharePage(value.first.path);
-        
+
         // Optional: Clear the intent so it doesn't re-trigger on reload
         ReceiveSharingIntent.instance.reset();
       }
