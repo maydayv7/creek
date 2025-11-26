@@ -15,7 +15,7 @@ import 'package:adobe/data/repos/image_repo.dart';
 import 'package:adobe/data/repos/board_repo.dart';
 
 // Services
-import 'package:adobe/services/image_analyzer_service.dart';
+import 'package:adobe/services/layout_analyzer_service.dart';
 import 'package:adobe/services/image_service.dart';
 import 'package:adobe/services/theme_service.dart';
 
@@ -91,7 +91,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
 
   Future<void> _analyzeImage(String imageId, String imagePath) async {
     try {
-      final result = await ImageAnalyzerService.analyzeImage(imagePath);
+      final result = await LayoutAnalyzerService.analyzeImage(imagePath);
       if (result != null && result['success'] == true) {
         await _imageRepo.updateImageAnalysis(imageId, json.encode(result));
         if (mounted) {
