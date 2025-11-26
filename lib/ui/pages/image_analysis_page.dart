@@ -109,7 +109,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
               style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
               child: _isAnalyzing 
                 ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text("Run Full Analysis"),
+                : const Text("Analyze Image"),
             ),
             
             if (_errorMessage != null)

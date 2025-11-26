@@ -2,70 +2,65 @@ package com.example.adobe
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugins.GeneratedPluginRegistrant
 import io.flutter.plugin.common.MethodChannel
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.adobe/image_analyzer"
-    private val INSTAGRAM_CHANNEL = "com.example.adobe/instagram_downloader"
-    private val executor = Executors.newSingleThreadExecutor()
+    private val CHANNEL = "com.example.adobe/methods"
+    private val scope = CoroutineScope(Dispatchers.Default)
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        GeneratedPluginRegistrant.registerWith(flutterEngine)
-
         super.configureFlutterEngine(flutterEngine)
 
-        // Start Python early
-        executor.execute {
+        // Initialize Python immediately in the background
+        scope.launch(Dispatchers.IO) {
             ImageAnalyzer.initializePython(context)
         }
 
-        // Image Analyzer Channel
-        MethodChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            CHANNEL
-        ).setMethodCallHandler { call, result ->
-            executor.execute {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+            // Launch a new coroutine for every method call on the IO dispatcher for parallel execution
+            scope.launch(Dispatchers.IO) {
                 try {
-                    val response = when (call.method) {
-                        "analyzeImage" -> {
+                    val response: Any? = when (call.method) {
+                        "analyzeLayout" -> {
                             val path = call.argument<String>("imagePath")!!
-                            ImageAnalyzer.analyzeImage(path)
+                            ImageAnalyzer.analyzeLayout(path)
                         }
                         "analyzeColorStyle" -> {
                             val path = call.argument<String>("imagePath")!!
                             ImageAnalyzer.analyzeColorStyle(path)
                         }
+                        "downloadInstagramImage" -> {
+                            val url = call.argument<String>("url")!!
+                            val outputDir = call.argument<String>("outputDir")!!
+                            ImageAnalyzer.downloadInstagramImage(url, outputDir)
+                        }
                         else -> null
                     }
 
-                    runOnUiThread {
-                        if (response != null) result.success(response)
-                        else result.notImplemented()
+                    // Switch back to the Main Thread to send the result to Flutter
+                    withContext(Dispatchers.Main) {
+                        if (response != null) {
+                            result.success(response)
+                        } else {
+                            if (call.method == "downloadInstagramImage") {
+                                // Specific error handling for downloader if needed
+                                result.error("ERROR", "Download returned null", null)
+                            } else if (response == null && (call.method == "analyzeLayout" || call.method == "analyzeColorStyle")) {
+                                // Python returned null (error inside script)
+                                result.error("ANALYSIS_ERROR", "Python returned null", null)
+                            } else {
+                                result.notImplemented()
+                            }
+                        }
                     }
                 } catch (e: Exception) {
-                    runOnUiThread { result.error("ERROR", e.message, null) }
-                }
-            }
-        }
-
-        // Instagram Channel
-        MethodChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            INSTAGRAM_CHANNEL
-        ).setMethodCallHandler { call, result ->
-            executor.execute {
-                if (call.method == "downloadInstagramImage") {
-                    val url = call.argument<String>("url")
-                    val outputDir = call.argument<String>("outputDir")
-                    val res = ImageAnalyzer.downloadInstagramImage(url!!, outputDir!!)
-                    runOnUiThread {
-                        if (res != null) result.success(res)
-                        else result.error("ERROR", "Failed", null)
+                    withContext(Dispatchers.Main) {
+                        result.error("EXCEPTION", e.message, e.stackTraceToString())
                     }
-                } else {
-                    runOnUiThread { result.notImplemented() }
                 }
             }
         }

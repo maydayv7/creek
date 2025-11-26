@@ -2,26 +2,39 @@ import os
 import sys
 import json
 import traceback
+import numpy as np
+import cv2
+import joblib
 
-# ----------------- Helper: JSON Encoder for Numpy -----------------
-# This prevents the "Java PyObject" crash by converting Numpy -> Standard Python
-
+# --- Global Cache ---
+_MODEL_DATA = None
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
-        import numpy as np
-        if isinstance(obj, np.integer):
+        if isinstance(obj, (np.integer, int)):
             return int(obj)
-        elif isinstance(obj, np.floating):
+        elif isinstance(obj, (np.floating, float)):
             return float(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         return super(NumpyEncoder, self).default(obj)
 
-# ----------------- YOUR FEATURE EXTRACTION LOGIC -----------------
+def _load_model_if_needed():
+    global _MODEL_DATA
+    if _MODEL_DATA is not None:
+        return _MODEL_DATA
 
+    try:
+        base_dir = os.path.dirname(__file__)
+        model_path = os.path.join(base_dir, "color_style_model.joblib")
+        if os.path.exists(model_path):
+            _MODEL_DATA = joblib.load(model_path)
+    except Exception as e:
+        print(f"Error loading model: {e}")
+    return _MODEL_DATA
 
-def compute_color_features(bgr, np, cv2):
+# --- Feature Extraction Helpers ---
+def compute_color_features(bgr):
     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
     lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
     H, S, V = cv2.split(hsv)
@@ -35,18 +48,15 @@ def compute_color_features(bgr, np, cv2):
 
     # Lightness / brightness
     mean_L, std_L, p1_L, p99_L = stats(L)
-    color.update({"mean_L": mean_L, "std_L": std_L,
-                 "p1_L": p1_L, "p99_L": p99_L})
+    color.update({"mean_L": mean_L, "std_L": std_L, "p1_L": p1_L, "p99_L": p99_L})
 
     # Saturation
     mean_S, std_S, p1_S, p99_S = stats(S)
-    color.update({"mean_S": mean_S, "std_S": std_S,
-                 "p1_S": p1_S, "p99_S": p99_S})
+    color.update({"mean_S": mean_S, "std_S": std_S, "p1_S": p1_S, "p99_S": p99_S})
 
     # Value / luminance
     mean_V, std_V, p1_V, p99_V = stats(V)
-    color.update({"mean_V": mean_V, "std_V": std_V,
-                 "p1_V": p1_V, "p99_V": p99_V})
+    color.update({"mean_V": mean_V, "std_V": std_V, "p1_V": p1_V, "p99_V": p99_V})
 
     # Hue stats
     Hf = H.astype(np.float32) * 2.0
@@ -55,31 +65,27 @@ def compute_color_features(bgr, np, cv2):
     hue_mean_deg = np.rad2deg(np.arctan2(sin_mean, cos_mean)) % 360
     R = np.sqrt(sin_mean**2 + cos_mean**2)
     hue_dispersion = float(1 - R)
-    color.update({"hue_mean_deg": float(hue_mean_deg),
-                 "hue_dispersion": hue_dispersion})
+    color.update({"hue_mean_deg": float(hue_mean_deg), "hue_dispersion": hue_dispersion})
 
     # Colorfulness
     rg = (bgr[:, :, 2].astype(np.float32) - bgr[:, :, 1].astype(np.float32))
-    yb = 0.5*(bgr[:, :, 2].astype(np.float32) + bgr[:, :,
-              1].astype(np.float32)) - bgr[:, :, 0].astype(np.float32)
+    yb = 0.5 * (bgr[:, :, 2].astype(np.float32) + bgr[:, :, 1].astype(np.float32)) - bgr[:, :, 0].astype(np.float32)
     sigma_rg, sigma_yb = rg.std(), yb.std()
     mean_rg, mean_yb = rg.mean(), yb.mean()
-    colorfulness = np.sqrt(sigma_rg**2 + sigma_yb**2) + \
-        0.3*np.sqrt(mean_rg**2 + mean_yb**2)
+    colorfulness = np.sqrt(sigma_rg**2 + sigma_yb**2) + 0.3 * np.sqrt(mean_rg**2 + mean_yb**2)
     color["colorfulness"] = float(colorfulness)
 
     # Palette
     pixels = bgr.reshape(-1, 3).astype(np.float32)
     K = 5
     criteria = (cv2.TermCriteria_EPS + cv2.TermCriteria_MAX_ITER, 20, 1.0)
-    _, _, centers = cv2.kmeans(
-        pixels, K, None, criteria, 1, cv2.KMEANS_PP_CENTERS)
+    _, _, centers = cv2.kmeans(pixels, K, None, criteria, 1, cv2.KMEANS_PP_CENTERS)
     color["palette_bgr"] = centers.astype(int).tolist()
 
     return color
 
 
-def compute_editing_features(bgr, np, cv2):
+def compute_editing_features(bgr):
     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
     lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
     H, S, V = cv2.split(hsv)
@@ -114,9 +120,9 @@ def compute_editing_features(bgr, np, cv2):
 
     patch_std = []
     step, k = 16, 16
-    for y in range(0, gray.shape[0]-k+1, step):
-        for x in range(0, gray.shape[1]-k+1, step):
-            patch = gray[y:y+k, x:x+k]
+    for y in range(0, gray.shape[0] - k + 1, step):
+        for x in range(0, gray.shape[1] - k + 1, step):
+            patch = gray[y:y + k, x:x + k]
             patch_std.append(patch.std())
     if len(patch_std) > 0:
         patch_std = np.array(patch_std)
@@ -129,7 +135,7 @@ def compute_editing_features(bgr, np, cv2):
     return feats
 
 
-def flatten_features(features_dict, np):
+def flatten_features(features_dict):
     flat_values = []
     # 1. Color Features
     color_feats = features_dict.get('color', {})
@@ -144,31 +150,15 @@ def flatten_features(features_dict, np):
         flat_values.append(val)
     return np.array(flat_values)
 
-# ----------------- PUBLIC API (CALLED FROM KOTLIN) -----------------
 
+# --- Public API ---
 
 def analyze_color_style(image_path):
-    # Lazy imports to handle missing libraries gracefully
     try:
-        import numpy as np
-        import cv2
-        import joblib
-        import sklearn
-    except ImportError as e:
-        return json.dumps({"success": False, "error": f"Missing Library: {e}"})
+        model_data = _load_model_if_needed()
+        if model_data is None:
+            return json.dumps({"success": False, "error": "Model failed to load"})
 
-    try:
-        BASE_DIR = os.path.dirname(__file__)
-        MODEL_PATH = os.path.join(BASE_DIR, "color_style_model.joblib")
-
-        # 1. Load Model
-        if not os.path.exists(MODEL_PATH):
-            return json.dumps({"success": False, "error": f"Model not found at: {MODEL_PATH}"})
-
-        # Load model using joblib
-        model_data = joblib.load(MODEL_PATH)
-
-        # 2. Load Image
         if not os.path.exists(image_path):
             return json.dumps({"success": False, "error": f"Image not found at: {image_path}"})
 
@@ -176,21 +166,22 @@ def analyze_color_style(image_path):
         if img is None:
             return json.dumps({"success": False, "error": "CV2 could not read image"})
 
-        # 3. Extract Features
+        # Extract Features
         raw_features = {
-            "color": compute_color_features(img, np, cv2),
-            "editing": compute_editing_features(img, np, cv2)
+            "color": compute_color_features(img),
+            "editing": compute_editing_features(img)
         }
-        flat_vector = flatten_features(raw_features, np)
 
-        # 4. Predict
+        flat_vector = flatten_features(raw_features)
+
+        # Predict
         clf = model_data['model']
         le = model_data['encoder']
 
         probs = clf.predict_proba([flat_vector])[0]
         classes = le.classes_
 
-        # 5. Format Results
+        # Format Results
         prediction = classes[np.argmax(probs)]
         score = max(probs)
 
@@ -198,7 +189,6 @@ def analyze_color_style(image_path):
         for c, p in zip(classes, probs):
             results.append({"label": c, "score": p})
 
-        # Sort by score desc
         results = sorted(results, key=lambda x: x["score"], reverse=True)[:3]
 
         response = {
@@ -208,15 +198,7 @@ def analyze_color_style(image_path):
             "top_score": score
         }
 
-        # Return as JSON String (Safe for Java)
         return json.dumps(response, cls=NumpyEncoder)
 
     except Exception as e:
         return json.dumps({"success": False, "error": f"Python Exception: {str(e)} | {traceback.format_exc()}"})
-
-# KEEP YOUR OTHER FUNCTIONS HERE IF NEEDED (e.g. download_instagram_image)
-
-
-def download_instagram_image(url, output_dir):
-    # Placeholder to keep existing logic working
-    return json.dumps({"success": False, "error": "Not implemented in this snippet"})
