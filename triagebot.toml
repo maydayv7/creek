@@ -18,7 +18,6 @@ allow-unauthenticated = [
 # ASSIGN / CLAIM
 # ─────────────────────────────────────────────
 [assign]
-allow-unauthenticated = true
 auto_assign_on_mention = true
 warn_on_unused_assign = true
 assignable = [

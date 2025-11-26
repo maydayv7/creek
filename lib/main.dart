@@ -2,11 +2,14 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:adobe/services/theme_service.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:adobe/ui/pages/home_page.dart';
 import 'package:adobe/ui/pages/share_handler_page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await themeService.loadTheme();
   runApp(const MyApp());
 }
 
@@ -49,11 +52,18 @@ class _MyAppState extends State<MyApp> {
         ReceiveSharingIntent.instance.reset();
       }
     });
+
+    themeService.addListener(_updateTheme);
+  }
+
+  void _updateTheme() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _intentSub.cancel();
+    themeService.removeListener(_updateTheme);
     super.dispose();
   }
 
@@ -74,6 +84,45 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
+      title: 'Local Pinterest',
+      
+      // 1. Light Theme
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.light,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple, 
+          brightness: Brightness.light
+        ),
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 0,
+        ),
+        cardColor: Colors.grey[100], // Light gray cards
+      ),
+
+      // 2. Dark Theme
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple, 
+          brightness: Brightness.dark
+        ),
+        scaffoldBackgroundColor: const Color(0xFF121212), // Dark background
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF121212),
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        cardColor: const Color(0xFF1E1E1E), // Dark gray cards
+      ),
+
+      // 3. Mode Switcher
+      themeMode: themeService.mode,
+      
       home: const HomePage(),
     );
   }
