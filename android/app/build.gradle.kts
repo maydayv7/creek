@@ -62,20 +62,9 @@ android {
 chaquopy {
     defaultConfig {
         version = "3.8"
-        
-        // Detect OS
-        val os = System.getProperty("os.name").lowercase()
-        val venvPath = file("../../python_env")
-
-        // Choose correct python path
-        val pythonExe = if (os.contains("win")) {
-            File(venvPath, "Scripts/python.exe").absolutePath
-        } else {
-            File(venvPath, "bin/python").absolutePath
-        }
-
-        buildPython(pythonExe)
-
+        val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+        val pythonFile = if (isWindows) file("../../python_env/Scripts/python.exe") else file("../../python_env/bin/python")
+        buildPython(pythonFile.absolutePath)
         pip {
             install("pillow")
             install("numpy")

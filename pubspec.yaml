@@ -33,6 +33,21 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/fonts/
     - assets/dinov2.onnx
     - assets/dinov2.onnx.data
     - assets/texture_centroids.json
+    
+  fonts:
+    - family: GeneralSans
+      fonts:
+        - asset: assets/fonts/GeneralSans-Extralight.otf
+          weight: 200
+        - asset: assets/fonts/GeneralSans-Light.otf
+          weight: 300
+        - asset: assets/fonts/GeneralSans-Regular.otf
+          weight: 400
+        - asset: assets/fonts/GeneralSans-Medium.otf
+          weight: 500
+        - asset: assets/fonts/GeneralSans-Semibold.otf
+          weight: 600
