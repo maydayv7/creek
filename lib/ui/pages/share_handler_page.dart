@@ -9,7 +9,7 @@ import 'package:adobe/services/instagram_download_service.dart';
 import 'package:adobe/data/repos/board_repo.dart';
 import 'package:adobe/data/repos/board_image_repo.dart';
 import 'package:adobe/data/repos/image_repo.dart';
-import 'package:adobe/services/image_analyzer_service.dart';
+import 'package:adobe/services/layout_analyzer_service.dart';
 import 'dart:convert';
 
 class ShareHandlerPage extends StatefulWidget {

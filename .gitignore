@@ -1,4 +1,5 @@
 # Miscellaneous
+~*
 *.class
 *.log
 *.pyc
@@ -41,3 +42,4 @@ app.*.map.json
 /android/app/release
 # Python virtual environment
 python_env/
+assets/clip_image_encoder.onnx

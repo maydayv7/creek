@@ -6,11 +6,18 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+
+// Repos & Models
 import 'package:adobe/data/models/board_model.dart';
 import 'package:adobe/data/models/image_model.dart';
 import 'package:adobe/data/repos/board_image_repo.dart';
 import 'package:adobe/data/repos/image_repo.dart';
-import 'package:adobe/services/image_analyzer_service.dart';
+import 'package:adobe/data/repos/board_repo.dart';
+
+// Services
+import 'package:adobe/services/layout_analyzer_service.dart';
+import 'package:adobe/services/image_service.dart';
+import 'package:adobe/services/theme_service.dart';
 
 class BoardDetailPage extends StatefulWidget {
   final Board board;
@@ -24,8 +31,12 @@ class BoardDetailPage extends StatefulWidget {
 class _BoardDetailPageState extends State<BoardDetailPage> {
   final _boardImageRepo = BoardImageRepository();
   final _imageRepo = ImageRepository();
+  final _boardRepo = BoardRepository(); // To list boards for moving
+  final _imageService = ImageService(); // Service for logic
+  
   final _imagePicker = ImagePicker();
   final _uuid = const Uuid();
+  
   late Future<List<ImageModel>> _imagesFuture;
 
   @override
@@ -92,6 +103,120 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
     } catch (e) {
       debugPrint('Error analyzing image: $e');
     }
+  }
+
+  // --- DIALOGS ---
+
+  void _showImageOptionsDialog(ImageModel img) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.remove_circle_outline, color: Colors.orange),
+              title: const Text("Remove from this Board"),
+              subtitle: const Text("Image stays in 'All Images'"),
+              onTap: () async {
+                await _imageService.removeImageFromSpecificBoard(img.id, widget.board.id);
+                if (context.mounted) Navigator.pop(context);
+                setState(() { _imagesFuture = _fetchImages(); });
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text("Delete Completely"),
+              subtitle: const Text("Remove from device & all boards"),
+              onTap: () {
+                 Navigator.pop(context);
+                 _confirmDeleteForever(img.id);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.drive_file_move_outline, color: Colors.blue),
+              title: const Text("Move / Copy to Board"),
+              onTap: () {
+                Navigator.pop(context);
+                _showMoveCopyDialog(img);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteForever(String imageId) {
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text("Delete Permanently?"),
+        content: const Text("This cannot be undone."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text("Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              await _imageService.deleteImagePermanently(imageId);
+              if (c.mounted) Navigator.pop(c);
+              setState(() { _imagesFuture = _fetchImages(); });
+            },
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMoveCopyDialog(ImageModel img) async {
+    final boards = await _boardRepo.getBoards(); // Raw maps
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text("Select Board"),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: boards.length,
+            itemBuilder: (context, index) {
+              final b = boards[index];
+              if (b['id'] == widget.board.id) return const SizedBox.shrink(); // Skip current
+
+              return ListTile(
+                title: Text(b['name']),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(
+                      child: const Text("Copy"),
+                      onPressed: () async {
+                         await _imageService.copyImageToBoard(img.id, b['id']);
+                         if (c.mounted) Navigator.pop(c);
+                         if(context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Copied!")));
+                      },
+                    ),
+                    TextButton(
+                      child: const Text("Move"),
+                      onPressed: () async {
+                         await _imageService.moveImage(img.id, widget.board.id, b['id']);
+                         if (c.mounted) Navigator.pop(c);
+                         setState(() { _imagesFuture = _fetchImages(); });
+                         if(context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Moved!")));
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   void _showAnalysisDialog(ImageModel image) {
@@ -219,7 +344,22 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.board.name),
+        title: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(widget.board.name, style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text("Long press an image for options", style: TextStyle(fontSize: 12)),
+          ],
+        ),
+        centerTitle: true,
+        leading: IconButton(
+          // THEME TOGGLE BUTTON
+          icon: Icon(themeService.mode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
+          onPressed: () {
+            themeService.toggleTheme();
+          },
+          tooltip: 'Toggle Theme',
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.photo_library),
@@ -249,7 +389,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
               crossAxisCount: 2,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
-              childAspectRatio: 0.8, // Taller for images
+              childAspectRatio: 0.8,
             ),
             itemCount: images.length,
             itemBuilder: (context, index) {
@@ -258,33 +398,29 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
 
               return GestureDetector(
                 onTap: () => _showAnalysisDialog(img),
+                onLongPress: () => _showImageOptionsDialog(img), // ADDED THIS
                 child: Stack(
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child:
-                          file.existsSync()
-                              ? Image.file(
-                                file,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[300],
-                                    alignment: Alignment.center,
-                                    child: const Icon(
-                                      Icons.broken_image,
-                                      color: Colors.grey,
-                                    ),
-                                  );
-                                },
-                              )
-                              : Container(
-                                color: Colors.grey[300],
-                                child: const Icon(
-                                  Icons.error,
-                                  color: Colors.red,
-                                ),
-                              ),
+                      child: file.existsSync()
+                          ? Image.file(
+                              file,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[300],
+                                  alignment: Alignment.center,
+                                  child: const Icon(Icons.broken_image, color: Colors.grey),
+                                );
+                              },
+                            )
+                          : Container(
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.error, color: Colors.red),
+                            ),
                     ),
                     if (img.analysisData != null)
                       Positioned(
@@ -296,11 +432,7 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
                             color: Colors.green.withValues(alpha: 0.8),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Icons.analytics,
-                            color: Colors.white,
-                            size: 16,
-                          ),
+                          child: const Icon(Icons.analytics, color: Colors.white, size: 16),
                         ),
                       ),
                   ],

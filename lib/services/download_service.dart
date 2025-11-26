@@ -76,7 +76,7 @@ class DownloadService {
 
           // Force highest resolution
           cdn = _unescapeUrl(cdn);
-          cdn = cdn.split("=").first + "=s0";
+          cdn = "${cdn.split("=").first}=s0";
           debugPrint("📸 Google Photos Image Found: $cdn");
 
           return downloadAndSaveImage(cdn);

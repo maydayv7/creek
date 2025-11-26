@@ -2,7 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:adobe/services/image_analyzer_service.dart';
+import 'package:adobe/services/layout_analyzer_service.dart';
+import 'package:adobe/services/texture_analyzer_service.dart';
 
 class ImageAnalysisPage extends StatefulWidget {
   const ImageAnalysisPage({super.key});
@@ -13,20 +14,36 @@ class ImageAnalysisPage extends StatefulWidget {
 
 class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
   File? _selectedImage;
-  Map<String, dynamic>? _analysisResult;
+  
+  // Results
+  Map<String, dynamic>? _layoutResult;
+  List<Map<String, dynamic>>? _textureResult;
+  Map<String, dynamic>? _colorResult; // Added for Color Style
+  
   bool _isAnalyzing = false;
   String? _errorMessage;
 
-  // --- 1. PICK IMAGE (Unchanged) ---
-  Future<void> _pickImage() async {
+  // Texture Service (from main)
+  final _textureService = TextureAnalyzerService();
+
+  @override
+  void dispose() {
+    _textureService.dispose();
+    super.dispose();
+  }
+
+  // Unified Image Picker (from main)
+  Future<void> _pickImage(ImageSource source) async {
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      final XFile? image = await picker.pickImage(source: source);
 
       if (image != null) {
         setState(() {
           _selectedImage = File(image.path);
-          _analysisResult = null;
+          _layoutResult = null;
+          _textureResult = null;
+          _colorResult = null;
           _errorMessage = null;
         });
       }
@@ -37,101 +54,69 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
     }
   }
 
-  // --- 2. TAKE PHOTO (Unchanged) ---
-  Future<void> _takePhoto() async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.camera);
-
-      if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-          _analysisResult = null;
-          _errorMessage = null;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Error taking photo: $e';
-      });
-    }
-  }
-
-  // --- 3. ANALYZE IMAGE (Updated to call Color Style) ---
-  Future<void> _analyzeImage() async {
-    if (_selectedImage == null) {
-      debugPrint("DEBUG: _selectedImage is NULL. Aborting.");
-      return;
-    }
-    debugPrint("DEBUG: Selected image path: ${_selectedImage!.path}");
+  // Unified Analysis Runner (Combines logic from HEAD and main)
+  Future<void> _runAnalysis() async {
+    if (_selectedImage == null) return;
 
     setState(() {
       _isAnalyzing = true;
       _errorMessage = null;
-      _analysisResult = null;
+      _layoutResult = null;
+      _textureResult = null;
+      _colorResult = null;
     });
 
     try {
-      // Copy image to a location accessible by the Python script
+      // 1. Prepare File
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = _selectedImage!.path.split('/').last;
       final targetPath = '${appDir.path}/$fileName';
-
       await _selectedImage!.copy(targetPath);
 
-      // --- NEW LOGIC: Call BOTH analyzers ---
-      final dinoResult = await ImageAnalyzerService.analyzeImage(targetPath);
-      debugPrint("calling color style analyzer");
-      final colorResult = await ImageAnalyzerService.analyzeColorStyle(
-        targetPath,
-      );
+      // 2. Run All Analyses in Parallel
+      // NOTE: Ensure LayoutAnalyzerService has 'analyzeColorStyle' implemented.
+      final layoutFuture = LayoutAnalyzerService.analyzeLayout(targetPath);
+      final textureFuture = _textureService.analyze(targetPath);
+      // We assume analyzeColorStyle is added to LayoutAnalyzerService
+      final colorFuture = LayoutAnalyzerService.analyzeColorStyle(targetPath); 
 
-      debugPrint("Dino Result: $dinoResult");
-      debugPrint("Color Result: $colorResult");
+      final results = await Future.wait([
+        layoutFuture, 
+        textureFuture,
+        colorFuture
+      ]);
 
-      setState(() {
-        _isAnalyzing = false;
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+          
+          // 1. Handle Layout Result
+          final lResult = results[0] as Map<String, dynamic>?;
+          if (lResult != null && lResult['success'] == true) {
+            _layoutResult = lResult;
+          } else if (lResult != null) {
+             // Optional: handle layout specific error
+          }
 
-        // We create a temporary map to hold combined results
-        Map<String, dynamic> combinedResults = {};
-        bool hasSuccess = false;
+          // 2. Handle Texture Result
+          _textureResult = results[1] as List<Map<String, dynamic>>?;
 
-        // 1. Process Dino Result (Existing features)
-        if (dinoResult != null && dinoResult['success'] == true) {
-          combinedResults.addAll(
-            dinoResult,
-          ); // Adds 'top5', 'scores' etc to top level
-          hasSuccess = true;
-        } else if (dinoResult != null) {
-          debugPrint("Dino Error: ${dinoResult['error']}");
-        }
+          // 3. Handle Color Result
+          final cResult = results[2] as Map<String, dynamic>?;
+          if (cResult != null && cResult['success'] == true) {
+            _colorResult = cResult; 
+          }
 
-        // 2. Process Color Result (New feature)
-        if (colorResult != null && colorResult['success'] == true) {
-          combinedResults['colorStyle'] =
-              colorResult; // Store under a specific key
-          hasSuccess = true;
-        } else if (colorResult != null) {
-          debugPrint("Color Error: ${colorResult['error']}");
-        } else {
-          debugPrint("Debug: result is null. Service failed.");
-        }
-
-        // 3. Final Decision
-        if (hasSuccess) {
-          _analysisResult = combinedResults;
-        } else {
-          // If both failed, show generic or specific error
-          _errorMessage =
-              dinoResult?['error'] ??
-              colorResult?['error'] ??
-              'Failed to analyze image';
-        }
-      });
+          // Generic error if everything failed
+          if (_layoutResult == null && (_textureResult == null || _textureResult!.isEmpty) && _colorResult == null) {
+            _errorMessage = "Analysis failed to return results.";
+          }
+        });
+      }
     } catch (e) {
       setState(() {
         _isAnalyzing = false;
-        _errorMessage = 'Error analyzing image: $e';
+        _errorMessage = 'Analysis Error: $e';
       });
     }
   }
@@ -139,266 +124,111 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Image Composition Analyzer'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Composition & Texture')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Image Selection Section
-            if (_selectedImage == null)
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.image, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No image selected',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ClipRRect(
+            // Image Preview
+            Container(
+              height: 250,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
                 borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  _selectedImage!,
-                  height: 300,
-                  fit: BoxFit.cover,
-                ),
+                image: _selectedImage != null 
+                  ? DecorationImage(image: FileImage(_selectedImage!), fit: BoxFit.cover)
+                  : null
               ),
-
-            const SizedBox(height: 16),
-
-            // Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _pickImage,
-                    icon: const Icon(Icons.photo_library),
-                    label: const Text('Gallery'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _takePhoto,
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('Camera'),
-                  ),
-                ),
-              ],
+              child: _selectedImage == null 
+                ? const Center(child: Icon(Icons.image, size: 50, color: Colors.grey))
+                : null,
             ),
+            
+            const SizedBox(height: 16),
+            
+            Row(children: [
+              Expanded(child: OutlinedButton.icon(
+                onPressed: () => _pickImage(ImageSource.gallery), 
+                icon: const Icon(Icons.photo), label: const Text("Gallery"))
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: OutlinedButton.icon(
+                onPressed: () => _pickImage(ImageSource.camera), 
+                icon: const Icon(Icons.camera_alt), label: const Text("Camera"))
+              ),
+            ]),
 
             const SizedBox(height: 16),
 
-            // Analyze Button
             ElevatedButton(
-              onPressed:
-                  _selectedImage != null && !_isAnalyzing
-                      ? _analyzeImage
-                      : null,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child:
-                  _isAnalyzing
-                      ? const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          SizedBox(width: 12),
-                          Text('Analyzing...'),
-                        ],
-                      )
-                      : const Text('Analyze Image'),
+              onPressed: (_selectedImage != null && !_isAnalyzing) ? _runAnalysis : null,
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
+              child: _isAnalyzing 
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text("Analyze Image"),
             ),
 
-            // Error Message
-            if (_errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red[200]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline, color: Colors.red[700]),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(color: Colors.red[700]),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            // Analysis Results
-            if (_analysisResult != null) ...[
-              const SizedBox(height: 24),
-              const Divider(),
+            if (_errorMessage != null) ...[
               const SizedBox(height: 16),
-              Text(
-                'Analysis Results',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // --- 1. NEW COLOR STYLE CARD ---
-              if (_analysisResult!.containsKey('colorStyle'))
-                _buildColorStyleCard(_analysisResult!['colorStyle']),
-
-              // --- 2. EXISTING TOP 5 FEATURES ---
-              if (_analysisResult!['top5'] != null) ...[
-                const SizedBox(height: 16),
-                Text(
-                  '🏆 Top 5 Features',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...(_analysisResult!['top5'] as List).map((feature) {
-                  return _buildFeatureCard(
-                    feature['name'] as String,
-                    feature['score'] as double,
-                  );
-                }),
-                const SizedBox(height: 24),
-              ],
-
-              // --- 3. EXISTING ALL SCORES ---
-              if (_analysisResult!['scores'] != null) ...[
-                Text(
-                  'All Scores',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...(_analysisResult!['scores'] as Map<String, dynamic>).entries
-                    .map((entry) {
-                      return _buildScoreCard(entry.key, entry.value as double);
-                    }),
-              ],
+              Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
             ],
+
+            const SizedBox(height: 24),
+
+            // --- RESULTS ---
+            
+            // 1. Texture Results
+            if (_textureResult != null && _textureResult!.isNotEmpty) ...[
+              const Text("🧶 Texture & Material", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _textureResult!.map((t) => Chip(
+                  avatar: CircleAvatar(
+                    backgroundColor: Colors.blue.shade900,
+                    child: Text("${(t['score']*100).toInt()}", style: const TextStyle(fontSize: 10, color: Colors.white)),
+                  ),
+                  label: Text(t['name']),
+                  backgroundColor: Colors.blue.shade50,
+                )).toList(),
+              ),
+              const Divider(height: 30),
+            ],
+
+            // 2. Color Style Results (Restored from HEAD)
+            if (_colorResult != null) ...[
+               _buildColorStyleCard(_colorResult!),
+               const Divider(height: 30),
+            ],
+
+            // 3. Layout Results
+            if (_layoutResult != null) ...[
+              const Text("📐 Layout & Composition", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              ...(_layoutResult!['top5'] as List).map((item) => ListTile(
+                title: Text(item['name']),
+                trailing: Text("${(item['score']*100).toStringAsFixed(1)}%", style: const TextStyle(fontWeight: FontWeight.bold)),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              )),
+            ]
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFeatureCard(String name, double score) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            Text(
-              '${(score * 100).toStringAsFixed(1)}%',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: _getScoreColor(score),
-              ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 100,
-              child: LinearProgressIndicator(
-                value: score,
-                backgroundColor: Colors.grey[200],
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  _getScoreColor(score),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScoreCard(String name, double score) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(child: Text(name, style: const TextStyle(fontSize: 14))),
-            Text(
-              score.toStringAsFixed(3),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: _getScoreColor(score),
-              ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 80,
-              child: LinearProgressIndicator(
-                value: score,
-                backgroundColor: Colors.grey[200],
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  _getScoreColor(score),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --- NEW WIDGET: Displays the Color Style Analysis ---
+  // --- Helper Widget from HEAD for Color Style ---
   Widget _buildColorStyleCard(Map<String, dynamic> colorData) {
-    // Safely extract data with default values to prevent crashes
     final String topLabel = colorData['top_label']?.toString() ?? 'Unknown';
     final double topScore = (colorData['top_score'] as num?)?.toDouble() ?? 0.0;
     final List predictions = colorData['predictions'] as List? ?? [];
 
     return Card(
-      elevation: 4,
-      margin: const EdgeInsets.symmetric(vertical: 12),
+      elevation: 2, // Reduced elevation to match simple look
+      margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -406,8 +236,8 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            Row(
-              children: const [
+            const Row(
+              children: [
                 Icon(Icons.palette, color: Colors.deepPurple),
                 SizedBox(width: 8),
                 Text(
@@ -431,10 +261,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -442,10 +269,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                   ),
                   child: Text(
                     "${(topScore * 100).toStringAsFixed(1)}%",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
                   ),
                 ),
               ],
@@ -466,12 +290,9 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
             // Runner-up predictions
             if (predictions.length > 1) ...[
               const SizedBox(height: 16),
-              const Text(
-                "Other possibilities:",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
+              const Text("Other possibilities:", style: TextStyle(fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 8),
-              ...predictions.skip(1).map((pred) {
+              ...predictions.skip(1).take(2).map((pred) { // Show top 2 alternatives
                 final pLabel = pred['label'].toString();
                 final pScore = (pred['score'] as num).toDouble();
                 return Padding(
@@ -480,10 +301,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                     children: [
                       SizedBox(
                         width: 80,
-                        child: Text(
-                          pLabel,
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
+                        child: Text(pLabel, style: const TextStyle(fontWeight: FontWeight.w500)),
                       ),
                       Expanded(
                         child: LinearProgressIndicator(
@@ -493,27 +311,15 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        "${(pScore * 100).toStringAsFixed(0)}%",
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
+                      Text("${(pScore * 100).toStringAsFixed(0)}%", style: const TextStyle(fontSize: 12, color: Colors.grey)),
                     ],
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ],
         ),
       ),
     );
-  }
-
-  Color _getScoreColor(double score) {
-    if (score >= 0.7) return Colors.green;
-    if (score >= 0.4) return Colors.orange;
-    return Colors.red;
   }
 }

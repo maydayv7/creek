@@ -50,7 +50,7 @@ object ImageAnalyzer {
     fun analyzeImage(imagePath: String): String? {
         return try {
             val py = Python.getInstance()
-            val module = py.getModule("analyzer")
+            val module = py.getModule("analyze_layout")
             val result = module.callAttr("analyze_single_image", imagePath)
             result.toString()
         } catch (e: Exception) {
@@ -71,5 +71,3 @@ object ImageAnalyzer {
         }
     }
 }
-
-
