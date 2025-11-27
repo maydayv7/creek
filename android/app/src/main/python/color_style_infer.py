@@ -157,14 +157,14 @@ def analyze_color_style(image_path):
     try:
         model_data = _load_model_if_needed()
         if model_data is None:
-            return json.dumps({"success": False, "error": "Model failed to load"})
+            return json.dumps({"success": False, "scores": {}, "error": "Model failed to load"})
 
         if not os.path.exists(image_path):
-            return json.dumps({"success": False, "error": f"Image not found at: {image_path}"})
+            return json.dumps({"success": False, "scores": {}, "error": f"Image not found at: {image_path}"})
 
         img = cv2.imread(image_path)
         if img is None:
-            return json.dumps({"success": False, "error": "CV2 could not read image"})
+            return json.dumps({"success": False, "scores": {}, "error": "CV2 could not read image"})
 
         # Extract Features
         raw_features = {
@@ -188,11 +188,11 @@ def analyze_color_style(image_path):
         sorted_features = sorted(results.items(), key=lambda x: x[1], reverse=True)
         response = {
             "success": True,
-            "predictions": {k: float(v) for k, v in results.items()},
-            "best": {sorted_features[0][0]: float(sorted_features[0][1])},
+            "scores": {k: float(v) for k, v in sorted_features}, #[:3]
+            "error": None,
         }
 
         return json.dumps(response, cls=NumpyEncoder)
 
     except Exception as e:
-        return json.dumps({"success": False, "error": f"Python Exception: {str(e)} | {traceback.format_exc()}"})
+        return json.dumps({"success": False, "scores": {}, "error": f"Python Exception: {str(e)} | {traceback.format_exc()}"})

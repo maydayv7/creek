@@ -227,24 +227,15 @@ def analyze_single_image(img_path):
             'Diagonals & Triangles': diagonals_triangles_score(lines, contours, centroid, img.shape)
         }
 
-        # 5. Sort and get top 5
-        sorted_features = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        top5 = {}
-        for k, v in sorted_features[:5]:
-            top5[k] = float(v)
-        
-        # 6. Return JSON result
-        result = {
+        return json.dumps({
             "success": True,
-            "predictions": {k: float(v) for k, v in scores.items()},
-            "best": top5,
-            "image_name": os.path.basename(img_path)
-        }
-        
-        return json.dumps(result)
+            "scores": scores,
+            "error": None
+        })
         
     except Exception as e:
         return json.dumps({
-            "error": str(e),
-            "success": False
+            "success": False,
+            "scores": {},
+            "error": str(e)
         })
