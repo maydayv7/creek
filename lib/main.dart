@@ -2,9 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:adobe/services/theme_service.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-// import 'package:adobe/ui/pages/home_page.dart';
+import 'package:adobe/ui/pages/home_page.dart';
 // import 'package:adobe/ui/pages/share_handler_page.dart';
-import 'package:adobe/ui/pages/image_analysis_page.dart'; // For Testing
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,9 +22,9 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   late StreamSubscription _intentSub;
   final _navigatorKey = GlobalKey<NavigatorState>();
-  
+
   // Controls the loading screen
-  bool _isReady = false; 
+  bool _isReady = false;
 
   @override
   void initState() {
@@ -56,7 +55,8 @@ class _MyAppState extends State<MyApp> {
       );
 
       // Check if the app was launched via a share action (Cold Start)
-      final initialMedia = await ReceiveSharingIntent.instance.getInitialMedia();
+      final initialMedia =
+          await ReceiveSharingIntent.instance.getInitialMedia();
       if (initialMedia.isNotEmpty) {
         _navigateToSharePage(initialMedia.first.path);
         ReceiveSharingIntent.instance.reset();
@@ -81,7 +81,9 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
-    try { _intentSub.cancel(); } catch (_) {}
+    try {
+      _intentSub.cancel();
+    } catch (_) {}
     themeService.removeListener(_updateTheme);
     super.dispose();
   }
@@ -115,16 +117,16 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
-      
+
       // Connect the ThemeService mode (Light / Dark / System)
-      themeMode: themeService.mode, 
+      themeMode: themeService.mode,
 
       // Light Theme Definition
       theme: ThemeData(
         fontFamily: 'GeneralSans',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue, 
-          brightness: Brightness.light
+          seedColor: Colors.blue,
+          brightness: Brightness.light,
         ),
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.white,
@@ -139,8 +141,8 @@ class _MyAppState extends State<MyApp> {
       darkTheme: ThemeData(
         fontFamily: 'GeneralSans',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue, 
-          brightness: Brightness.dark
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
         ),
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.grey[900],
@@ -151,8 +153,7 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
 
-      // home: const HomePage(),
-      home: const ImageAnalysisPage(),
+      home: const HomePage(),
     );
   }
 }
