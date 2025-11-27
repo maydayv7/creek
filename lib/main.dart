@@ -1,15 +1,17 @@
 import 'dart:async';
+import 'dart:io'; // Required for File handling
 import 'package:flutter/material.dart';
-import 'package:adobe/services/theme_service.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-// import 'package:adobe/ui/pages/home_page.dart';
-// import 'package:adobe/ui/pages/share_handler_page.dart';
-import 'package:adobe/ui/pages/image_analysis_page.dart'; // For Testing
+
+// Services
+import 'package:adobe/services/theme_service.dart';
+
+// Pages
+import 'package:adobe/ui/pages/image_analysis_page.dart'; // Current Home/Test Page
+import 'package:adobe/ui/pages/share_to_moodboard_page.dart'; // Share Page
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Removed await calls here to prevent startup freeze.
-  // Initialization logic is now handled inside MyApp.
   runApp(const MyApp());
 }
 
@@ -22,10 +24,10 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late StreamSubscription _intentSub;
-  final _navigatorKey = GlobalKey<NavigatorState>();
-  
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
   // Controls the loading screen
-  bool _isReady = false; 
+  bool _isReady = false;
 
   @override
   void initState() {
@@ -34,7 +36,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initApp() async {
-    // 1. Load Theme (Wrapped in try-catch to be safe)
+    // 1. Load Theme
     try {
       await themeService.loadTheme();
     } catch (e) {
@@ -47,7 +49,7 @@ class _MyAppState extends State<MyApp> {
       _intentSub = ReceiveSharingIntent.instance.getMediaStream().listen(
         (List<SharedMediaFile> value) {
           if (value.isNotEmpty) {
-            _navigateToSharePage(value.first.path);
+            _showShareOptions(value);
           }
         },
         onError: (err) {
@@ -56,9 +58,11 @@ class _MyAppState extends State<MyApp> {
       );
 
       // Check if the app was launched via a share action (Cold Start)
-      final initialMedia = await ReceiveSharingIntent.instance.getInitialMedia();
+      final initialMedia =
+          await ReceiveSharingIntent.instance.getInitialMedia();
       if (initialMedia.isNotEmpty) {
-        _navigateToSharePage(initialMedia.first.path);
+        _showShareOptions(initialMedia);
+        // Important: Reset immediately to avoid re-triggering on reload
         ReceiveSharingIntent.instance.reset();
       }
     } catch (e) {
@@ -79,29 +83,107 @@ class _MyAppState extends State<MyApp> {
     if (mounted) setState(() {});
   }
 
+  // --- SHARE HANDLING LOGIC ---
+
+  void _showShareOptions(List<SharedMediaFile> files) {
+    // We use the navigator key to get context because 'context' might not be valid in async callbacks
+    final context = _navigatorKey.currentState?.overlay?.context;
+
+    // Safety check: ensure we have context and a file
+    if (context == null || files.isEmpty) return;
+
+    final File imageFile = File(files.first.path);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
+                child: Text(
+                  "Save Image To...",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+
+              // Option 1: Moodboard
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.dashboard_customize,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+                title: const Text("Moodboard"),
+                subtitle: const Text("Add to references & analysis"),
+                onTap: () {
+                  Navigator.pop(context); // Close Bottom Sheet
+
+                  // Navigate to ShareToMoodboardPage
+                  _navigatorKey.currentState?.push(
+                    MaterialPageRoute(
+                      builder:
+                          (_) => ShareToMoodboardPage(imageFile: imageFile),
+                    ),
+                  );
+                },
+              ),
+
+              // Option 2: Project Files
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orangeAccent.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.folder_copy,
+                    color: Colors.orangeAccent,
+                  ),
+                ),
+                title: const Text("Project Files"),
+                subtitle: const Text("Add to canvas assets"),
+                onTap: () {
+                  Navigator.pop(context); // Close Bottom Sheet
+
+                  // Feature Placeholder
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Files feature coming soon!")),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
-    try { _intentSub.cancel(); } catch (_) {}
+    try {
+      _intentSub.cancel();
+    } catch (_) {}
     themeService.removeListener(_updateTheme);
     super.dispose();
   }
 
-  void _navigateToSharePage(String sharedText) {
-    // Wait for the frame to render before pushing the route
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      /*
-      _navigatorKey.currentState?.push(
-        MaterialPageRoute(
-          builder: (_) => ShareHandlerPage(sharedText: sharedText),
-        ),
-      );
-      */
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Show a loading spinner until essential services are initialized
+    // Loading Screen
     if (!_isReady) {
       return const MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -113,18 +195,18 @@ class _MyAppState extends State<MyApp> {
     }
 
     return MaterialApp(
-      navigatorKey: _navigatorKey,
+      navigatorKey:
+          _navigatorKey, // Critical for global navigation from Share Intent
       debugShowCheckedModeBanner: false,
-      
-      // Connect the ThemeService mode (Light / Dark / System)
-      themeMode: themeService.mode, 
 
-      // Light Theme Definition
+      // Theme Configuration
+      themeMode: themeService.mode,
+
       theme: ThemeData(
         fontFamily: 'GeneralSans',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue, 
-          brightness: Brightness.light
+          seedColor: Colors.blue,
+          brightness: Brightness.light,
         ),
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.white,
@@ -135,12 +217,11 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
 
-      // Dark Theme Definition
       darkTheme: ThemeData(
         fontFamily: 'GeneralSans',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue, 
-          brightness: Brightness.dark
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
         ),
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.grey[900],
@@ -151,7 +232,7 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
 
-      // home: const HomePage(),
+      // Set Home Page
       home: const ImageAnalysisPage(),
     );
   }
