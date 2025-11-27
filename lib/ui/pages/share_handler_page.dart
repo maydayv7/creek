@@ -1,17 +1,11 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:uuid/uuid.dart';
 import 'package:adobe/services/download_service.dart';
 import 'package:adobe/services/instagram_download_service.dart';
-import 'package:adobe/data/repos/board_repo.dart';
-import 'package:adobe/data/repos/board_image_repo.dart';
-import 'package:adobe/data/repos/image_repo.dart';
-import 'package:adobe/services/image_analyzer_service.dart'; // Master Runner
+import 'package:adobe/ui/pages/share_to_moodboard_page.dart';
 
 class ShareHandlerPage extends StatefulWidget {
-  final String sharedText; 
+  final String sharedText;
 
   const ShareHandlerPage({super.key, required this.sharedText});
 
@@ -20,200 +14,130 @@ class ShareHandlerPage extends StatefulWidget {
 }
 
 class _ShareHandlerPageState extends State<ShareHandlerPage> {
+  // Services
   final _downloadService = DownloadService();
   final _instagramService = InstagramDownloadService();
-  final _boardRepo = BoardRepository();
-  final _boardImageRepo = BoardImageRepository();
-  final _imageRepo = ImageRepository();
-  final _uuid = const Uuid();
 
-  List<String> _downloadedImageIds = []; 
-  bool _isDownloading = true;
+  // State
+  bool _isProcessing = true;
   bool _hasError = false;
   String? _errorMessage;
-  List<Map<String, dynamic>> _boards = [];
 
   @override
   void initState() {
     super.initState();
-    _startProcess();
+    _processSharedContent();
   }
 
-  void _startProcess() async {
-    _boards = await _boardRepo.getBoards();
-    final sharedPath = widget.sharedText.trim();
+  Future<void> _processSharedContent() async {
+    final sharedContent = widget.sharedText.trim();
+    File? finalFile;
 
-    if (File(sharedPath).existsSync()) {
-      try {
-        final id = await _handleDirectImage(sharedPath);
-        if (mounted) {
-          setState(() {
-            if (id != null) _downloadedImageIds = [id];
-            _isDownloading = false;
-            if (id == null) {
-              _hasError = true;
-              _errorMessage = "Failed to save image";
-            }
-          });
-        }
-      } catch (e) {
-        if (mounted) setState(() { _hasError = true; _errorMessage = "$e"; _isDownloading = false; });
+    try {
+      // CASE A: It's a Local File Path
+      if (await File(sharedContent).exists()) {
+        finalFile = File(sharedContent);
       }
-    } else {
-      // URL Handling
-      final urlRegExp = RegExp(r'(https?://\S+)');
-      final match = urlRegExp.firstMatch(sharedPath);
+      // CASE B: It's a URL
+      else {
+        final urlRegExp = RegExp(r'(https?://\S+)');
+        final match = urlRegExp.firstMatch(sharedContent);
 
-      if (match != null) {
-        final url = match.group(0)!;
-        try {
+        if (match != null) {
+          final url = match.group(0)!;
+
           if (url.contains('instagram.com')) {
-            final ids = await _instagramService.downloadInstagramImage(url);
-            if (mounted) {
-              setState(() {
-               _downloadedImageIds = ids ?? [];
-               _isDownloading = false;
-               if (_downloadedImageIds.isEmpty) { _hasError = true; _errorMessage = "Insta download failed"; }
-            });
+            // Instagram Logic
+            // Assuming the service returns a List of file paths
+            final downloadedPaths = await _instagramService
+                .downloadInstagramImage(url);
+
+            if (downloadedPaths != null && downloadedPaths.isNotEmpty) {
+              finalFile = File(downloadedPaths.first);
             }
           } else {
-            final id = await _downloadService.downloadAndSaveImage(url);
-            if (mounted) {
-              setState(() {
-               if (id != null) _downloadedImageIds = [id];
-               _isDownloading = false;
-               if (id == null) { _hasError = true; _errorMessage = "Download failed"; }
-            });
+            // Generic Download Logic
+            // Ensure this service returns the String path of the saved file
+            final savedPath = await _downloadService.downloadAndSaveImage(url);
+
+            if (savedPath != null) {
+              finalFile = File(savedPath);
             }
           }
-        } catch (e) {
-          if (mounted) setState(() { _hasError = true; _errorMessage = "$e"; _isDownloading = false; });
+        } else {
+          throw Exception("Invalid content: Not a valid file path or URL.");
+        }
+      }
+
+      // SUCCESS: Navigate to ShareToMoodboardPage
+      if (finalFile != null && await finalFile.exists()) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ShareToMoodboardPage(imageFile: finalFile!),
+            ),
+          );
         }
       } else {
-        if (mounted) setState(() { _hasError = true; _errorMessage = "Invalid URL"; _isDownloading = false; });
-      }
-    }
-  }
-
-  Future<String?> _handleDirectImage(String filePath) async {
-    final file = File(filePath);
-    if (!await file.exists()) return null;
-
-    final dir = await getApplicationDocumentsDirectory();
-    final imagesDir = Directory('${dir.path}/images');
-    if (!await imagesDir.exists()) await imagesDir.create(recursive: true);
-
-    final extension = filePath.split('.').last;
-    final imageId = _uuid.v4();
-    final targetPath = '${imagesDir.path}/$imageId.$extension';
-
-    await file.copy(targetPath);
-    await _imageRepo.insertImage(imageId, targetPath);
-    return imageId;
-  }
-
-  Future<void> _saveToBoard(int boardId) async {
-    if (_downloadedImageIds.isEmpty) return;
-
-    for (final id in _downloadedImageIds) {
-      await _boardImageRepo.saveToBoard(boardId, id);
-    }
-
-    final images = await _imageRepo.getAllImages();
-    
-    for (final id in _downloadedImageIds) {
-      final imageData = images.firstWhere((img) => img['id'] == id, orElse: () => <String, dynamic>{});
-      if (imageData.isNotEmpty && imageData['filePath'] != null) {
-        // Trigger Background Analysis
-        _analyzeImageInBackground(id, imageData['filePath'] as String);
-      }
-    }
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Saved ${_downloadedImageIds.length} image(s)! Analysis running.")),
-    );
-    Navigator.popUntil(context, (route) => route.isFirst);
-  }
-
-  Future<void> _analyzeImageInBackground(String imageId, String imagePath) async {
-    try {
-      // Changed to use Master Runner
-      final result = await ImageAnalyzerService.analyzeFullSuite(imagePath);
-      if (result['success'] == true) {
-        await _imageRepo.updateImageAnalysis(imageId, json.encode(result));
+        throw Exception("Could not retrieve image file.");
       }
     } catch (e) {
-      debugPrint('Background Analysis Error: $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = e.toString();
+          _isProcessing = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Save to Board")),
-      body: _buildBody(),
-    );
-  }
-
-  Widget _buildBody() {
-    if (_hasError) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error, color: Colors.red, size: 48),
-            Text(_errorMessage ?? "Error"),
-            ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("Back"))
-          ],
-        ),
-      );
-    }
-    if (_isDownloading) return const Center(child: CircularProgressIndicator());
-
-    return ListView.builder(
-      itemCount: _boards.length + 2, 
-      itemBuilder: (context, index) {
-        if (index == 0) return const Padding(padding: EdgeInsets.all(16), child: Text("Select a Board"));
-        if (index == 1) {
-          return ListTile(
-          leading: const Icon(Icons.add_box, color: Colors.red),
-          title: const Text("Create New Board"),
-          onTap: _showCreateBoardDialog,
-        );
-        }
-        
-        final board = _boards[index - 2];
-        return ListTile(
-          leading: const Icon(Icons.dashboard),
-          title: Text(board['name']),
-          onTap: () => _saveToBoard(board['id']),
-        );
-      },
-    );
-  }
-
-  void _showCreateBoardDialog() {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text("New Board"),
-        content: TextField(controller: controller, decoration: const InputDecoration(hintText: "Name")),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () async {
-              if (controller.text.isNotEmpty) {
-                final newId = await _boardRepo.createBoard(controller.text);
-                if (!c.mounted) return;
-                Navigator.pop(c);
-                _saveToBoard(newId);
-              }
-            },
-            child: const Text("Create"),
-          ),
-        ],
+      backgroundColor: Colors.white,
+      appBar: AppBar(title: const Text("Processing...")),
+      body: Center(
+        child:
+            _hasError
+                ? Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.red,
+                        size: 50,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Error processing media",
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _errorMessage ?? "Unknown Error",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Close"),
+                      ),
+                    ],
+                  ),
+                )
+                : const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 20),
+                    Text("Analyzing & Preparing Image..."),
+                  ],
+                ),
       ),
     );
   }

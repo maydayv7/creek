@@ -18,6 +18,23 @@ class ProjectRepo {
     return res.map((e) => ProjectModel.fromMap(e)).toList();
   }
 
+  Future<List<ProjectModel>> getRecentProjectsAndEvents() async {
+    final db = await AppDatabase.db;
+    final res = await db.query(
+      'projects',
+      // No 'where parent_id is null' check here, we want everything
+      orderBy: 'last_accessed_at DESC',
+      limit: 10,
+    );
+    return res.map((e) => ProjectModel.fromMap(e)).toList();
+  }
+
+  Future<List<ProjectModel>> getAllProjectsAndEvents() async {
+    final db = await AppDatabase.db;
+    final res = await db.query('projects', orderBy: 'title ASC');
+    return res.map((e) => ProjectModel.fromMap(e)).toList();
+  }
+
   Future<List<ProjectModel>> getAllProjects() async {
     final db = await AppDatabase.db;
     final res = await db.query(
@@ -37,6 +54,13 @@ class ProjectRepo {
       orderBy: 'created_at DESC',
     );
     return res.map((e) => ProjectModel.fromMap(e)).toList();
+  }
+
+  Future<ProjectModel?> getProjectById(int id) async {
+    final db = await AppDatabase.db;
+    final res = await db.query('projects', where: 'id = ?', whereArgs: [id]);
+    if (res.isNotEmpty) return ProjectModel.fromMap(res.first);
+    return null;
   }
 
   Future<void> updateProject(
