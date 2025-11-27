@@ -1,4 +1,5 @@
 # Miscellaneous
+~*
 *.class
 *.log
 *.pyc
@@ -12,13 +13,13 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# IntelliJ
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# Flutter/Dart/Pub related
+# Flutter/Dart/Pub
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
@@ -29,16 +30,17 @@ migrate_working_dir/
 /build/
 .gradle
 
-# Symbolication related
+# Symbolication
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio artifacts
+# Android Studio
 /android/app/debug
 /android/app/profile
 /android/app/release
-# Python virtual environment
+
+# Python
 python_env/
-assets/clip_vitb32_image.onnx
+
+# AI Models
+assets/*.onnx*

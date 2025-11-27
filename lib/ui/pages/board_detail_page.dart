@@ -1,5 +1,3 @@
-// lib/ui/pages/board_detail_page.dart
-
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -10,11 +8,14 @@ import 'package:adobe/data/models/board_model.dart';
 import 'package:adobe/data/models/image_model.dart';
 import 'package:adobe/data/repos/board_image_repo.dart';
 import 'package:adobe/data/repos/image_repo.dart';
-import 'package:adobe/services/image_analyzer_service.dart';
+import 'package:adobe/data/repos/board_repo.dart';
+import 'package:adobe/services/image_service.dart';
+import 'package:adobe/services/theme_service.dart';
+import 'package:adobe/services/image_analyzer_service.dart'; // Master Service
+import '../widgets/analysis_dialog.dart'; // Dialog Widget
 
 class BoardDetailPage extends StatefulWidget {
   final Board board;
-
   const BoardDetailPage({super.key, required this.board});
 
   @override
@@ -24,8 +25,11 @@ class BoardDetailPage extends StatefulWidget {
 class _BoardDetailPageState extends State<BoardDetailPage> {
   final _boardImageRepo = BoardImageRepository();
   final _imageRepo = ImageRepository();
+  final _boardRepo = BoardRepository(); 
+  final _imageService = ImageService(); 
   final _imagePicker = ImagePicker();
   final _uuid = const Uuid();
+  
   late Future<List<ImageModel>> _imagesFuture;
 
   @override
@@ -41,17 +45,12 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
 
   Future<void> _pickImageFromGallery() async {
     try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-      );
+      final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
       if (image == null) return;
 
-      // Copy to images directory
       final dir = await getApplicationDocumentsDirectory();
       final imagesDir = Directory('${dir.path}/images');
-      if (!await imagesDir.exists()) {
-        await imagesDir.create(recursive: true);
-      }
+      if (!await imagesDir.exists()) await imagesDir.create(recursive: true);
 
       final extension = image.path.split('.').last;
       final imageId = _uuid.v4();
@@ -64,155 +63,79 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
       // Trigger analysis
       _analyzeImage(imageId, targetPath);
 
-      if (mounted) {
-        setState(() {
-          _imagesFuture = _fetchImages();
-        });
-      }
+      if (mounted) setState(() { _imagesFuture = _fetchImages(); });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   Future<void> _analyzeImage(String imageId, String imagePath) async {
     try {
-      final result = await ImageAnalyzerService.analyzeImage(imagePath);
-      if (result != null && result['success'] == true) {
+      // Changed to use Master Runner
+      final result = await ImageAnalyzerService.analyzeFullSuite(imagePath);
+      if (result['success'] == true) {
         await _imageRepo.updateImageAnalysis(imageId, json.encode(result));
-        if (mounted) {
-          setState(() {
-            _imagesFuture = _fetchImages();
-          });
-        }
+        if (mounted) setState(() { _imagesFuture = _fetchImages(); });
       }
     } catch (e) {
-      debugPrint('Error analyzing image: $e');
+      debugPrint('Analysis Error: $e');
     }
   }
 
   void _showAnalysisDialog(ImageModel image) {
-    if (image.analysisData == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Analysis not available for this image')),
-      );
-      return;
-    }
+    showDialog(
+      context: context,
+      builder: (context) => AnalysisDialog(image: image),
+    );
+  }
 
-    try {
-      final analysis = json.decode(image.analysisData!);
-      if (analysis['success'] != true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Analysis failed for this image')),
-        );
-        return;
-      }
-
-      final scores = analysis['scores'] as Map<String, dynamic>;
-      final top5 = analysis['top5'] as List;
-
-      showDialog(
-        context: context,
-        builder:
-            (context) => Dialog(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                constraints: const BoxConstraints(
-                  maxWidth: 400,
-                  maxHeight: 600,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Image Analysis',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Top 5 Features:',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: top5.length,
-                        itemBuilder: (context, index) {
-                          final item = top5[index];
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(item['name']),
-                                Text(
-                                  '${(item['score'] * 100).toStringAsFixed(1)}%',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'All Scores:',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: scores.length,
-                        itemBuilder: (context, index) {
-                          final entry = scores.entries.elementAt(index);
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(entry.key),
-                                Text(
-                                  '${(entry.value * 100).toStringAsFixed(1)}%',
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ],
-                ),
-              ),
+  void _showImageOptionsDialog(ImageModel img) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.remove_circle_outline, color: Colors.orange),
+              title: const Text("Remove from this Board"),
+              onTap: () async {
+                await _imageService.removeImageFromSpecificBoard(img.id, widget.board.id);
+                if (context.mounted) Navigator.pop(context);
+                setState(() { _imagesFuture = _fetchImages(); });
+              },
             ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error displaying analysis: $e')));
-    }
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text("Delete Completely"),
+              onTap: () { Navigator.pop(context); _confirmDeleteForever(img.id); },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteForever(String imageId) {
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text("Delete Permanently?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text("Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              await _imageService.deleteImagePermanently(imageId);
+              if (c.mounted) Navigator.pop(c);
+              setState(() { _imagesFuture = _fetchImages(); });
+            },
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -220,36 +143,25 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.board.name),
+        leading: IconButton(
+          icon: Icon(themeService.mode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
+          onPressed: () { themeService.toggleTheme(); },
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.photo_library),
-            onPressed: _pickImageFromGallery,
-            tooltip: 'Add from Gallery',
-          ),
+          IconButton(icon: const Icon(Icons.photo_library), onPressed: _pickImageFromGallery),
         ],
       ),
       body: FutureBuilder<List<ImageModel>>(
         future: _imagesFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Text("No images saved to this board yet."),
-            );
-          }
-
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final images = snapshot.data!;
+          if (images.isEmpty) return const Center(child: Text("No images."));
 
           return GridView.builder(
             padding: const EdgeInsets.all(8),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 0.8, // Taller for images
+              crossAxisCount: 2, crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 0.8,
             ),
             itemCount: images.length,
             itemBuilder: (context, index) {
@@ -258,51 +170,20 @@ class _BoardDetailPageState extends State<BoardDetailPage> {
 
               return GestureDetector(
                 onTap: () => _showAnalysisDialog(img),
+                onLongPress: () => _showImageOptionsDialog(img),
                 child: Stack(
+                  fit: StackFit.expand,
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child:
-                          file.existsSync()
-                              ? Image.file(
-                                file,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[300],
-                                    alignment: Alignment.center,
-                                    child: const Icon(
-                                      Icons.broken_image,
-                                      color: Colors.grey,
-                                    ),
-                                  );
-                                },
-                              )
-                              : Container(
-                                color: Colors.grey[300],
-                                child: const Icon(
-                                  Icons.error,
-                                  color: Colors.red,
-                                ),
-                              ),
+                      child: Image.file(file, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.error)),
                     ),
                     if (img.analysisData != null)
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.8),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.analytics,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ),
+                      Positioned(top: 8, right: 8, child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                        child: const Icon(Icons.analytics, color: Colors.white, size: 16),
+                      )),
                   ],
                 ),
               );

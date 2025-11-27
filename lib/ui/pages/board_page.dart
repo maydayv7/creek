@@ -1,5 +1,3 @@
-// lib/ui/pages/board_page.dart
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 

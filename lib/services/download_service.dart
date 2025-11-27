@@ -54,13 +54,13 @@ class DownloadService {
       }
 
       var contentType = response.headers['content-type'];
-      debugPrint("🔹 Type: $contentType");
+      debugPrint("Type: $contentType");
 
       
       // CASE A → HTML webpage (NOT a direct image)
       
       if (contentType != null && !contentType.startsWith('image/')) {
-        debugPrint("📄 It's a website. Extracting real image...");
+        debugPrint("It's a website. Extracting real image...");
         final document = parser.parse(response.body);
 
        
@@ -76,8 +76,8 @@ class DownloadService {
 
           // Force highest resolution
           cdn = _unescapeUrl(cdn);
-          cdn = cdn.split("=").first + "=s0";
-          debugPrint("📸 Google Photos Image Found: $cdn");
+          cdn = "${cdn.split("=").first}=s0";
+          debugPrint("Google Photos Image Found: $cdn");
 
           return downloadAndSaveImage(cdn);
         }
@@ -110,7 +110,7 @@ class DownloadService {
         if (viewerMatch != null) {
           String imgUrl = viewerMatch.group(1)!;
           imgUrl = _unescapeUrl(imgUrl);
-          debugPrint("🖼️ Google Viewer Direct Image: $imgUrl");
+          debugPrint("Google Viewer Direct Image: $imgUrl");
 
           return downloadAndSaveImage(imgUrl);
         }
@@ -123,13 +123,13 @@ class DownloadService {
             String? ogImg = meta.attributes['content'];
             if (ogImg != null) {
               ogImg = _unescapeUrl(ogImg);
-              debugPrint("🎯 OG Image Found: $ogImg");
+              debugPrint("OG Image Found: $ogImg");
               return downloadAndSaveImage(ogImg);
             }
           }
         }
 
-        debugPrint("❌ No valid image found inside this page.");
+        debugPrint("No valid image found inside this page.");
         return null;
       }
 
@@ -162,10 +162,10 @@ class DownloadService {
 
       await _repo.insertImage(imageId, filePath);
 
-      debugPrint("✅ Saved Successfully! → $filePath");
+      debugPrint("Saved Successfully! → $filePath");
       return imageId;
     } catch (e) {
-      debugPrint("❌ Error: $e");
+      debugPrint("Error: $e");
       return null;
     }
   }

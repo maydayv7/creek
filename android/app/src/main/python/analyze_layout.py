@@ -246,5 +246,3 @@ def analyze_single_image(img_path):
             "error": str(e),
             "success": False
         })
-
-

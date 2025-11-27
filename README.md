@@ -1,56 +1,49 @@
 # adobe
 
-A Flutter project with Python image analysis using Chaquopy.
+A Flutter project with AI-based image analysis
 
 ## Prerequisites
 
 - Flutter SDK
-- Python 3.11 (for build-time)
+- Python 3.8
+- Kotlin + Gradle
+- JDK
 - Android SDK
 
 ## Setup
 
-### 1. Install Python 3.11
+### 1. Setup Python
+
+#### A) Install Python 3.8
 
 **macOS:**
 
 ```bash
-brew install python@3.11
+brew install python@3.8
 ```
 
 **Linux:**
 
 ```bash
-sudo apt-get install python3.11 python3.11-venv
+sudo apt-get install python3.8 python3.8-venv
 ```
 
 **Windows:**
 Download from [python.org](https://www.python.org/downloads/)
 
-### 2. Set up Python Virtual Environment
-
-Run the setup script to create a Python virtual environment in the repository:
+#### B) Set up Virtual Environment
 
 ```bash
-./setup_python_env.sh
+python -m venv python_env
 ```
 
-This creates a `python_env` directory with Python 3.11, which will be used by the build system. This ensures all developers use the same Python version.
+### 3. AI Models
 
-### 3. Build the APK
+Download the models from [here](https://mega.nz/folder/WghwgRYA#byC4igRSImx0LRd9KW40hw) and place them under `assets`
+
+### 4. Build the APK
 
 ```bash
+flutter clean
 flutter build apk --release
 ```
-
-## Project Structure
-
-- `android/app/src/main/python/` - Python code (image analysis)
-- `python_env/` - Python virtual environment (created by setup script)
-- `lib/` - Flutter/Dart code
-
-## Notes
-
-- The Python runtime version (embedded in the app) is **3.8** (configured in `android/app/build.gradle.kts`)
-- The build-time Python version is **3.11** (from the virtual environment)
-- The virtual environment is used only during build, not at runtime

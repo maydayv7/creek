@@ -28,8 +28,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
     }
 
     defaultConfig {
@@ -37,7 +39,7 @@ android {
         applicationId = "com.example.adobe"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -60,25 +62,16 @@ android {
 chaquopy {
     defaultConfig {
         version = "3.8"
-        
-        // Detect OS
-        val os = System.getProperty("os.name").lowercase()
-        val venvPath = file("../../python_env")
-
-        // Choose correct python path
-        val pythonExe = if (os.contains("win")) {
-            File(venvPath, "Scripts/python.exe").absolutePath
-        } else {
-            File(venvPath, "bin/python").absolutePath
-        }
-
-        buildPython(pythonExe)
-
+        val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+        val pythonFile = if (isWindows) file("../../python_env/Scripts/python.exe") else file("../../python_env/bin/python")
+        buildPython(pythonFile.absolutePath)
         pip {
             install("pillow")
             install("numpy")
-            install("opencv-python-headless")
+            install("opencv-contrib-python-headless")
             install("instaloader")
+            install("scikit-learn")
+            install("joblib")
         }
     }
 }

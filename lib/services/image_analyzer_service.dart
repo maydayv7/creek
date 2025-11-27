@@ -1,82 +1,53 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+
+// Import the segregated services
+import 'layout_analyzer_service.dart';
+import 'color_analyzer_service.dart';
+import 'texture_analyzer_service.dart';
+import 'embedding_analyzer_service.dart';
 import 'emotional_embeddings_service.dart'; 
 import 'lighting_service.dart';
 
 class ImageAnalyzerService {
-  // Channel for Python/Chaquopy (OpenCV)
-  static const MethodChannel _channel = MethodChannel(
-    'com.example.adobe/image_analyzer',
-  );
+  /// Runs all 4 analysis tools in parallel and returns a combined JSON Map.
+  static Future<Map<String, dynamic>> analyzeFullSuite(String imagePath) async {
+    // 1. Instantiate services
+    final layoutService = LayoutAnalyzerService();
+    final colorService = ColorAnalyzerService();
+    final textureService = TextureAnalyzerService();
+    // EmbeddingService is static
 
-  static Future<Map<String, dynamic>?> analyzeImage(String imagePath) async {
     try {
-      // 1. Run BOTH analyzers in parallel (Faster performance)
+      // 2. Run in parallel for performance
       final results = await Future.wait([
-        // Task A: Python OpenCV (Composition, Colors, Geometry)
-        _channel.invokeMethod('analyzeImage', {'imagePath': imagePath}),
-
-        // Task C: Emotion detection
-        EmotionalEmbeddingsService.analyzeImage(imagePath),
-
-        // Task D: Lighting style detection
-        LightingEmbeddingsService.analyzeImage(imagePath),
-
-
+        layoutService.analyze(imagePath),           // Index 0: Layout
+        colorService.analyze(imagePath),            // Index 1: Color
+        textureService.analyze(imagePath),          // Index 2: Texture
+        EmbeddingAnalyzerService.analyze(imagePath) // Index 3: Embeddings
       ]);
 
-      // 2. Extract Results
-      final String? pyResultJson = results[0] as String?;
-      final Map<String, dynamic>? emotionMap =
-          results[1] as Map<String, dynamic>?;
-      final Map<String, dynamic>? lightingMap =
-          results[2] as Map<String, dynamic>?;
-      // 3. Parse Python Result (This is the Base)
-      Map<String, dynamic> finalResult = {};
+      // 3. Construct Unified Result
+      final Map<String, dynamic> combinedResult = {
+        'success': true,
+        'timestamp': DateTime.now().toIso8601String(),
+        'layout': results[0],
+        'color': results[1],
+        'texture': results[2],   // This is a List
+        'embedding': results[3],
+      };
 
-      if (pyResultJson != null) {
-        try {
-          finalResult = json.decode(pyResultJson);
-        } catch (e) {
-          debugPrint("Error decoding Python JSON: $e");
-          // Continue even if python fails, so we can try to show AI results
-          finalResult = {
-            'success': true,
-            'error_partial': 'Python analysis failed',
-          };
-        }
-      } else {
-        finalResult = {'success': true};
-      }
+      return combinedResult;
 
-      // 4. Merge AI Style Result into the Base JSON
-      if (emotionMap != null && emotionMap['success'] == true) {
-        finalResult['emotion_label'] = emotionMap['label']; 
-        finalResult['emotion_scores'] =
-            emotionMap['scores']; // Map of style probabilities
-      }
-
-      if (lightingMap != null && lightingMap['success'] == true) {
-        finalResult['lighting_label'] = lightingMap['label']; 
-        finalResult['lighting_scores'] =
-            lightingMap['scores']; // Map of style probabilities
-      }
-
-      debugPrint(
-        "Platform analyzing image finalResult[\"emotion_label\"]: ${finalResult["emotion_label"]}, finalResult[\"emotion_scores\"]: ${finalResult["emotion_scores"]}",
-      );
-      debugPrint(
-        "Platform analyzing image finalResult[\"lighting_label\"]: ${finalResult["lighting_label"]}, finalResult[\"lighting_scores\"]: ${finalResult["lighting_scores"]}",
-      );
-
-      return finalResult;
-    } on PlatformException catch (e) {
-      debugPrint("Platform Error analyzing image: ${e.message}");
-      return {'success': false, 'error': e.message ?? 'Unknown error'};
     } catch (e) {
-      debugPrint("Unexpected error: $e");
-      return {'success': false, 'error': e.toString()};
+      debugPrint("Master Analysis Failed: $e");
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    } finally {
+      // 4. Cleanup heavy resources
+      textureService.dispose();
     }
   }
 }
