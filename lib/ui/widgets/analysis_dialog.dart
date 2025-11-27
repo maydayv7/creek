@@ -100,7 +100,7 @@ class AnalysisDialog extends StatelessWidget {
                       ),
                     ),
                   
-                  // 5. Emotional Embeddings
+                  
                   // 5. Emotional Embeddings
                   if (data['emotions'] != null)
                     _buildSection(
@@ -140,7 +140,7 @@ class AnalysisDialog extends StatelessWidget {
                       ),
                     ),
 
-                  // 6. Lighting Embeddings
+                  
                   // 6. Lighting Embeddings
                   if (data['lighting'] != null)
                     _buildSection(
@@ -165,6 +165,44 @@ class AnalysisDialog extends StatelessWidget {
                             spacing: 6,
                             children:
                                 (data['lighting']['top5'] as List? ?? [])
+                                    .map<Widget>(
+                                      (e) => Chip(
+                                        label: Text(
+                                          e['name'],
+                                          style: const TextStyle(fontSize: 10),
+                                        ),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  
+                  // 7. Era Embeddings
+                  if (data['era'] != null)
+                    _buildSection(
+                      "Era Style",
+                      Icons.history_edu,
+                      Colors.blue,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            data['era']['label'] ?? "Unknown",
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+
+                          Wrap(
+                            spacing: 6,
+                            children:
+                                (data['era']['top5'] as List? ?? [])
                                     .map<Widget>(
                                       (e) => Chip(
                                         label: Text(

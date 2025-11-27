@@ -16,6 +16,7 @@ import 'texture_analyzer_service.dart';
 import 'embedding_analyzer_service.dart';
 import 'emotional_embeddings_service.dart';
 import 'lighting_service.dart';
+import 'era_service.dart';
 
 class ImageAnalyzerService {
 
