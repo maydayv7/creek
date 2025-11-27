@@ -22,6 +22,7 @@ dependencies:
   provider: ^6.1.5+1
   image: ^4.5.4
   flutter_onnxruntime: ^1.6.0
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
@@ -41,7 +42,7 @@ flutter:
     - assets/style_embeddings.json
     - assets/emotion_centroids.json
     - assets/lighting_centroids.json
-    
+
   fonts:
     - family: GeneralSans
       fonts:
