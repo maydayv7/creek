@@ -1,9 +1,11 @@
+// lib/services/embedding_analyzer_service.dart
+
 import 'dart:convert';
 import 'dart:io';
+import 'package:adobe/utils/image_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:onnxruntime/onnxruntime.dart';
-import 'package:adobe/utils/image_utils.dart';
-import 'package:adobe/utils/clip_image_processor.dart';
+import '../../utils/clip_image_processor.dart';
 
 class EmbeddingAnalyzerService {
   OrtSession? _session;
@@ -39,9 +41,9 @@ class EmbeddingAnalyzerService {
     String? jsonPath
   }) async {
     // Safety check
-    if (modelPath == null || jsonPath == null) return null;
+    if (modelPath == null || jsonPath == null) return {'success': false, 'scores': {}, 'error': 'Paths missing'};
     await initialize(modelPath: modelPath, jsonPath: jsonPath);
-    if (_session == null || _centroids == null) return null;
+    if (_session == null || _centroids == null) return {'success': false, 'scores': {}, 'error': 'Init failed'};
 
     OrtValueTensor? inputOrt;
     OrtRunOptions? runOptions;
@@ -49,7 +51,7 @@ class EmbeddingAnalyzerService {
 
     try {
       final float32Input = await ClipImageProcessor.preprocess(imagePath);
-      if (float32Input == null) return null;
+      if (float32Input == null) return {'success': false, 'scores': {}, 'error': 'Image decode failed'};
 
       // Create Tensor
       // Note: ensure ClipImageProcessor returns a flat List<double>
@@ -94,19 +96,21 @@ class EmbeddingAnalyzerService {
       }
 
       scores = Map.fromEntries(
-        scores.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value))
+        (scores.entries.toList()
+          ..sort((a, b) => b.value
+          .compareTo(a.value))
+        )//.take(3)
       );
 
       return {
         "success": true,
-        "predictions": scores,
-        "best": {scores.keys.first: scores.values.first},
+        "scores": scores,
+        "error": null,
       };
 
     } catch (e) {
       debugPrint("Embeddings Analysis Error: $e");
-      return null;
+      return {'success': false, 'scores': {}, 'error': e.toString()};
     } finally {
       inputOrt?.release();
       runOptions?.release();

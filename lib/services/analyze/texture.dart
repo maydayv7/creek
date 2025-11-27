@@ -1,9 +1,11 @@
+// lib/services/texture_analyzer_service.dart
+
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:onnxruntime/onnxruntime.dart';
-import 'package:adobe/utils/image_utils.dart';
+import '../../utils/image_utils.dart';
 
 class TextureAnalyzerService {
   OrtSession? _session;
@@ -46,9 +48,9 @@ class TextureAnalyzerService {
     String? jsonPath
   }) async {
     // Safety check
-    if (modelPath == null || jsonPath == null) return {'success': false, 'error': 'Paths missing'};
+    if (modelPath == null || jsonPath == null) return {'success': false, 'scores': {}, 'error': 'Paths missing'};
     await initialize(modelPath: modelPath, jsonPath: jsonPath);
-    if (_session == null || _centroids == null) return {'success': false, 'error': 'Init failed'};
+    if (_session == null || _centroids == null) return {'success': false, 'scores': {}, 'error': 'Init failed'};
 
     OrtValueTensor? inputOrt;
     OrtRunOptions? runOptions;
@@ -58,7 +60,7 @@ class TextureAnalyzerService {
       // 1. Preprocess
       final bytes = await File(path).readAsBytes();
       final image = img.decodeImage(bytes);
-      if (image == null) return {'success': false, 'error': 'Image decode failed'};
+      if (image == null) return {'success': false, 'scores': {}, 'error': 'Image decode failed'};
 
       final resized = img.copyResize(image, width: INPUT_SIZE, height: INPUT_SIZE);
 
@@ -125,27 +127,20 @@ class TextureAnalyzerService {
       var sorted = rawScores.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
       Map<String, dynamic> finalResults = {};
 
-      if (sorted.isNotEmpty) {
-        double topScore = sorted.first.value;
-        for (var entry in sorted) {
-          if (finalResults.length >= MAX_COUNT) break;
-          if (entry.value < ABSOLUTE_FLOOR) continue;
-          if (entry.value < (topScore * RELATIVE_THRESH)) break;
-          
-          finalResults[entry.key] = entry.value;
-        }
+      for(var entry in sorted) { //.take(3)
+        finalResults[entry.key] = entry.value;
       }
 
       // Return Map consistent with other services
       return {
         'success': true,
-        'predictions': finalResults, 
-        'best': {finalResults.keys.first: finalResults.values.first},
+        'scores': finalResults,
+        'error': null,
       };
 
     } catch (e) {
       debugPrint("Texture Analysis Failed: $e");
-      return {'success': false, 'error': e.toString()};
+      return {'success': false, 'scores': {}, 'error': e.toString()};
     } finally {
       // FFI Requires manual release of C++ resources
       inputOrt?.release();

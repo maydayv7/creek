@@ -1,3 +1,5 @@
+// lib/services/image_analyzer_service.dart
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
@@ -6,15 +8,13 @@ import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 // Import analysis services
-import 'layout.dart';
 import 'color.dart';
 import 'texture.dart';
 import 'embedding.dart';
-import 'emotional_embeddings.dart';
-import 'lighting.dart';
-import 'era.dart';
+import 'layout.dart';
 
 class ImageAnalyzerService {
 
@@ -26,7 +26,6 @@ class ImageAnalyzerService {
     Future<String> copy(String assetName, {String? filename}) async {
       final name = filename ?? assetName;
       final file = File('${dir.path}/$name');
-      // Only copy if it doesn't exist or is empty
       if (!await file.exists() || await file.length() == 0) {
         final data = await rootBundle.load('assets/$assetName');
         await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
@@ -35,14 +34,13 @@ class ImageAnalyzerService {
     }
 
     // Copy everything needed by the services
-    // Make sure your assets/ folder actually contains these files!
     final paths = await Future.wait([
-      // Texture
+      // DINO
       copy('dinov2.onnx'), 
       copy('dinov2.onnx.data'),
       copy('texture_centroids.json'),
       
-      // CLIP (Embeddings/Emotion/Lighting)
+      // CLIP
       copy('clip_image_encoder.onnx'),
       copy('style_embeddings.json'),
       copy('emotion_centroids.json'),
@@ -67,7 +65,6 @@ class ImageAnalyzerService {
     required String imagePath,
     required RootIsolateToken rootToken,
     required bool runInIsolate,
-    // Pass config map to the task
     required Map<String, String> assetPaths,
     required Future<dynamic> Function(String, Map<String, String>) task,
   }) async {
@@ -92,16 +89,20 @@ class ImageAnalyzerService {
       
       stopwatch.stop();
       timelineTask.finish();
+      result['execution_time']= stopwatch.elapsedMilliseconds;
+      return result;
 
-      return {
-        'data': result,
-        'stats': {'execution_time_ms': stopwatch.elapsedMilliseconds}
-      };
     } catch (e) {
       stopwatch.stop();
       timelineTask.finish();
       debugPrint("[$name] Failed: $e");
-      return {'error': e.toString()};
+
+      return {
+        'success': false,
+        'scores': {},
+        'error': e.toString(),
+        'execution_time': stopwatch.elapsedMilliseconds,
+      };
     }
   }
 
@@ -169,7 +170,7 @@ class ImageAnalyzerService {
           name: 'Emotional', imagePath: imagePath, rootToken: token, runInIsolate: true, 
           assetPaths: assetPaths,
           task: (path, assets) async {
-             final service = EmotionalEmbeddingsService();
+             final service = EmbeddingAnalyzerService();
              final res = await service.analyze(path,
                 modelPath: assets['clip_model'],
                 jsonPath: assets['emotion_json']
@@ -183,7 +184,7 @@ class ImageAnalyzerService {
           name: 'Lighting', imagePath: imagePath, rootToken: token, runInIsolate: true, 
           assetPaths: assetPaths,
           task: (path, assets) async {
-             final service = LightingEmbeddingsService();
+             final service = EmbeddingAnalyzerService();
              final res = await service.analyze(path,
                 modelPath: assets['clip_model'],
                 jsonPath: assets['lighting_json']
@@ -197,7 +198,7 @@ class ImageAnalyzerService {
           name: 'Era', imagePath: imagePath, rootToken: token, runInIsolate: true, 
           assetPaths: assetPaths,
           task: (path, assets) async {
-             final service = EraEmbeddingsService();
+             final service = EmbeddingAnalyzerService();
              final res = await service.analyze(path,
                 modelPath: assets['clip_model'],
                 jsonPath: assets['era_json']
@@ -210,61 +211,78 @@ class ImageAnalyzerService {
 
       totalSw.stop();
 
-      final finalResult = {
+      // This is only for testing
+      final logResult = {
         'success': true,
-        'total_time_ms': totalSw.elapsedMilliseconds,
-        'timestamp': DateTime.now().toIso8601String(),
+        'total_time': totalSw.elapsedMilliseconds,
+        'filename': p.basename(imagePath),
         'results': {
-          'layout': results[0],
-          'color': results[1],
-          'texture': results[2],
-          'embedding': results[3],
-          'emotions': results[4],
-          'lighting': results[5],
-          'era': results[6],
+          'Layout': results[0]['execution_time'],
+          'Color': results[1]['execution_time'],
+          'Texture': results[2]['execution_time'],
+          'Style': results[3]['execution_time'],
+          'Emotions': results[4]['execution_time'],
+          'Lighting': results[5]['execution_time'],
+          'Era': results[6]['execution_time'],
         }
       };
+      _logSummary(logResult);
 
-      _logSummary(finalResult);
-      print("\n\n\n layout: ${results[0]} \n\n\n");
-      print("color: ${results[1]} \n\n\n");
-      print("texture: ${results[2]} \n\n\n");
-      print("embedding: ${results[3]} \n\n\n");
-      print("emotions: ${results[4]} \n\n\n");
-      print("lighting: ${results[5]} \n\n\n");
-      print("era: ${results[6]} \n\n\n");
+      final finalResult = {
+        'success': true,
+        'data': {
+          'filename': p.basename(imagePath),
+          'results': {
+            'Style': {"scores": results[3]['scores']},
+            'Texture': {"scores": results[2]['scores']},
+            'Lighting': {"scores": results[5]['scores']},
+            'Colour Pallete': {"scores": results[1]['scores']},
+            'Emotions': {"scores": results[4]['scores']},
+            'Era': {"scores": results[6]['scores']},
+            'Layout': {"scores": results[0]['scores']}
+          }
+        },
+        'error': null,
+      };
+      debugPrint(finalResult.toString());
       return finalResult;
 
     } catch (e) {
       debugPrint("Master Analysis Failed: $e");
-      return {'success': false, 'error': e.toString()};
+      return {
+        'success': false,
+        'data': {
+          'filename': '',
+          'results': {
+            'Style': {"scores": {}},
+            'Texture': {"scores": {}},
+            'Lighting': {"scores": {}},
+            'Colour Pallete': {"scores": {}},
+            'Emotions': {"scores": {}},
+            'Era': {"scores": {}},
+          }
+        },
+        'error': e.toString()
+      };
     }
   }
 
   static void _logSummary(Map<String, dynamic> result) {
-    final int total = result['total_time_ms'];
+    final int total = result['total_time'];
     final Map<String, dynamic> subTasks = result['results'];
-
     StringBuffer output = StringBuffer();
+
     output.writeln('\n══════════ ⚡ HYBRID PARALLEL REPORT ⚡ ══════════');
     output.writeln(' 🕒 Total Wall Time: ${total}ms');
     output.writeln('──────────────────────────────────────────────────────');
     
     subTasks.forEach((key, value) {
-      if (value is Map && value.containsKey('stats')) {
-        final int time = value['stats']['execution_time_ms'];
-        final int barLength = (time / 50).ceil().clamp(0, 20);
-        final String bar = '█' * barLength;
-        
-        output.writeln(' ${key.padRight(12)} : ${time.toString().padLeft(4)}ms $bar');
-      } else {
-        String err = value['error'] ?? "Unknown";
-        if (err.length > 30) err = "${err.substring(0, 30)}...";
-        output.writeln(' ${key.padRight(12)} : FAILED ❌ ($err)');
-      }
+      final int barLength = (value / 50).ceil().clamp(0, 20);
+      final String bar = '█' * barLength;
+      output.writeln(' ${key.padRight(12)} : ${value.toString().padLeft(4)}ms $bar');
     });
-    output.writeln('══════════════════════════════════════════════════════\n');
 
+    output.writeln('══════════════════════════════════════════════════════\n');
     dev.log(output.toString(), name: 'ImageAnalyzer');
   }
 }
