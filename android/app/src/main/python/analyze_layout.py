@@ -229,13 +229,15 @@ def analyze_single_image(img_path):
 
         # 5. Sort and get top 5
         sorted_features = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        top5 = [{"name": k, "score": v} for k, v in sorted_features[:5]]
+        top5 = {}
+        for k, v in sorted_features[:5]:
+            top5[k] = float(v)
         
         # 6. Return JSON result
         result = {
             "success": True,
-            "scores": {k: float(v) for k, v in scores.items()},
-            "top5": top5,
+            "predictions": {k: float(v) for k, v in scores.items()},
+            "best": top5,
             "image_name": os.path.basename(img_path)
         }
         

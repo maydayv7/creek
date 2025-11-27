@@ -181,21 +181,15 @@ def analyze_color_style(image_path):
         probs = clf.predict_proba([flat_vector])[0]
         classes = le.classes_
 
-        # Format Results
-        prediction = classes[np.argmax(probs)]
-        score = max(probs)
-
-        results = []
+        results = {}
         for c, p in zip(classes, probs):
-            results.append({"label": c, "score": p})
+            results[c] = float(p)
 
-        results = sorted(results, key=lambda x: x["score"], reverse=True)[:3]
-
+        sorted_features = sorted(results.items(), key=lambda x: x[1], reverse=True)
         response = {
             "success": True,
-            "predictions": results,
-            "top_label": prediction,
-            "top_score": score
+            "predictions": {k: float(v) for k, v in results.items()},
+            "best": {sorted_features[0][0]: float(sorted_features[0][1])},
         }
 
         return json.dumps(response, cls=NumpyEncoder)
