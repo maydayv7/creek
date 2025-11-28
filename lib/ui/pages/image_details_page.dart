@@ -760,38 +760,8 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                     ),
                   ),
 
-                  // --- 3. BOTTOM NAVIGATION ---
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border(top: BorderSide(color: Colors.grey[200]!)),
-                    ),
-                    child: BottomNavigationBar(
-                      backgroundColor: Colors.white,
-                      elevation: 0,
-                      selectedItemColor: Colors.black,
-                      unselectedItemColor: Colors.grey,
-                      selectedLabelStyle: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
-                      ),
-                      unselectedLabelStyle: const TextStyle(fontSize: 11),
-                      type: BottomNavigationBarType.fixed,
-                      items: const [
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.grid_view),
-                          label: 'Moodboard',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.auto_awesome_mosaic),
-                          label: 'Stylesheet',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.description_outlined),
-                          label: 'Files',
-                        ),
-                      ],
-                    ),
-                  ),
+                  
+                  
                 ],
               ),
     );

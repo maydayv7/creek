@@ -5,6 +5,7 @@ import '../../data/models/image_model.dart';
 import '../../data/repos/project_repo.dart';
 import '../../data/repos/image_repo.dart';
 import 'project_tag_page.dart';
+import 'image_details_page.dart';
 
 class ProjectBoardPage extends StatefulWidget {
   final int projectId;
@@ -317,26 +318,52 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
   }
 
   Widget _buildImageCard(ImageModel image, ThemeData theme, bool isDark) {
-    return Container(
-      width: 120,
-      clipBehavior: Clip.antiAlias, // Ensures image doesn't overflow rounded corners
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: isDark ? Colors.black26 : Colors.grey[200],
-        border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
-      ),
-      child: Stack(
-        fit: StackFit.expand, // Forces image to fill the entire container
-        children: [
-          Image.file(
-            File(image.filePath),
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: Colors.grey[300],
-              child: const Icon(Icons.broken_image, color: Colors.grey),
-            ),
+    return GestureDetector(
+      // <-- Added this wrapper
+      onTap: () {
+        // Navigate to Image Details
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (_) => ImageDetailsPage(
+                  imagePath: image.filePath,
+                  imageId: image.id,
+                  projectId: widget.projectId,
+                ),
           ),
-        ],
+        ).then((_) {
+          // Refresh board when returning (in case tags changed)
+          _loadImagesForSelected();
+        });
+      },
+      child: Container(
+        width: 120,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: isDark ? Colors.black26 : Colors.grey[200],
+          border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Hero(
+              // Optional: Add Hero for smooth zoom animation
+              tag:
+                  'image_${image.id}', // Make sure this matches the tag in ImageDetailsPage
+              child: Image.file(
+                File(image.filePath),
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (_, __, ___) => Container(
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
