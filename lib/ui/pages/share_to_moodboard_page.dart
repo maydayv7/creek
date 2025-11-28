@@ -29,6 +29,7 @@ class ProjectItemViewModel {
 
 class ProjectGroup {
   final ProjectModel project;
+  // Holds ViewModels so we have cover paths for events too
   final List<ProjectItemViewModel> events;
   final String? coverPath;
   bool isExpanded;
@@ -350,8 +351,6 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
                               ),
                             ),
                           ),
-
-                          // Add padding here so the cards don't touch the edges of the screen
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: ListView.builder(
@@ -451,15 +450,14 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
     );
   }
 
-  // UPDATED: Full Border + Light Grey Background for Sub-events
+  // UPDATED: Main tap saves to Project, Arrow toggles Events
   Widget _buildProjectGroup(ProjectGroup g) {
     final project = g.project;
     final hasEvents = g.events.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12), // Separate cards
-      clipBehavior:
-          Clip.antiAlias, // Clip children (like the grey background) to the rounded corners
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -467,13 +465,11 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
       ),
       child: Column(
         children: [
-          // PARENT PROJECT
+          // PARENT PROJECT TILE
           ListTile(
-            onTap:
-                () =>
-                    hasEvents
-                        ? setState(() => g.isExpanded = !g.isExpanded)
-                        : _navigateToSavePage(project.id!, project.title),
+            // ACTION 1: Tap main area -> Save to Project
+            onTap: () => _navigateToSavePage(project.id!, project.title),
+
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 8,
@@ -501,13 +497,20 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
               project.title,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
+
+            // ACTION 2: Tap Dropdown -> Toggle List
             trailing:
                 hasEvents
-                    ? Icon(
-                      g.isExpanded
-                          ? Icons.keyboard_arrow_up
-                          : Icons.keyboard_arrow_down,
-                      color: Colors.grey[600],
+                    ? IconButton(
+                      icon: Icon(
+                        g.isExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        color: Colors.grey[600],
+                      ),
+                      onPressed: () {
+                        setState(() => g.isExpanded = !g.isExpanded);
+                      },
                     )
                     : null,
           ),
@@ -532,9 +535,7 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color:
-                                  Colors
-                                      .white, // White box on grey bg looks nice
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(10),
                               image:
                                   e.coverPath != null

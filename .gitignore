@@ -29,6 +29,7 @@ migrate_working_dir/
 .pub/
 /build/
 .gradle
+pubspec.lock
 
 # Symbolication
 app.*.symbols

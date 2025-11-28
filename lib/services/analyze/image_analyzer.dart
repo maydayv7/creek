@@ -16,7 +16,6 @@ import 'layout.dart';
 import 'font.dart';
 
 class ImageAnalyzerService {
-
   /// Prepare ALL assets (Models + JSONs) on Main Thread.
   /// Returns a map of absolute paths.
   static Future<Map<String, String>> _prepareAssets() async {
@@ -35,10 +34,10 @@ class ImageAnalyzerService {
     // Copy everything needed by the services
     final paths = await Future.wait([
       // DINO
-      copy('dinov2.onnx'), 
+      copy('dinov2.onnx'),
       copy('dinov2.onnx.data'),
       copy('texture_centroids.json'),
-      
+
       // CLIP
       copy('clip_image_encoder.onnx'),
       copy('style_embeddings.json'),
@@ -64,7 +63,7 @@ class ImageAnalyzerService {
   }
 
   static Future<Map<String, dynamic>> _runProfiledJob({
-    required String name, 
+    required String name,
     required String imagePath,
     required RootIsolateToken rootToken,
     required bool runInIsolate,
@@ -73,7 +72,7 @@ class ImageAnalyzerService {
   }) async {
     final stopwatch = Stopwatch()..start();
     final dev.TimelineTask timelineTask = dev.TimelineTask();
-    timelineTask.start('Analyze: $name'); 
+    timelineTask.start('Analyze: $name');
 
     try {
       dynamic result;
@@ -89,12 +88,11 @@ class ImageAnalyzerService {
         // CONCURRENT (Main Thread)
         result = await task(imagePath, assetPaths);
       }
-      
+
       stopwatch.stop();
       timelineTask.finish();
-      result['execution_time']= stopwatch.elapsedMilliseconds;
+      result['execution_time'] = stopwatch.elapsedMilliseconds;
       return result;
-
     } catch (e) {
       stopwatch.stop();
       timelineTask.finish();
@@ -123,106 +121,133 @@ class ImageAnalyzerService {
 
       // 2. Run Analysis
       final results = await Future.wait([
-        
-        // --- GROUP A: MAIN THREAD (Python) ---
+        // --- GROUP A: PARALLEL ---
         _runProfiledJob(
-          name: 'Layout', imagePath: imagePath, rootToken: token, runInIsolate: false, 
+          name: 'Layout',
+          imagePath: imagePath,
+          rootToken: token,
+          runInIsolate: true,
           assetPaths: assetPaths,
-          task: (path, _) => LayoutAnalyzerService().analyze(path)
-        ),
-        
-        _runProfiledJob(
-          name: 'Color', imagePath: imagePath, rootToken: token, runInIsolate: false, 
-          assetPaths: assetPaths,
-          task: (path, _) => ColorAnalyzerService().analyze(path)
+          task: (path, _) => LayoutAnalyzerService().analyze(path),
         ),
 
         _runProfiledJob(
-          name: 'Font', imagePath: imagePath, rootToken: token, runInIsolate: false, 
+          name: 'Color',
+          imagePath: imagePath,
+          rootToken: token,
+          runInIsolate: true,
           assetPaths: assetPaths,
-          task: (path, assets) async {
-             final service = FontIdentifierService();
-             final res = await service.analyze(path, 
-                modelPath: assets['fannet_model'], 
-                jsonPath: assets['font_json']
-             );
-             service.dispose();
-             return res;
-          }
-        ),
-        
-        // --- GROUP B: PARALLEL (ONNX FFI) ---
-        // Notice we pass assetPaths to the tasks
-        
-        _runProfiledJob(
-          name: 'Texture', imagePath: imagePath, rootToken: token, runInIsolate: true, 
-          assetPaths: assetPaths,
-          task: (path, assets) async {
-             final service = TextureAnalyzerService();
-             // Pass specific paths
-             final res = await service.analyze(path, 
-                modelPath: assets['texture_model'], 
-                jsonPath: assets['texture_json']
-             );
-             service.dispose(); 
-             return res;
-          }
+          task: (path, _) => ColorAnalyzerService().analyze(path),
         ),
 
         _runProfiledJob(
-          name: 'Embedding', imagePath: imagePath, rootToken: token, runInIsolate: true, 
+          name: 'Texture',
+          imagePath: imagePath,
+          rootToken: token,
+          runInIsolate: true,
           assetPaths: assetPaths,
           task: (path, assets) async {
-             final service = EmbeddingAnalyzerService(); 
-             final res = await service.analyze(path,
-                modelPath: assets['clip_model'],
-                jsonPath: assets['embedding_json']
-             );
-             service.dispose();
-             return res;
-          }
+            final service = TextureAnalyzerService();
+            // Pass specific paths
+            final res = await service.analyze(
+              path,
+              modelPath: assets['texture_model'],
+              jsonPath: assets['texture_json'],
+            );
+            service.dispose();
+            return res;
+          },
         ),
 
         _runProfiledJob(
-          name: 'Emotional', imagePath: imagePath, rootToken: token, runInIsolate: true, 
+          name: 'Embedding',
+          imagePath: imagePath,
+          rootToken: token,
+          runInIsolate: true,
           assetPaths: assetPaths,
           task: (path, assets) async {
-             final service = EmbeddingAnalyzerService();
-             final res = await service.analyze(path,
-                modelPath: assets['clip_model'],
-                jsonPath: assets['emotion_json']
-             );
-             service.dispose();
-             return res;
-          }
+            final service = EmbeddingAnalyzerService();
+            final res = await service.analyze(
+              path,
+              modelPath: assets['clip_model'],
+              jsonPath: assets['embedding_json'],
+            );
+            service.dispose();
+            return res;
+          },
         ),
 
         _runProfiledJob(
-          name: 'Lighting', imagePath: imagePath, rootToken: token, runInIsolate: true, 
+          name: 'Emotional',
+          imagePath: imagePath,
+          rootToken: token,
+          runInIsolate: true,
           assetPaths: assetPaths,
           task: (path, assets) async {
-             final service = EmbeddingAnalyzerService();
-             final res = await service.analyze(path,
-                modelPath: assets['clip_model'],
-                jsonPath: assets['lighting_json']
-             );
-             service.dispose();
-             return res;
-          }
+            final service = EmbeddingAnalyzerService();
+            final res = await service.analyze(
+              path,
+              modelPath: assets['clip_model'],
+              jsonPath: assets['emotion_json'],
+            );
+            service.dispose();
+            return res;
+          },
         ),
 
         _runProfiledJob(
-          name: 'Era', imagePath: imagePath, rootToken: token, runInIsolate: true, 
+          name: 'Lighting',
+          imagePath: imagePath,
+          rootToken: token,
+          runInIsolate: true,
           assetPaths: assetPaths,
           task: (path, assets) async {
-             final service = EmbeddingAnalyzerService();
-             final res = await service.analyze(path,
-                modelPath: assets['clip_model'],
-                jsonPath: assets['era_json']
-             );
-             service.dispose();
-             return res;
-          }
+            final service = EmbeddingAnalyzerService();
+            final res = await service.analyze(
+              path,
+              modelPath: assets['clip_model'],
+              jsonPath: assets['lighting_json'],
+            );
+            service.dispose();
+            return res;
+          },
+        ),
+
+        _runProfiledJob(
+          name: 'Era',
+          imagePath: imagePath,
+          rootToken: token,
+          runInIsolate: true,
+          assetPaths: assetPaths,
+          task: (path, assets) async {
+            final service = EmbeddingAnalyzerService();
+            final res = await service.analyze(
+              path,
+              modelPath: assets['clip_model'],
+              jsonPath: assets['era_json'],
+            );
+            service.dispose();
+            return res;
+          },
+        ),
+
+        // --- GROUP B: MAIN THREAD ---
+        _runProfiledJob(
+          name: 'Font',
+          imagePath: imagePath,
+          rootToken: token,
+          runInIsolate: false,
+          assetPaths: assetPaths,
+          task: (path, assets) async {
+            final service = FontIdentifierService();
+            final res = await service.analyze(
+              path,
+              modelPath: assets['fannet_model'],
+              jsonPath: assets['font_json'],
+            );
+            service.dispose();
+            return res;
+          },
         ),
       ]);
 
@@ -236,13 +261,13 @@ class ImageAnalyzerService {
         'results': {
           'Layout': results[0]['execution_time'],
           'Color': results[1]['execution_time'],
-          'Font': results[2]['execution_time'],
-          'Texture': results[3]['execution_time'],
-          'Style': results[4]['execution_time'],
-          'Emotions': results[5]['execution_time'],
-          'Lighting': results[6]['execution_time'],
-          'Era': results[7]['execution_time'],
-        }
+          'Texture': results[2]['execution_time'],
+          'Style': results[3]['execution_time'],
+          'Emotions': results[4]['execution_time'],
+          'Lighting': results[5]['execution_time'],
+          'Era': results[6]['execution_time'],
+          'Font': results[7]['execution_time'],
+        },
       };
       _logSummary(logResult);
 
@@ -251,21 +276,20 @@ class ImageAnalyzerService {
         'data': {
           'filename': p.basename(imagePath),
           'results': {
-            'Layout': {"scores": results[0]['data']['scores']},
-            'Colour Palette': {"scores": results[1]['data']['scores']},
-            'Font': {"scores": results[2]['data']['scores']},
-            'Texture': {"scores": results[3]['data']['scores']},
-            'Style': {"scores": results[4]['data']['scores']},
-            'Emotions': {"scores": results[5]['data']['scores']},
-            'Lighting': {"scores": results[6]['data']['scores']},
-            'Era': {"scores": results[7]['data']['scores']},
-          }
+            'Style': {"scores": results[3]['scores']},
+            'Texture': {"scores": results[2]['scores']},
+            'Lighting': {"scores": results[5]['scores']},
+            'Colour Palette': {"scores": results[1]['scores']},
+            'Emotions': {"scores": results[4]['scores']},
+            'Era': {"scores": results[6]['scores']},
+            'Layout': {"scores": results[0]['scores']},
+            'Font': {"scores": results[7]['scores']},
+          },
         },
         'error': null,
       };
       debugPrint(finalResult.toString());
       return finalResult;
-
     } catch (e) {
       debugPrint("Master Analysis Failed: $e");
       return {
@@ -279,9 +303,10 @@ class ImageAnalyzerService {
             'Colour Palette': {"scores": {}},
             'Emotions': {"scores": {}},
             'Era': {"scores": {}},
-          }
+            'Font': {"scores": {}},
+          },
         },
-        'error': e.toString()
+        'error': e.toString(),
       };
     }
   }
@@ -294,11 +319,13 @@ class ImageAnalyzerService {
     output.writeln('\n══════════ ⚡ HYBRID PARALLEL REPORT ⚡ ══════════');
     output.writeln(' 🕒 Total Wall Time: ${total}ms');
     output.writeln('──────────────────────────────────────────────────────');
-    
+
     subTasks.forEach((key, value) {
       final int barLength = (value / 50).ceil().clamp(0, 20);
       final String bar = '█' * barLength;
-      output.writeln(' ${key.padRight(12)} : ${value.toString().padLeft(4)}ms $bar');
+      output.writeln(
+        ' ${key.padRight(12)} : ${value.toString().padLeft(4)}ms $bar',
+      );
     });
 
     output.writeln('══════════════════════════════════════════════════════\n');
