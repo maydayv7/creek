@@ -1,12 +1,9 @@
 import 'dart:io';
-import 'dart:ui'; // Required for PathMetric
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-//services
 import '../../services/image_service.dart';
 import '../../services/note_service.dart';
-import '../../services/analyze/image_analyzer.dart';
 
 // --- HELPER CLASS FOR TEMPORARY NOTES ---
 class TempNote {
@@ -51,46 +48,80 @@ class _ImageSavePageState extends State<ImageSavePage> {
   final NoteService _noteService = NoteService();
 
   // --- STATE ---
+  late PageController _pageController;
   int _currentImageIndex = 0;
-  final Set<String> _selectedTags = {};
+
+  // Data storage per image
+  final Map<int, Set<String>> _tagsPerImage = {};
+  final Map<int, List<TempNote>> _notesPerImage = {};
+
+  // CRITICAL: A unique key for EACH image to calculate drawing coordinates correctly
+  late List<GlobalKey> _imageKeys;
+
   final TextEditingController _commentController = TextEditingController();
-
-  // List to store multiple notes before saving
-  final List<TempNote> _addedNotes = [];
-
-  String _selectedCategory = 'Typography';
+  String _selectedCategory = 'Compositions';
   bool _isSaving = false;
 
-  // --- INTERACTION STATE ---
+  // --- DRAWING STATE ---
   bool _isDrawMode = false;
-  final GlobalKey _imageKey = GlobalKey();
-
   Offset? _startPos;
   Offset? _currentPos;
-  Rect? _finalSelectionRect; // Current drawing
-  Size? _imageRenderSize; // Size of image on screen
+  Rect? _finalSelectionRect;
+
+  // FIXED: Store render size per image index
+  final Map<int, Size> _imageRenderSizes = {};
 
   final List<String> _availableTags = [
-    'Fonts',
-    'Colours',
-    'Everything!',
     'Compositions',
-    'Textures',
-    'Layout',
-    'Dark Mode',
-    'Minimal',
+    'Subject',
+    'Fonts',
+    'Background',
+    'Texture',
+    'Colours',
+    'Material Look',
+    'Lighting',
+    'Style',
+    'Era',
+    'Emotion',
   ];
 
   final List<String> _categories = [
-    'Typography',
-    'Color Palette',
-    'Layout',
-    'Design Style',
-    'General',
+    'Compositions',
+    'Subject',
+    'Fonts',
+    'Background',
+    'Texture',
+    'Colours',
+    'Material Look',
+    'Lighting',
+    'Style',
+    'Era',
+    'Emotion',
   ];
 
-  // --- ACTIONS ---
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
 
+    // Generate a unique key for every image path
+    _imageKeys = List.generate(widget.imagePaths.length, (_) => GlobalKey());
+
+    // Initialize data maps
+    for (int i = 0; i < widget.imagePaths.length; i++) {
+      _tagsPerImage[i] = {};
+      _notesPerImage[i] = [];
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  // --- ACTIONS ---
   void _activateSelectionMode() {
     setState(() {
       _isDrawMode = true;
@@ -102,41 +133,65 @@ class _ImageSavePageState extends State<ImageSavePage> {
 
   void _toggleTag(String tag) {
     setState(() {
-      if (_selectedTags.contains(tag)) {
-        _selectedTags.remove(tag);
+      final currentTags = _tagsPerImage[_currentImageIndex]!;
+      if (currentTags.contains(tag)) {
+        currentTags.remove(tag);
       } else {
-        _selectedTags.add(tag);
+        currentTags.add(tag);
       }
     });
   }
 
-  // --- GESTURES ---
+  // --- DRAWING GESTURES (FIXED LOGIC) ---
+  // Helper: Convert global screen touch to local image coordinates
+  Offset? _getLocalPosition(Offset globalPosition) {
+    // Get the key for the currently visible image
+    final currentKey = _imageKeys[_currentImageIndex];
+    final RenderBox? box =
+        currentKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return null;
+
+    // FIXED: Store the render size for this specific image
+    _imageRenderSizes[_currentImageIndex] = box.size;
+
+    // Convert global to local
+    final local = box.globalToLocal(globalPosition);
+
+    // Clamp coordinates to ensure we don't draw outside the image
+    final dx = local.dx.clamp(0.0, box.size.width);
+    final dy = local.dy.clamp(0.0, box.size.height);
+
+    return Offset(dx, dy);
+  }
 
   void _onPanStart(DragStartDetails details) {
     if (!_isDrawMode) return;
+
+    final pos = _getLocalPosition(details.globalPosition);
+    if (pos == null) return;
+
     setState(() {
-      _startPos = details.localPosition;
-      _currentPos = details.localPosition;
+      _startPos = pos;
+      _currentPos = pos;
     });
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
     if (!_isDrawMode) return;
+
+    final pos = _getLocalPosition(details.globalPosition);
+    if (pos == null) return;
+
     setState(() {
-      _currentPos = details.localPosition;
+      _currentPos = pos;
     });
   }
 
   void _onPanEnd(DragEndDetails details) {
     if (!_isDrawMode || _startPos == null || _currentPos == null) return;
 
+    // Create the rect from the corrected local positions
     final rect = Rect.fromPoints(_startPos!, _currentPos!);
-    final RenderBox? box =
-        _imageKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box != null) {
-      _imageRenderSize = box.size;
-    }
-
     _finalSelectionRect = rect;
 
     setState(() {
@@ -148,11 +203,9 @@ class _ImageSavePageState extends State<ImageSavePage> {
     _showNoteModal();
   }
 
-  // --- MODAL ---
+  // --- ADD NOTE MODAL ---
   void _showNoteModal() {
-    // Clear controller for new note
     _commentController.clear();
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -173,108 +226,65 @@ class _ImageSavePageState extends State<ImageSavePage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
+                  const Text(
+                    "Add Note",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  const SizedBox(height: 16),
+                  // Category Dropdown
+                  DropdownButtonFormField<String>(
+                    value: _selectedCategory,
+                    decoration: InputDecoration(
+                      labelText: "Category",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                    ),
+                    items:
+                        _categories
+                            .map(
+                              (c) => DropdownMenuItem(value: c, child: Text(c)),
+                            )
+                            .toList(),
+                    onChanged: (v) => setState(() => _selectedCategory = v!),
+                  ),
+                  const SizedBox(height: 12),
+                  // Note Text
+                  TextField(
+                    controller: _commentController,
+                    autofocus: true,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: "Enter details...",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                  Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Colors.black12,
-                        child: Icon(Icons.person, color: Colors.grey),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        "You",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const Spacer(),
-
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8EAF6),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedCategory,
-                            isDense: true,
-                            icon: const Icon(
-                              Icons.keyboard_arrow_down,
-                              size: 18,
-                            ),
-                            style: const TextStyle(
-                              color: Colors.black87,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13,
-                            ),
-                            items:
-                                _categories
-                                    .map(
-                                      (c) => DropdownMenuItem(
-                                        value: c,
-                                        child: Text(c),
-                                      ),
-                                    )
-                                    .toList(),
-                            onChanged:
-                                (v) => setState(() => _selectedCategory = v!),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          child: TextField(
-                            controller: _commentController,
-                            autofocus: true,
-                            style: const TextStyle(fontSize: 14),
-                            decoration: const InputDecoration(
-                              hintText: "Add your note...",
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(
-                                vertical: 12,
-                              ),
-                            ),
-                          ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      // ADD NOTE BUTTON
-                      IconButton(
-                        onPressed: () {
-                          // 1. Add to Temp List
-                          _addTempNote();
-                          Navigator.pop(context);
-                        },
-                        icon: const Icon(Icons.check_circle, size: 30),
-                        color: Colors.black,
+                      onPressed: () {
+                        _addTempNote();
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        "Save Note",
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -285,16 +295,18 @@ class _ImageSavePageState extends State<ImageSavePage> {
     );
   }
 
-  // --- LOGIC TO ADD TEMP NOTE ---
   void _addTempNote() {
+    // FIXED: Use the stored render size for the current image index
+    final imageSize = _imageRenderSizes[_currentImageIndex];
+
     if (_finalSelectionRect != null &&
-        _imageRenderSize != null &&
+        imageSize != null &&
         _commentController.text.isNotEmpty) {
-      // Calculate Normalized Coords
-      final nX = _finalSelectionRect!.center.dx / _imageRenderSize!.width;
-      final nY = _finalSelectionRect!.center.dy / _imageRenderSize!.height;
-      final nW = _finalSelectionRect!.width / _imageRenderSize!.width;
-      final nH = _finalSelectionRect!.height / _imageRenderSize!.height;
+      // Calculate Normalized Coordinates (0.0 - 1.0)
+      final nX = _finalSelectionRect!.center.dx / imageSize.width;
+      final nY = _finalSelectionRect!.center.dy / imageSize.height;
+      final nW = _finalSelectionRect!.width / imageSize.width;
+      final nH = _finalSelectionRect!.height / imageSize.height;
 
       final newNote = TempNote(
         normX: nX,
@@ -306,30 +318,33 @@ class _ImageSavePageState extends State<ImageSavePage> {
       );
 
       setState(() {
-        _addedNotes.add(newNote);
+        _notesPerImage[_currentImageIndex]?.add(newNote);
       });
     }
   }
 
-  // --- SAVE FINAL (ALL NOTES) ---
+  // --- FINAL SAVE ---
   Future<void> _onSaveToMoodboard() async {
     setState(() => _isSaving = true);
 
     try {
-      for (String path in widget.imagePaths) {
+      for (int i = 0; i < widget.imagePaths.length; i++) {
+        String path = widget.imagePaths[i];
         final file = File(path);
         if (!file.existsSync()) continue;
 
-        // 1. Save Image (Once)
+        // 1. Save Image
         final imageId = await _imageService.saveImage(file, widget.projectId);
 
-        // 2. Save Tags
-        if (_selectedTags.isNotEmpty) {
-          await _imageService.updateTags(imageId, _selectedTags.toList());
+        // 2. Save Tags for this specific image
+        final tags = _tagsPerImage[i] ?? {};
+        if (tags.isNotEmpty) {
+          await _imageService.updateTags(imageId, tags.toList());
         }
 
-        // 3. Save ALL Added Notes
-        for (var note in _addedNotes) {
+        // 3. Save Notes for this specific image
+        final notes = _notesPerImage[i] ?? [];
+        for (var note in notes) {
           await _noteService.addNote(
             imageId,
             note.content,
@@ -340,22 +355,21 @@ class _ImageSavePageState extends State<ImageSavePage> {
             normHeight: note.normHeight,
           );
         }
-
-        // 4. Analyze
-        _analyzeInBackground(imageId, file.path);
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Saved to ${widget.projectName}!'),
+          const SnackBar(
+            content: Text('All images saved successfully!'),
             backgroundColor: Colors.green,
           ),
         );
-        if (widget.isFromShare)
+
+        if (widget.isFromShare) {
           SystemNavigator.pop();
-        else
+        } else {
           Navigator.popUntil(context, (route) => route.isFirst);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -367,17 +381,10 @@ class _ImageSavePageState extends State<ImageSavePage> {
     }
   }
 
-  Future<void> _analyzeInBackground(String imageId, String originalPath) async {
-    try {
-      final result = await ImageAnalyzerService.analyzeFullSuite(originalPath);
-      await _imageService.updateAnalysis(imageId, result);
-    } catch (e) {
-      debugPrint("Analysis Error: $e");
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final currentTags = _tagsPerImage[_currentImageIndex] ?? {};
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -399,164 +406,198 @@ class _ImageSavePageState extends State<ImageSavePage> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        centerTitle: false,
-        titleSpacing: 0,
       ),
       body: Column(
         children: [
-          // --- IMAGE AREA ---
+          // --- HORIZONTAL IMAGE CAROUSEL ---
           Expanded(
             child: Container(
               width: double.infinity,
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
+                color: Colors.black,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: LayoutBuilder(
-                  // Needed to position dots accurately
-                  builder: (context, constraints) {
-                    return Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        InteractiveViewer(
-                          panEnabled: !_isDrawMode,
-                          scaleEnabled: !_isDrawMode,
-                          child: Center(
-                            child: GestureDetector(
-                              onPanStart: _isDrawMode ? _onPanStart : null,
-                              onPanUpdate: _isDrawMode ? _onPanUpdate : null,
-                              onPanEnd: _isDrawMode ? _onPanEnd : null,
-                              child: Stack(
-                                children: [
-                                  Image.file(
-                                    File(widget.imagePaths[_currentImageIndex]),
-                                    key: _imageKey,
-                                    fit: BoxFit.contain,
-                                  ),
-
-                                  // 1. Current Drawing Overlay
-                                  if (_isDrawMode &&
-                                      _startPos != null &&
-                                      _currentPos != null)
-                                    Positioned.fill(
-                                      child: CustomPaint(
-                                        painter: SelectionOverlayPainter(
-                                          rect: Rect.fromPoints(
-                                            _startPos!,
-                                            _currentPos!,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    PageView.builder(
+                      controller: _pageController,
+                      itemCount: widget.imagePaths.length,
+                      onPageChanged: (index) {
+                        setState(() {
+                          _currentImageIndex = index;
+                          _isDrawMode = false;
+                          _finalSelectionRect = null;
+                        });
+                      },
+                      itemBuilder: (context, index) {
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            return Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                InteractiveViewer(
+                                  panEnabled: !_isDrawMode,
+                                  scaleEnabled: !_isDrawMode,
+                                  child: Center(
+                                    child: GestureDetector(
+                                      onPanStart:
+                                          _isDrawMode ? _onPanStart : null,
+                                      onPanUpdate:
+                                          _isDrawMode ? _onPanUpdate : null,
+                                      onPanEnd: _isDrawMode ? _onPanEnd : null,
+                                      child: Stack(
+                                        children: [
+                                          // THE IMAGE WITH UNIQUE KEY
+                                          Image.file(
+                                            File(widget.imagePaths[index]),
+                                            key: _imageKeys[index],
+                                            fit: BoxFit.contain,
+                                            width: double.infinity,
                                           ),
+                                          // DRAWING OVERLAY (Only if drawing on THIS page)
+                                          if (_isDrawMode &&
+                                              index == _currentImageIndex &&
+                                              _startPos != null &&
+                                              _currentPos != null)
+                                            Positioned.fill(
+                                              child: CustomPaint(
+                                                painter:
+                                                    SelectionOverlayPainter(
+                                                      rect: Rect.fromPoints(
+                                                        _startPos!,
+                                                        _currentPos!,
+                                                      ),
+                                                    ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // EXISTING NOTE INDICATORS (Dots)
+                                ...(_notesPerImage[index] ?? []).map((note) {
+                                  return Positioned(
+                                    left:
+                                        (note.normX * constraints.maxWidth) -
+                                        10,
+                                    top:
+                                        (note.normY * constraints.maxHeight) -
+                                        10,
+                                    child: Container(
+                                      width: 20,
+                                      height: 20,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.3,
+                                            ),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                        ],
+                                        border: Border.all(
+                                          color: const Color(0xFF7C4DFF),
+                                          width: 2,
                                         ),
                                       ),
                                     ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // 2. RENDER PERSISTENT DOTS FOR ADDED NOTES
-                        ..._addedNotes.map((note) {
-                          return Positioned(
-                            left: (note.normX * constraints.maxWidth) - 10,
-                            top: (note.normY * constraints.maxHeight) - 10,
-                            child: Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.3),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ],
-                                // Removed borders, just pure white dots per request
-                              ),
-                            ),
-                          );
-                        }).toList(),
-
-                        // 3. Notes Button
-                        Positioned(
-                          bottom: 12, // Moved closer to corner (was 16)
-                          right: 12, // Moved closer to corner (was 16)
-                          child: ElevatedButton(
-                            onPressed: _activateSelectionMode,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black,
-                              elevation: 2,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              side: BorderSide(color: Colors.grey[200]!),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Text(
-                                  "Notes",
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                SizedBox(width: 8),
-                                Icon(Icons.assignment_outlined, size: 18),
+                                  );
+                                }).toList(),
                               ],
-                            ),
-                          ),
-                        ),
-
-                        // 4. "TOP" INSTRUCTION POP UP
-                        if (_isDrawMode && _startPos == null)
-                          Positioned(
-                            top: 20,
-                            left: 0,
-                            right: 0,
-                            child: Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black87,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: const Text(
-                                  "Drag on image to select area",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                    // PAGE DOTS
+                    if (widget.imagePaths.length > 1)
+                      Positioned(
+                        bottom: 12,
+                        left: 0,
+                        right: 0,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            widget.imagePaths.length,
+                            (index) => Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color:
+                                    _currentImageIndex == index
+                                        ? Colors.blue
+                                        : Colors.white.withOpacity(0.5),
                               ),
                             ),
                           ),
-                      ],
-                    );
-                  },
+                        ),
+                      ),
+                    // NOTES BUTTON
+                    Positioned(
+                      bottom: 24,
+                      right: 12,
+                      child: ElevatedButton.icon(
+                        onPressed: _activateSelectionMode,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.assignment_outlined, size: 18),
+                        label: const Text(
+                          "Notes",
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                    // INSTRUCTION OVERLAY
+                    if (_isDrawMode && _startPos == null)
+                      Positioned(
+                        top: 20,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              "Drag on image to select area",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
           ),
-
-          // --- BOTTOM FORM AREA ---
+          // --- BOTTOM FORM (TAGS & SAVE) ---
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(24),
@@ -574,107 +615,79 @@ class _ImageSavePageState extends State<ImageSavePage> {
               ],
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // --- THE BOX WRAPPER ---
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey[300]!, width: 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'What do you like about this image?',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Tags',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 12),
-
-                      const Divider(height: 1, color: Color(0xFFEEEEEE)),
-
-                      const SizedBox(height: 16),
-
-                      // Tags
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children:
-                            _availableTags.map((tag) {
-                              final isSelected = _selectedTags.contains(tag);
-                              return GestureDetector(
-                                onTap: () => _toggleTag(tag),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        isSelected
-                                            ? const Color(0xFFEEF0FF)
-                                            : Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color:
-                                          isSelected
-                                              ? const Color(0xFF7C4DFF)
-                                              : Colors.grey[400]!,
-                                      width: 1.0,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (isSelected) ...[
-                                        const Icon(
-                                          Icons.close,
-                                          size: 14,
-                                          color: Color(0xFF7C4DFF),
-                                        ),
-                                        const SizedBox(width: 6),
-                                      ],
-                                      Text(
-                                        tag,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight:
-                                              isSelected
-                                                  ? FontWeight.w600
-                                                  : FontWeight.normal,
-                                          color:
-                                              isSelected
-                                                  ? const Color(0xFF7C4DFF)
-                                                  : Colors.black87,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                    ),
+                    if (widget.imagePaths.length > 1)
+                      Text(
+                        "Image ${_currentImageIndex + 1}/${widget.imagePaths.length}",
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
                       ),
-                    ],
-                  ),
+                  ],
                 ),
-
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children:
+                      _availableTags.map((tag) {
+                        final isSelected = currentTags.contains(tag);
+                        return GestureDetector(
+                          onTap: () => _toggleTag(tag),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  isSelected
+                                      ? const Color(0xFFEEF0FF)
+                                      : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color:
+                                    isSelected
+                                        ? const Color(0xFF7C4DFF)
+                                        : Colors.grey[300]!,
+                              ),
+                            ),
+                            child: Text(
+                              tag,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight:
+                                    isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                color:
+                                    isSelected
+                                        ? const Color(0xFF7C4DFF)
+                                        : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                ),
                 const SizedBox(height: 24),
-
-                // Save Button
                 SizedBox(
                   width: double.infinity,
                   height: 54,
                   child: ElevatedButton(
                     onPressed: _isSaving ? null : _onSaveToMoodboard,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF212121),
+                      backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
-                      elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(27),
                       ),
@@ -689,16 +702,15 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                 strokeWidth: 2,
                               ),
                             )
-                            : const Text(
-                              'Save to Moodboard',
-                              style: TextStyle(
+                            : Text(
+                              'Save ${widget.imagePaths.length > 1 ? "All" : ""} to Moodboard',
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                   ),
                 ),
-                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -708,6 +720,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
   }
 }
 
+// --- OVERLAY PAINTER ---
 class SelectionOverlayPainter extends CustomPainter {
   final Rect rect;
 
@@ -717,11 +730,9 @@ class SelectionOverlayPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final Path backgroundPath =
         Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-
     final Path holePath = Path()..addRect(rect);
-
     final Path overlayPath = Path.combine(
-      PathOperation.difference,
+      ui.PathOperation.difference,
       backgroundPath,
       holePath,
     );
@@ -738,7 +749,7 @@ class SelectionOverlayPainter extends CustomPainter {
     double dashSpace = 4;
     Path borderPath = Path()..addRect(rect);
 
-    for (PathMetric pathMetric in borderPath.computeMetrics()) {
+    for (ui.PathMetric pathMetric in borderPath.computeMetrics()) {
       double distance = 0.0;
       while (distance < pathMetric.length) {
         canvas.drawPath(
@@ -753,6 +764,7 @@ class SelectionOverlayPainter extends CustomPainter {
         Paint()
           ..color = Colors.white
           ..style = PaintingStyle.fill;
+
     canvas.drawCircle(
       rect.center,
       8,
@@ -764,7 +776,6 @@ class SelectionOverlayPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant SelectionOverlayPainter oldDelegate) {
-    return rect != oldDelegate.rect;
-  }
+  bool shouldRepaint(covariant SelectionOverlayPainter oldDelegate) =>
+      rect != oldDelegate.rect;
 }

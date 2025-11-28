@@ -35,10 +35,10 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
 
   Future<void> _initData() async {
     final events = await _projectRepo.getEvents(widget.projectId);
-    
+
     _mainProject = ProjectModel(
       id: widget.projectId,
-      title: "Main Project", 
+      title: "Main Project",
       lastAccessedAt: DateTime.now(),
       createdAt: DateTime.now(),
     );
@@ -51,7 +51,7 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
 
   Future<void> _loadImagesForSelected() async {
     if (_selectedProject?.id == null) return;
-    
+
     setState(() => _isLoading = true);
 
     final images = await _imageRepo.getImages(_selectedProject!.id!);
@@ -62,7 +62,7 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
 
   void _categorizeImages(List<ImageModel> images) {
     _categorizedImages.clear();
-    
+
     for (var img in images) {
       if (img.tags.isEmpty) {
         if (!_categorizedImages.containsKey('Uncategorized')) {
@@ -89,12 +89,32 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
     }
   }
 
+  // Navigate to image details and refresh on return
+  Future<void> _navigateToImageDetails(ImageModel image) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => ImageDetailsPage(
+              imagePath: image.filePath,
+              imageId: image.id,
+              projectId: widget.projectId,
+            ),
+      ),
+    );
+
+    // Refresh the board when returning from image details
+    // The result can be anything or null - we always refresh
+    await _loadImagesForSelected();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final buttonColor = isDark ? Colors.white.withOpacity(0.1) : Colors.grey[100];
+    final buttonColor =
+        isDark ? Colors.white.withOpacity(0.1) : Colors.grey[100];
 
     final List<DropdownMenuItem<ProjectModel>> dropdownItems = [];
     if (_mainProject != null) {
@@ -145,7 +165,10 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
         children: [
           // Controls Row
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -168,7 +191,11 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                           fontWeight: FontWeight.w500,
                           fontSize: 14,
                         ),
-                        icon: Icon(Icons.keyboard_arrow_down, size: 18, color: theme.iconTheme.color),
+                        icon: Icon(
+                          Icons.keyboard_arrow_down,
+                          size: 18,
+                          color: theme.iconTheme.color,
+                        ),
                         dropdownColor: theme.cardColor,
                       ),
                     ),
@@ -176,23 +203,23 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                 ),
                 const SizedBox(width: 8),
                 _buildControlIcon(
-                  theme, 
-                  buttonColor, 
+                  theme,
+                  buttonColor,
                   Icons.palette_outlined,
-                  "Stylesheet", 
+                  "Stylesheet",
                   () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Stylesheet")),
-                    );
-                  }
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text("Stylesheet")));
+                  },
                 ),
                 const SizedBox(width: 8),
                 _buildControlIcon(
-                  theme, 
-                  buttonColor, 
+                  theme,
+                  buttonColor,
                   Icons.tune_outlined,
                   "Filter",
-                  () {}
+                  () {},
                 ),
               ],
             ),
@@ -200,96 +227,125 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
 
           // Main Content
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _categorizedImages.isEmpty
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _categorizedImages.isEmpty
                     ? Center(
-                        child: Text(
-                          "No images found",
-                          style: TextStyle(
-                            fontFamily: 'GeneralSans',
-                            color: theme.colorScheme.onSurface.withOpacity(0.6),
-                          ),
+                      child: Text(
+                        "No images found",
+                        style: TextStyle(
+                          fontFamily: 'GeneralSans',
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        itemCount: _categorizedImages.keys.length,
-                        itemBuilder: (context, index) {
-                          final category = _categorizedImages.keys.elementAt(index);
-                          final images = _categorizedImages[category]!;
-
-                          return GestureDetector(
-                            onTap: () {
-                              if (_selectedProject?.id != null) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ProjectTagPage(
-                                      projectId: _selectedProject!.id!,
-                                      tag: category,
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              clipBehavior: Clip.antiAlias,
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                                border: Border.all(color: Colors.grey.withOpacity(0.3)),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Category Header
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          category.toUpperCase(),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 1.0,
-                                            fontFamily: 'GeneralSans',
-                                            color: theme.colorScheme.onSurface,
-                                          ),
-                                        ),
-                                        Icon(
-                                          Icons.arrow_forward,
-                                          size: 16,
-                                          color: theme.colorScheme.onSurface.withOpacity(0.4),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  
-                                  // Image List
-                                  SizedBox(
-                                    height: 140, // Adjusted height since footer is gone
-                                    child: ListView.separated(
-                                      clipBehavior: Clip.none,
-                                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                                      scrollDirection: Axis.horizontal,
-                                      itemCount: images.length,
-                                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                                      itemBuilder: (context, imgIndex) {
-                                        final image = images[imgIndex];
-                                        return _buildImageCard(image, theme, isDark);
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
                       ),
+                    )
+                    : ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      itemCount: _categorizedImages.keys.length,
+                      itemBuilder: (context, index) {
+                        final category = _categorizedImages.keys.elementAt(
+                          index,
+                        );
+                        final images = _categorizedImages[category]!;
+
+                        return GestureDetector(
+                          onTap: () {
+                            if (_selectedProject?.id != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => ProjectTagPage(
+                                        projectId: _selectedProject!.id!,
+                                        tag: category,
+                                      ),
+                                ),
+                              ).then((_) => _loadImagesForSelected());
+                            }
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(
+                              color:
+                                  isDark
+                                      ? const Color(0xFF1E1E1E)
+                                      : Colors.white,
+                              border: Border.all(
+                                color: Colors.grey.withOpacity(0.3),
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Category Header
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    12,
+                                    16,
+                                    8,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        category.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.0,
+                                          fontFamily: 'GeneralSans',
+                                          color: theme.colorScheme.onSurface,
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.arrow_forward,
+                                        size: 16,
+                                        color: theme.colorScheme.onSurface
+                                            .withOpacity(0.4),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Image List
+                                SizedBox(
+                                  height: 140,
+                                  child: ListView.separated(
+                                    clipBehavior: Clip.none,
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      0,
+                                      16,
+                                      16,
+                                    ),
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: images.length,
+                                    separatorBuilder:
+                                        (_, __) => const SizedBox(width: 8),
+                                    itemBuilder: (context, imgIndex) {
+                                      final image = images[imgIndex];
+                                      return _buildImageCard(
+                                        image,
+                                        theme,
+                                        isDark,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
           ),
         ],
       ),
@@ -297,11 +353,11 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
   }
 
   Widget _buildControlIcon(
-    ThemeData theme, 
-    Color? bgColor, 
-    IconData icon, 
+    ThemeData theme,
+    Color? bgColor,
+    IconData icon,
     String tooltip,
-    VoidCallback onTap
+    VoidCallback onTap,
   ) {
     return GestureDetector(
       onTap: onTap,
@@ -319,24 +375,7 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
 
   Widget _buildImageCard(ImageModel image, ThemeData theme, bool isDark) {
     return GestureDetector(
-      // <-- Added this wrapper
-      onTap: () {
-        // Navigate to Image Details
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (_) => ImageDetailsPage(
-                  imagePath: image.filePath,
-                  imageId: image.id,
-                  projectId: widget.projectId,
-                ),
-          ),
-        ).then((_) {
-          // Refresh board when returning (in case tags changed)
-          _loadImagesForSelected();
-        });
-      },
+      onTap: () => _navigateToImageDetails(image),
       child: Container(
         width: 120,
         clipBehavior: Clip.antiAlias,
@@ -349,9 +388,7 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
           fit: StackFit.expand,
           children: [
             Hero(
-              // Optional: Add Hero for smooth zoom animation
-              tag:
-                  'image_${image.id}', // Make sure this matches the tag in ImageDetailsPage
+              tag: 'image_${image.id}',
               child: Image.file(
                 File(image.filePath),
                 fit: BoxFit.cover,

@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'dart:ui' as ui; // Fixed import
+import 'dart:ui' as ui; 
 import 'package:flutter/material.dart';
 
-// --- IMPORTS ---
+//services,models
 import '../../services/image_service.dart';
 import '../../services/note_service.dart';
 import '../../data/models/note_model.dart';
@@ -47,14 +47,17 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
 
   // Master List of Tags
   final List<String> _allAvailableTags = [
-    'Fonts',
-    'Colours',
-    'Everything!',
     'Compositions',
-    'Textures',
-    'Layout',
-    'Dark Mode',
-    'Minimal',
+    'Subject',
+    'Fonts',
+    'Background',
+    'Texture',
+    'Colours',
+    'Material Look',
+    'Lighting',
+    'Style',
+    'Era',
+    'Emotion',
   ];
 
   @override
@@ -163,7 +166,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
   // --- ADD NOTE INPUT DIALOG ---
   void _showAddNoteInputDialog() {
     final TextEditingController newNoteController = TextEditingController();
-    String newCategory = 'Typography';
+    String newCategory = 'Compositions';
 
     showModalBottomSheet(
       context: context,
@@ -208,11 +211,17 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                       ),
                       items:
                           [
-                                'Typography',
-                                'Color Palette',
-                                'Layout',
-                                'Design Style',
-                                'General',
+                                'Compositions',
+                                'Subject',
+                                'Fonts',
+                                'Background',
+                                'Texture',
+                                'Colours',
+                                'Material Look',
+                                'Lighting',
+                                'Style',
+                                'Era',
+                                'Emotion',
                               ]
                               .map(
                                 (c) =>
@@ -592,7 +601,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                                                     BorderRadius.circular(20),
                                               ),
                                               child: const Text(
-                                                "Drag to add note",
+                                                "Drag on image to select area",
                                                 style: TextStyle(
                                                   color: Colors.white,
                                                   fontSize: 12,

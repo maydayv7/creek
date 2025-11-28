@@ -110,4 +110,8 @@ class ImageService {
       await _repo.deleteImage(id);
     }
   }
+
+  Future<List<ImageModel>> getImages(int projectId) async {
+    return await _repo.getImages(projectId);
+  }
 }
