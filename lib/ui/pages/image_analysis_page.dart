@@ -269,6 +269,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
         _buildList("Layout Composition", results['Layout']),
         _buildList("Color Palette", results['Colour Palette']),
         _buildList("Texture", results['Texture']),
+        _buildList("Font", results['Font']),
       ],
     );
   }

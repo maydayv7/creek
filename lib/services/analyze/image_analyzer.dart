@@ -13,6 +13,7 @@ import 'color.dart';
 import 'texture.dart';
 import 'embedding.dart';
 import 'layout.dart';
+import 'font.dart';
 
 class ImageAnalyzerService {
 
@@ -44,6 +45,8 @@ class ImageAnalyzerService {
       copy('emotion_centroids.json'),
       copy('lighting_centroids.json'),
       copy('era_centroids.json'),
+      copy('fannet.onnx'),
+      copy('font_database.json'),
     ]);
 
     return {
@@ -55,6 +58,8 @@ class ImageAnalyzerService {
       'emotion_json': paths[5],
       'lighting_json': paths[6],
       'era_json': paths[7],
+      'fannet_model': paths[8],
+      'font_json': paths[9],
     };
   }
 
@@ -119,21 +124,18 @@ class ImageAnalyzerService {
       // 2. Run Analysis
       final results = await Future.wait([
         
-        // --- GROUP A: MAIN THREAD (Python) ---
+        // --- GROUP A: PARALLEL ---
         _runProfiledJob(
-          name: 'Layout', imagePath: imagePath, rootToken: token, runInIsolate: false, 
+          name: 'Layout', imagePath: imagePath, rootToken: token, runInIsolate: true, 
           assetPaths: assetPaths,
           task: (path, _) => LayoutAnalyzerService().analyze(path)
         ),
         
         _runProfiledJob(
-          name: 'Color', imagePath: imagePath, rootToken: token, runInIsolate: false, 
+          name: 'Color', imagePath: imagePath, rootToken: token, runInIsolate: true, 
           assetPaths: assetPaths,
           task: (path, _) => ColorAnalyzerService().analyze(path)
         ),
-        
-        // --- GROUP B: PARALLEL (ONNX FFI) ---
-        // Notice we pass assetPaths to the tasks
         
         _runProfiledJob(
           name: 'Texture', imagePath: imagePath, rootToken: token, runInIsolate: true, 
@@ -205,6 +207,21 @@ class ImageAnalyzerService {
              return res;
           }
         ),
+
+        // --- GROUP B: MAIN THREAD ---
+        _runProfiledJob(
+          name: 'Font', imagePath: imagePath, rootToken: token, runInIsolate: false, 
+          assetPaths: assetPaths,
+          task: (path, assets) async {
+             final service = FontIdentifierService();
+             final res = await service.analyze(path, 
+                modelPath: assets['fannet_model'], 
+                jsonPath: assets['font_json']
+             );
+             service.dispose();
+             return res;
+          }
+        ),
       ]);
 
       totalSw.stop();
@@ -222,6 +239,7 @@ class ImageAnalyzerService {
           'Emotions': results[4]['execution_time'],
           'Lighting': results[5]['execution_time'],
           'Era': results[6]['execution_time'],
+          'Font': results[7]['execution_time'],
         }
       };
       _logSummary(logResult);
@@ -237,7 +255,8 @@ class ImageAnalyzerService {
             'Colour Palette': {"scores": results[1]['scores']},
             'Emotions': {"scores": results[4]['scores']},
             'Era': {"scores": results[6]['scores']},
-            'Layout': {"scores": results[0]['scores']}
+            'Layout': {"scores": results[0]['scores']},
+            'Font': {"scores": results[7]['scores']},
           }
         },
         'error': null,
@@ -258,6 +277,7 @@ class ImageAnalyzerService {
             'Colour Palette': {"scores": {}},
             'Emotions': {"scores": {}},
             'Era': {"scores": {}},
+            'Font': {"scores": {}},
           }
         },
         'error': e.toString()
