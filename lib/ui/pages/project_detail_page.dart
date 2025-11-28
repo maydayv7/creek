@@ -1,13 +1,9 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:adobe/data/models/project_model.dart';
-import 'package:adobe/data/models/image_model.dart';
-import 'package:adobe/data/models/file_model.dart';
-import 'package:adobe/data/repos/project_repo.dart';
-import 'package:adobe/data/repos/image_repo.dart';
-import 'package:adobe/data/repos/file_repo.dart';
-import 'package:adobe/services/project_service.dart';
+import '../../data/models/project_model.dart';
+import '../../data/repos/project_repo.dart';
+import '../../services/project_service.dart';
+import 'project_board_page.dart'; // Import the board page
 
 class ProjectDetailPage extends StatefulWidget {
   final int projectId;
@@ -18,56 +14,42 @@ class ProjectDetailPage extends StatefulWidget {
   State<ProjectDetailPage> createState() => _ProjectDetailPageState();
 }
 
-class _ProjectDetailPageState extends State<ProjectDetailPage>
-    with SingleTickerProviderStateMixin {
+class _ProjectDetailPageState extends State<ProjectDetailPage> {
   final _projectRepo = ProjectRepo();
-  final _imageRepo = ImageRepo();
-  final _fileRepo = FileRepo();
   final _projectService = ProjectService();
 
   ProjectModel? _project;
-  List<ImageModel> _images = [];
-  List<FileModel> _files = [];
   List<ProjectModel> _events = [];
   bool _isLoading = true;
-  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadData();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
       final project = await _projectRepo.getProjectById(widget.projectId);
+      
+      // If project not found, handle exit
       if (project == null) {
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Project not found')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Project not found')),
+          );
         }
         return;
       }
 
-      final images = await _imageRepo.getImages(widget.projectId);
-      final files = await _fileRepo.getFiles(widget.projectId);
+      // Fetch sub-events
       final events = await _projectRepo.getEvents(widget.projectId);
 
       if (mounted) {
         setState(() {
           _project = project;
-          _images = images;
-          _files = files;
           _events = events;
           _isLoading = false;
         });
@@ -76,9 +58,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
       debugPrint('Error loading project data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading project: $e')));
       }
     }
   }
@@ -93,81 +72,87 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
     await showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text(
-              "Create New Event",
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    hintText: "Event Name",
-                    labelText: "Name",
-                    border: OutlineInputBorder(),
-                  ),
-                  autofocus: true,
-                  style: const TextStyle(fontFamily: 'GeneralSans'),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    hintText: "Description (optional)",
-                    labelText: "Description",
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                  style: const TextStyle(fontFamily: 'GeneralSans'),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  "Cancel",
-                  style: TextStyle(fontFamily: 'GeneralSans'),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (nameController.text.trim().isNotEmpty) {
-                    try {
-                      await _projectService.createProject(
-                        nameController.text.trim(),
-                        description:
-                            descriptionController.text.trim().isEmpty
-                                ? null
-                                : descriptionController.text.trim(),
-                        parentId: _project!.id,
-                      );
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        _loadData();
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error creating event: $e')),
-                        );
-                      }
-                    }
-                  }
-                },
-                child: const Text(
-                  "Create",
-                  style: TextStyle(fontFamily: 'GeneralSans'),
-                ),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text(
+          "Create New Event",
+          style: TextStyle(
+            fontFamily: 'GeneralSans',
+            fontWeight: FontWeight.w600,
           ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                hintText: "Event Name",
+                labelText: "Name",
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+              style: const TextStyle(fontFamily: 'GeneralSans'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                hintText: "Description (optional)",
+                labelText: "Description",
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              style: const TextStyle(fontFamily: 'GeneralSans'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.trim().isNotEmpty) {
+                try {
+                  await _projectService.createProject(
+                    nameController.text.trim(),
+                    description: descriptionController.text.trim().isEmpty
+                        ? null
+                        : descriptionController.text.trim(),
+                    parentId: _project!.id,
+                  );
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    _loadData(); // Refresh to show new event
+                  }
+                } catch (e) {
+                  debugPrint("Error creating event: $e");
+                }
+              }
+            },
+            child: const Text("Create"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToBoard(int projectId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProjectBoardPage(projectId: projectId),
+      ),
+    ).then((_) => _loadData()); // Refresh on return (e.g. last accessed update)
+  }
+
+  void _showPlaceholder(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature coming soon!'),
+        duration: const Duration(seconds: 1),
+      ),
     );
   }
 
@@ -179,365 +164,255 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
     if (_isLoading) {
       return Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: const Text("Project"),
-          backgroundColor: theme.appBarTheme.backgroundColor,
-        ),
+        appBar: AppBar(title: const Text("Loading...")),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_project == null) {
-      return Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: const Text("Project"),
-          backgroundColor: theme.appBarTheme.backgroundColor,
-        ),
-        body: const Center(child: Text("Project not found")),
-      );
-    }
+    if (_project == null) return const Scaffold(body: SizedBox());
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(_project!.title),
         backgroundColor: theme.appBarTheme.backgroundColor,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: "Moodboard"),
-            Tab(text: "Stylesheet"),
-            Tab(text: "Files"),
-          ],
-          labelStyle: const TextStyle(
-            fontFamily: 'GeneralSans',
-            fontWeight: FontWeight.w600,
-          ),
-        ),
       ),
-      body: Column(
-        children: [
-          // Tab Content
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildMoodboardTab(theme, isDark),
-                _buildStylesheetTab(theme, isDark),
-                _buildFilesTab(theme, isDark),
-              ],
-            ),
-          ),
-          // Events Section
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? Colors.grey[850] : Colors.grey[50],
-              border: Border(
-                top: BorderSide(
-                  color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-                  width: 1,
-                ),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Main Project Details & Actions
+              _buildSectionHeader("Project Overview", theme),
+              const SizedBox(height: 8),
+              if (_project!.description != null && _project!.description!.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                  child: Row(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    _project!.description!,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                      fontFamily: 'GeneralSans',
+                    ),
+                  ),
+                ),
+              
+              // Actions for Main Project
+              _buildActionRow(_project!.id!, theme, isDark),
+
+              const SizedBox(height: 32),
+
+              // 2. Events Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildSectionHeader("Events", theme),
+                  IconButton(
+                    onPressed: _createEventDialog,
+                    icon: Icon(Icons.add_circle, color: theme.colorScheme.primary),
+                    tooltip: "Add Event",
+                  )
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // 3. Events List
+              if (_events.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[850] : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
+                    ),
+                  ),
+                  child: Column(
                     children: [
+                      Icon(Icons.event_note, size: 48, color: Colors.grey[400]),
+                      const SizedBox(height: 8),
                       Text(
-                        "Events",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'GeneralSans',
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: _createEventDialog,
-                        icon: const Icon(Icons.add),
-                        tooltip: 'Create Event',
+                        "No events created yet",
+                        style: TextStyle(color: Colors.grey[500]),
                       ),
                     ],
                   ),
+                )
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _events.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final event = _events[index];
+                    return _buildEventCard(event, theme, isDark);
+                  },
                 ),
-                SizedBox(
-                  height: 120,
-                  child:
-                      _events.isEmpty
-                          ? Center(
-                            child: Text(
-                              "No events yet. Tap + to create one.",
-                              style: TextStyle(
-                                color: theme.colorScheme.onSurface.withOpacity(
-                                  0.6,
-                                ),
-                                fontFamily: 'GeneralSans',
-                              ),
-                            ),
-                          )
-                          : ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            itemCount: _events.length,
-                            itemBuilder: (context, index) {
-                              final event = _events[index];
-                              return _buildEventCard(event, theme, isDark);
-                            },
-                          ),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
+                
+              const SizedBox(height: 40),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMoodboardTab(ThemeData theme, bool isDark) {
-    if (_images.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.image_outlined,
-              size: 64,
-              color: theme.colorScheme.onSurface.withOpacity(0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              "No images in moodboard",
-              style: TextStyle(
-                fontSize: 18,
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
-                fontFamily: 'GeneralSans',
-              ),
-            ),
-          ],
         ),
-      );
-    }
-
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: _images.length,
-      itemBuilder: (context, index) {
-        final image = _images[index];
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.file(
-            File(image.filePath),
-            fit: BoxFit.cover,
-            errorBuilder:
-                (context, error, stackTrace) => Container(
-                  color: isDark ? Colors.grey[700] : Colors.grey[200],
-                  child: Icon(
-                    Icons.broken_image,
-                    color: theme.colorScheme.onSurface.withOpacity(0.3),
-                  ),
-                ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildStylesheetTab(ThemeData theme, bool isDark) {
-    final stylesheet = _project?.styleSheetMap ?? {};
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Global Stylesheet",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'GeneralSans',
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (stylesheet.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[800] : Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  "No stylesheet data yet",
-                  style: TextStyle(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
-                    fontFamily: 'GeneralSans',
-                  ),
-                ),
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[800] : Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-                ),
-              ),
-              child: SelectableText(
-                const JsonEncoder.withIndent('  ').convert(stylesheet),
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }
 
-  Widget _buildFilesTab(ThemeData theme, bool isDark) {
-    if (_files.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.folder_outlined,
-              size: 64,
-              color: theme.colorScheme.onSurface.withOpacity(0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              "No files yet",
-              style: TextStyle(
-                fontSize: 18,
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
-                fontFamily: 'GeneralSans',
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+  // --- Widgets ---
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _files.length,
-      itemBuilder: (context, index) {
-        final file = _files[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          color: isDark ? Colors.grey[800] : Colors.grey[100],
-          child: ListTile(
-            leading: Icon(
-              Icons.insert_drive_file,
-              color: theme.colorScheme.primary,
-            ),
-            title: Text(
-              file.name,
-              style: const TextStyle(
-                fontFamily: 'GeneralSans',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            subtitle:
-                file.description != null
-                    ? Text(
-                      file.description!,
-                      style: const TextStyle(fontFamily: 'GeneralSans'),
-                    )
-                    : null,
-            trailing: Icon(
-              Icons.chevron_right,
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
-            ),
-            onTap: () {
-              // TODO: Open file viewer/editor
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Opening ${file.name}...')),
-              );
-            },
-          ),
-        );
-      },
+  Widget _buildSectionHeader(String title, ThemeData theme) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+        fontFamily: 'GeneralSans',
+        color: theme.colorScheme.onSurface,
+      ),
     );
   }
 
   Widget _buildEventCard(ProjectModel event, ThemeData theme, bool isDark) {
-    return GestureDetector(
-      onTap: () {
-        // Navigate to event detail (could be same page or different)
-        if (event.id != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ProjectDetailPage(projectId: event.id!),
-            ),
-          ).then((_) => _loadData());
-        }
-      },
-      child: Container(
-        width: 200,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          color: isDark ? Colors.grey[800] : Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-            width: 1,
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[850] : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          )
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Icon(Icons.event, size: 32, color: theme.colorScheme.primary),
-              const SizedBox(height: 8),
-              Text(
-                event.title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'GeneralSans',
-                  color: theme.colorScheme.onSurface,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (event.description != null &&
-                  event.description!.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  event.description!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+              Icon(Icons.event, size: 20, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  event.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                     fontFamily: 'GeneralSans',
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
+              ),
+            ],
+          ),
+          if (event.description != null && event.description!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              event.description!,
+              style: TextStyle(
+                fontSize: 13,
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 16),
+          // Actions for this specific Event
+          _buildActionRow(event.id!, theme, isDark, isSmall: true),
+        ],
+      ),
+    );
+  }
+
+  /// Reusable row of actions (Moodboard, Stylesheet, Files)
+  Widget _buildActionRow(int targetId, ThemeData theme, bool isDark, {bool isSmall = false}) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildActionButton(
+            label: "Moodboard",
+            icon: Icons.dashboard_outlined,
+            color: Colors.purple, // Distinct color for main action
+            theme: theme,
+            isDark: isDark,
+            isSmall: isSmall,
+            onTap: () => _navigateToBoard(targetId),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildActionButton(
+            label: "Stylesheet",
+            icon: Icons.palette_outlined,
+            color: Colors.blue,
+            theme: theme,
+            isDark: isDark,
+            isSmall: isSmall,
+            onTap: () => _showPlaceholder("Stylesheet"),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildActionButton(
+            label: "Files",
+            icon: Icons.folder_open_outlined,
+            color: Colors.orange,
+            theme: theme,
+            isDark: isDark,
+            isSmall: isSmall,
+            onTap: () => _showPlaceholder("Files"),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required ThemeData theme,
+    required bool isDark,
+    required VoidCallback onTap,
+    bool isSmall = false,
+  }) {
+    return Material(
+      color: isDark ? Colors.grey[800] : Colors.grey[100],
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: isSmall ? 10 : 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: isSmall ? 20 : 24, color: color),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: isSmall ? 11 : 13,
+                  fontWeight: FontWeight.w500,
+                  color: theme.colorScheme.onSurface,
+                  fontFamily: 'GeneralSans',
+                ),
+              ),
             ],
           ),
         ),
