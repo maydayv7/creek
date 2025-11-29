@@ -5,7 +5,7 @@ buildscript {
         maven { url = uri("https://chaquo.com/maven") }
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.7.0")
+        classpath("com.android.tools.build:gradle:8.9.1")
         classpath("com.chaquo.python:gradle:15.0.1")
     }
 }
