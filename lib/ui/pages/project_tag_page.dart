@@ -1,10 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:adobe/ui/styles/variables.dart';
+import 'package:adobe/ui/widgets/top_bar.dart';
+import 'package:adobe/ui/widgets/bottom_bar.dart';
 import '../../data/models/image_model.dart';
 import '../../data/repos/image_repo.dart';
-import '../../data/repos/project_repo.dart'; // Added to fetch project name
-import 'image_save_page.dart'; // Import Save Page
+import '../../data/repos/project_repo.dart';
+import 'image_save_page.dart';
+import 'image_details_page.dart';
 
 class ProjectTagPage extends StatefulWidget {
   final int projectId;
@@ -26,7 +30,7 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
   final ImagePicker _picker = ImagePicker();
   
   List<ImageModel> _images = [];
-  String _projectName = "Project"; // Default
+  String _projectName = "Project";
   bool _isLoading = true;
 
   @override
@@ -36,7 +40,9 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
   }
 
   Future<void> _loadData() async {
-    // 1. Fetch Images
+    final project = await _projectRepo.getProjectById(widget.projectId);
+    if (project != null) _projectName = project.title;
+
     final allImages = await _imageRepo.getImages(widget.projectId);
     final filtered = allImages.where((img) {
       if (widget.tag == 'Uncategorized') {
@@ -45,13 +51,9 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
       return img.tags.contains(widget.tag);
     }).toList();
 
-    // 2. Fetch Project Name (for the Save Page)
-    final project = await _projectRepo.getProjectById(widget.projectId);
-
     if (mounted) {
       setState(() {
         _images = filtered;
-        if (project != null) _projectName = project.title;
         _isLoading = false;
       });
     }
@@ -59,52 +61,62 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
 
   Future<void> _pickAndRedirect() async {
     try {
-      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-      if (pickedFile != null) {
+      final List<XFile> pickedFiles = await _picker.pickMultiImage();
+      if (pickedFiles.isNotEmpty) {
         if (!mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => ImageSavePage(
-              imagePaths: [pickedFile.path],
+              imagePaths: pickedFiles.map((e) => e.path).toList(),
               projectId: widget.projectId,
               projectName: _projectName,
               isFromShare: false,
             ),
           ),
-        ).then((_) => _loadData()); // Refresh upon return
+        ).then((_) => _loadData());
       }
     } catch (e) {
-      debugPrint("Error picking image: $e");
+      debugPrint("Error picking images: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    // 1. Prepare Columns for Masonry Layout
+    final leftColumn = <Widget>[];
+    final rightColumn = <Widget>[];
+
+    for (int i = 0; i < _images.length; i++) {
+      final item = _buildStaggeredImageItem(_images[i], index: i);
+      if (i % 2 == 0) {
+        leftColumn.add(item);
+      } else {
+        rightColumn.add(item);
+      }
+    }
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(
-          widget.tag.toUpperCase(),
-          style: const TextStyle(
-            fontFamily: 'GeneralSans',
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.0,
-          ),
-        ),
-        centerTitle: false,
-        backgroundColor: theme.appBarTheme.backgroundColor,
-        elevation: 0,
+      backgroundColor: Variables.background,
+      
+      appBar: TopBar(
+        currentProjectId: widget.projectId,
+        titleOverride: widget.tag.toUpperCase(),
+        onBack: () => Navigator.pop(context),
       ),
+
+      bottomNavigationBar: BottomBar(
+        currentTab: BottomBarItem.moodboard,
+        projectId: widget.projectId,
+      ),
+
       floatingActionButton: FloatingActionButton(
         onPressed: _pickAndRedirect,
-        backgroundColor: isDark ? Colors.white : Colors.black,
-        foregroundColor: isDark ? Colors.black : Colors.white,
+        backgroundColor: Variables.textPrimary,
+        foregroundColor: Variables.background,
         child: const Icon(Icons.add_photo_alternate_outlined),
       ),
+      
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _images.isEmpty
@@ -112,64 +124,91 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.image_not_supported_outlined,
-                          size: 64, color: Colors.grey[400]),
+                      const Icon(Icons.image_not_supported_outlined,
+                          size: 64, color: Variables.textDisabled),
                       const SizedBox(height: 16),
                       Text(
                         "No images found for '${widget.tag}'",
-                        style: TextStyle(
-                          fontFamily: 'GeneralSans',
-                          fontSize: 16,
-                          color: Colors.grey[600],
-                        ),
+                        style: Variables.bodyStyle.copyWith(color: Variables.textSecondary),
                       ),
                     ],
                   ),
                 )
-              : GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.8,
-                  ),
-                  itemCount: _images.length,
-                  itemBuilder: (context, index) {
-                    final image = _images[index];
-                    return GestureDetector(
-                      onTap: () {
-                        // Details logic
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E1E1E) : Colors.grey[200],
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isDark ? Colors.white10 : Colors.transparent,
-                          ),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.file(
-                              File(image.filePath),
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: Colors.grey[300],
-                                child: const Center(
-                                  child: Icon(Icons.broken_image, color: Colors.grey),
-                                ),
-                              ),
-                            ),
-                          ],
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          children: leftColumn
+                              .map((e) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: e,
+                                  ))
+                              .toList(),
                         ),
                       ),
-                    );
-                  },
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          children: rightColumn
+                              .map((e) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: e,
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+    );
+  }
+
+  Widget _buildStaggeredImageItem(ImageModel image, {required int index}) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ImageDetailsPage(
+              imagePath: image.filePath,
+              imageId: image.id,
+              projectId: widget.projectId,
+            ),
+          ),
+        ).then((_) => _loadData());
+      },
+      child: Container(
+        // Simulate staggered heights similar to Alternate Page
+        height: (index % 3 == 0) ? 240 : 180,
+        decoration: BoxDecoration(
+          color: Variables.surfaceSubtle,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Variables.borderSubtle),
+        ),
+        // Explicitly clip content to border radius
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.file(
+                File(image.filePath),
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder: (_, __, ___) => Container(
+                  color: Variables.surfaceSubtle,
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Variables.textDisabled),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:adobe/ui/styles/variables.dart';
 import '../../data/models/image_model.dart';
 import '../../data/repos/image_repo.dart';
 import 'image_details_page.dart';
@@ -27,6 +28,15 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  // Called when project changes in parent
+  @override
+  void didUpdateWidget(covariant ProjectBoardPageAlternate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.projectId != widget.projectId) {
+      _loadData();
+    }
   }
 
   void refreshData() {
@@ -75,9 +85,9 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
           builder: (context, setModalState) {
             return Container(
               height: MediaQuery.of(context).size.height * 0.6,
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -86,9 +96,9 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         "Filter by Tags",
-                        style: TextStyle(fontFamily: 'GeneralSans', fontSize: 20, fontWeight: FontWeight.bold),
+                        style: Variables.headerStyle.copyWith(fontSize: 20),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close),
@@ -98,7 +108,7 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                   ),
                   const SizedBox(height: 20),
                   if (_allTags.isEmpty)
-                    const Text("No tags available."),
+                    Text("No tags available.", style: Variables.bodyStyle),
                   
                   Expanded(
                     child: SingleChildScrollView(
@@ -118,18 +128,17 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                                   _selectedTags.remove(tag);
                                 }
                               });
+                              // Update main state
                               this.setState(() {
                                 _applyFilter();
                               });
                             },
-                            labelStyle: TextStyle(
-                              fontFamily: 'GeneralSans',
-                              color: isSelected ? Colors.white : null,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                            labelStyle: Variables.captionStyle.copyWith(
+                              color: isSelected ? Colors.white : Variables.textPrimary,
+                              fontWeight: FontWeight.w600,
                             ),
-                            backgroundColor: Colors.grey[200],
-                            selectedColor: Colors.black87,
+                            backgroundColor: Variables.surfaceSubtle,
+                            selectedColor: Variables.textPrimary,
                             checkmarkColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(20),
@@ -159,7 +168,7 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                         child: ElevatedButton(
                           onPressed: () => Navigator.pop(context),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
+                            backgroundColor: Variables.textPrimary,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
@@ -195,18 +204,17 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
 
     return Column(
       children: [
+        // Context Info Row (Image Count + Active Filters)
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: Row(
             children: [
               Text(
                 "ALL IMAGES (${_filteredImages.length})",
-                style: TextStyle(
-                  fontFamily: 'GeneralSans',
+                style: Variables.captionStyle.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 12,
                   letterSpacing: 1.2,
-                  color: Colors.grey[600],
+                  color: Variables.textSecondary,
                 ),
               ),
               const Spacer(),
@@ -214,22 +222,29 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.black,
+                    color: Variables.textPrimary,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    "${_selectedTags.length} Filters",
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    "${_selectedTags.length} Active",
+                    style: Variables.captionStyle.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 )
             ],
           ),
         ),
+        
+        // Masonry Grid
         Expanded(
           child: _filteredImages.isEmpty 
-            ? Center(child: Text("No images found", style: TextStyle(color: Colors.grey[500])))
+            ? Center(
+                child: Text(
+                  "No images found",
+                  style: Variables.bodyStyle.copyWith(color: Variables.textSecondary),
+                ),
+              )
             : SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 80), // Bottom padding for FAB
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -266,7 +281,7 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
         height: (index % 3 == 0) ? 240 : 180, 
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: Colors.grey[200],
+          color: Variables.surfaceSubtle,
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(
@@ -276,7 +291,9 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
               File(image.filePath),
               fit: BoxFit.cover,
               width: double.infinity,
-              errorBuilder: (_,__,___) => const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+              errorBuilder: (_,__,___) => const Center(
+                child: Icon(Icons.broken_image, color: Variables.textDisabled),
+              ),
             ),
             if (image.tags.isNotEmpty)
               Positioned(
@@ -300,7 +317,15 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(color: Colors.white.withOpacity(0.1)),
                         ),
-                        child: Text(tag.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 9, fontFamily: 'GeneralSans', fontWeight: FontWeight.w600)),
+                        child: Text(
+                          tag.toUpperCase(), 
+                          style: const TextStyle(
+                            color: Colors.white, 
+                            fontSize: 9, 
+                            fontFamily: 'GeneralSans', 
+                            fontWeight: FontWeight.w600
+                          ),
+                        ),
                       );
                     }).toList(),
                   ),
