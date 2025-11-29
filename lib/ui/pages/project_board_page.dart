@@ -1,13 +1,17 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:adobe/ui/styles/variables.dart';
+import 'package:adobe/ui/widgets/top_bar.dart';
+import 'package:adobe/ui/widgets/bottom_bar.dart'; 
 import '../../data/models/project_model.dart';
 import '../../data/models/image_model.dart';
 import '../../data/repos/project_repo.dart';
 import '../../data/repos/image_repo.dart';
 import 'project_tag_page.dart';
 import 'project_board_page_alternate.dart';
-import 'image_save_page.dart'; // Import the Save Page
+import 'image_save_page.dart';
+import 'image_details_page.dart';
 
 class ProjectBoardPage extends StatefulWidget {
   final int projectId;
@@ -25,13 +29,9 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
 
   final GlobalKey<ProjectBoardPageAlternateState> _alternatePageKey = GlobalKey();
 
-  ProjectModel? _mainProject;
-  List<ProjectModel> _events = [];
-  ProjectModel? _selectedProject;
-
+  ProjectModel? _currentProject;
   Map<String, List<ImageModel>> _categorizedImages = {};
   bool _isLoading = true;
-  
   bool _showAlternateView = false;
 
   @override
@@ -42,31 +42,28 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
 
   Future<void> _initData() async {
     try {
-      final mainProject = await _projectRepo.getProjectById(widget.projectId);
-      final events = await _projectRepo.getEvents(widget.projectId);
-
-      if (mainProject != null) {
-        _mainProject = mainProject;
-        _events = events;
-        _selectedProject = _mainProject;
-        await _loadImagesForSelected();
-      } else {
-        if (mounted) Navigator.pop(context);
+      final project = await _projectRepo.getProjectById(widget.projectId);
+      if (project != null) {
+        if (mounted) {
+          setState(() {
+            _currentProject = project;
+          });
+          await _loadImagesForSelected();
+        }
       }
     } catch (e) {
-      debugPrint("Error loading board data: $e");
-      setState(() => _isLoading = false);
+      debugPrint("Error loading board: $e");
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _loadImagesForSelected() async {
-    if (_selectedProject?.id == null) return;
-    
+    if (_currentProject?.id == null) return;
     if (!_showAlternateView) {
       setState(() => _isLoading = true);
-      final images = await _imageRepo.getImages(_selectedProject!.id!);
+      final images = await _imageRepo.getImages(_currentProject!.id!);
       _categorizeImages(images);
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -89,35 +86,39 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
     }
   }
 
-  void _onProjectChanged(ProjectModel? newValue) {
-    if (newValue != null && newValue != _selectedProject) {
+  void _onProjectChanged(ProjectModel newProject) {
+    if (newProject.id != _currentProject?.id) {
       setState(() {
-        _selectedProject = newValue;
+        _currentProject = newProject;
       });
-      if (!_showAlternateView) _loadImagesForSelected();
+      if (!_showAlternateView) {
+        _loadImagesForSelected();
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+           _alternatePageKey.currentState?.refreshData();
+        });
+      }
     }
   }
 
-  // --- Image Picker Logic ---
   Future<void> _pickAndRedirect() async {
     try {
-      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-      if (pickedFile != null && _selectedProject != null) {
+      final List<XFile> pickedFiles = await _picker.pickMultiImage();
+      
+      if (pickedFiles.isNotEmpty && _currentProject != null) {
         if (!mounted) return;
         
-        // Navigate to ImageSavePage
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => ImageSavePage(
-              imagePaths: [pickedFile.path],
-              projectId: _selectedProject!.id!,
-              projectName: _selectedProject!.title,
+              imagePaths: pickedFiles.map((e) => e.path).toList(),
+              projectId: _currentProject!.id!,
+              projectName: _currentProject!.title,
               isFromShare: false,
             ),
           ),
         ).then((_) {
-          // Refresh data upon return
           if (!_showAlternateView) {
             _loadImagesForSelected();
           } else {
@@ -126,286 +127,251 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
         });
       }
     } catch (e) {
-      debugPrint("Error picking image: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error picking image: $e")),
-        );
-      }
+      debugPrint("Error picking images: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final buttonColor = isDark ? Colors.white.withOpacity(0.1) : Colors.grey[100];
-
-    final List<DropdownMenuItem<ProjectModel>> dropdownItems = [];
-    if (_mainProject != null) {
-      dropdownItems.add(
-        DropdownMenuItem(
-          value: _mainProject,
-          child: Text(
-            _mainProject!.title,
-            style: const TextStyle(fontFamily: 'GeneralSans'),
-          ),
-        ),
-      );
-    }
-    for (var event in _events) {
-      dropdownItems.add(
-        DropdownMenuItem(
-          value: event,
-          child: Text(
-            event.title,
-            style: const TextStyle(fontFamily: 'GeneralSans'),
-          ),
-        ),
+    if (_currentProject == null) {
+      return const Scaffold(
+        backgroundColor: Variables.background,
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor,
-        centerTitle: false,
-        title: Text(
-          _selectedProject?.title ?? "Loading...",
-          style: TextStyle(
-            fontFamily: 'GeneralSans',
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.settings_outlined, color: theme.iconTheme.color),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
-        ],
+      backgroundColor: Variables.background,
+      appBar: TopBar(
+        currentProjectId: _currentProject!.id!,
+        onBack: () => Navigator.pop(context),
+        onProjectChanged: _onProjectChanged,
+        onSettingsPressed: () {},
       ),
-      // --- FAB for Adding Image ---
+      bottomNavigationBar: BottomBar(
+        currentTab: BottomBarItem.moodboard,
+        projectId: _currentProject!.id!,
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _pickAndRedirect,
-        backgroundColor: isDark ? Colors.white : Colors.black,
-        foregroundColor: isDark ? Colors.black : Colors.white,
+        backgroundColor: Variables.textPrimary,
+        foregroundColor: Variables.background,
         child: const Icon(Icons.add_photo_alternate_outlined),
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Row(
               children: [
-                Expanded(
-                  child: Container(
-                    height: 40,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: buttonColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<ProjectModel>(
-                        value: _selectedProject,
-                        isExpanded: true,
-                        items: dropdownItems,
-                        onChanged: _onProjectChanged,
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurface,
-                          fontFamily: 'GeneralSans',
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
-                        ),
-                        icon: Icon(Icons.keyboard_arrow_down, size: 18, color: theme.iconTheme.color),
-                        dropdownColor: theme.cardColor,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _buildControlIcon(
-                  theme, buttonColor, Icons.palette_outlined, "Stylesheet", 
-                  () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Stylesheet")))
-                ),
-                const SizedBox(width: 8),
-                _buildControlIcon(
-                  theme, buttonColor, Icons.tune_outlined, "Filter", 
-                  () {
-                    if (_showAlternateView) {
-                      _alternatePageKey.currentState?.showFilterDialog();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Filter for categories not implemented")),
-                      );
-                    }
-                  }
-                ),
-                const SizedBox(width: 8),
-
-                _buildControlIcon(
-                  theme, 
-                  _showAlternateView ? Colors.black : buttonColor, 
-                  _showAlternateView ? Icons.dashboard : Icons.view_agenda_outlined, 
-                  "Switch View", 
-                  () {
+                InkWell(
+                  onTap: () {
                     setState(() {
                       _showAlternateView = !_showAlternateView;
                       if (!_showAlternateView) _loadImagesForSelected();
                     });
                   },
-                  iconColor: _showAlternateView ? Colors.white : theme.iconTheme.color,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Variables.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Variables.borderSubtle),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _showAlternateView ? Icons.dashboard : Icons.view_agenda_outlined,
+                          size: 18,
+                          color: Variables.textPrimary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _showAlternateView ? "Categorized" : "All Images",
+                          style: Variables.bodyStyle.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+                const Spacer(),
+                if (_showAlternateView)
+                  InkWell(
+                    onTap: () {
+                      _alternatePageKey.currentState?.showFilterDialog();
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Variables.surfaceSubtle,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Variables.borderSubtle),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.tune_outlined,
+                            size: 18,
+                            color: Variables.textPrimary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Filter",
+                            style: Variables.bodyStyle.copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
-
           Expanded(
             child: _showAlternateView 
                 ? ProjectBoardPageAlternate(
                     key: _alternatePageKey, 
-                    projectId: _selectedProject?.id ?? widget.projectId,
+                    projectId: _currentProject!.id!,
                   )
-                : _buildCategorizedView(theme, isDark),
+                : _buildCategorizedView(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCategorizedView(ThemeData theme, bool isDark) {
+  Widget _buildCategorizedView() {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_categorizedImages.isEmpty) {
       return Center(
         child: Text(
           "No images found",
-          style: TextStyle(
-            fontFamily: 'GeneralSans',
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
-          ),
+          style: Variables.bodyStyle.copyWith(color: Variables.textSecondary),
         ),
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
       itemCount: _categorizedImages.keys.length,
       itemBuilder: (context, index) {
         final category = _categorizedImages.keys.elementAt(index);
         final images = _categorizedImages[category]!;
 
-        return GestureDetector(
-          onTap: () {
-            if (_selectedProject?.id != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProjectTagPage(
-                    projectId: _selectedProject!.id!,
-                    tag: category,
-                  ),
-                ),
-              );
-            }
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              border: Border.all(color: Colors.grey.withOpacity(0.3)),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          // Keep this clipping so the scrolling list cuts off cleanly at the border
+          clipBehavior: Clip.antiAlias, 
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Variables.borderSubtle),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InkWell(
+                onTap: () {
+                  if (_currentProject?.id != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProjectTagPage(
+                          projectId: _currentProject!.id!,
+                          tag: category,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         category.toUpperCase(),
-                        style: TextStyle(
+                        style: Variables.headerStyle.copyWith(
                           fontSize: 14,
-                          fontWeight: FontWeight.bold,
                           letterSpacing: 1.0,
-                          fontFamily: 'GeneralSans',
-                          color: theme.colorScheme.onSurface,
                         ),
                       ),
-                      Icon(
+                      const Icon(
                         Icons.arrow_forward,
                         size: 16,
-                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        color: Variables.textSecondary,
                       ),
                     ],
                   ),
                 ),
-                SizedBox(
-                  height: 140,
-                  child: ListView.separated(
-                    clipBehavior: Clip.none,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: images.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, imgIndex) {
-                      final image = images[imgIndex];
-                      return Container(
-                        width: 120,
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: isDark ? Colors.black26 : Colors.grey[200],
-                          border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
-                        ),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.file(
-                              File(image.filePath),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: Colors.grey[300],
-                                child: const Icon(Icons.broken_image, color: Colors.grey),
+              ),
+              SizedBox(
+                height: 140,
+                child: ListView.separated(
+                  clipBehavior: Clip.none,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: images.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, imgIndex) {
+                    final image = images[imgIndex];
+                    return GestureDetector(
+                      onTap: () {
+                        if (_currentProject?.id != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ImageDetailsPage(
+                                imagePath: image.filePath,
+                                imageId: image.id,
+                                projectId: _currentProject!.id!,
                               ),
                             ),
-                          ],
+                          ).then((_) => _loadImagesForSelected());
+                        }
+                      },
+                      child: Container(
+                        width: 120,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: Variables.surfaceSubtle,
+                          border: Border.all(color: Variables.borderSubtle),
                         ),
-                      );
-                    },
-                  ),
+                        // FIX: Explicitly clip image to border radius
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.file(
+                                File(image.filePath),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: Variables.surfaceSubtle,
+                                  child: const Icon(Icons.broken_image, color: Variables.textDisabled),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
-    );
-  }
-
-  Widget _buildControlIcon(
-    ThemeData theme, 
-    Color? bgColor, 
-    IconData icon, 
-    String tooltip,
-    VoidCallback onTap,
-    {Color? iconColor}
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, size: 20, color: iconColor ?? theme.iconTheme.color),
-      ),
     );
   }
 }
