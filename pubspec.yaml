@@ -24,6 +24,7 @@ dependencies:
   onnxruntime: ^1.4.1
   intl: ^0.20.2
   google_mlkit_text_recognition: ^0.15.0
+  flutter_svg: ^2.2.3
 
 dev_dependencies:
   flutter_test:
@@ -36,6 +37,7 @@ flutter:
 
   assets:
     - assets/fonts/
+    - assets/icons/
     - assets/dinov2.onnx
     - assets/dinov2.onnx.data
     - assets/texture_centroids.json

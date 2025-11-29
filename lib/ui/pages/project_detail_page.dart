@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../../data/models/project_model.dart';
 import '../../data/repos/project_repo.dart';
 import '../../services/project_service.dart';
-import 'project_board_page.dart'; // Import the board page
+import 'project_board_page.dart';
+import 'stylesheet_page.dart';
 
 class ProjectDetailPage extends StatefulWidget {
   final int projectId;
@@ -144,7 +145,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       MaterialPageRoute(
         builder: (_) => ProjectBoardPage(projectId: projectId),
       ),
-    ).then((_) => _loadData()); // Refresh on return (e.g. last accessed update)
+    ).then((_) => _loadData());
+  }
+
+  void _navigateToStylesheet(int projectId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StylesheetPage(projectId: projectId),
+      ),
+    ).then((_) => _loadData());
   }
 
   void _showPlaceholder(String feature) {
@@ -357,7 +367,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             theme: theme,
             isDark: isDark,
             isSmall: isSmall,
-            onTap: () => _showPlaceholder("Stylesheet"),
+            onTap: () => _navigateToStylesheet(targetId),
           ),
         ),
         const SizedBox(width: 8),
