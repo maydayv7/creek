@@ -65,4 +65,17 @@ object ImageAnalyzer {
             null
         }
     }
+
+    fun generateStylesheet(jsonList: List<String>): String? {
+        waitForPython()
+        return try {
+            val py = Python.getInstance()
+            val module = py.getModule("stylesheet_generator")
+            val result = module.callAttr("generate_stylesheet", jsonList)
+            result.toString()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 }
