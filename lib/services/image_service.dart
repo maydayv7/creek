@@ -6,56 +6,28 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../data/repos/image_repo.dart';
 import '../data/models/image_model.dart';
-import 'analyze/image_analyzer.dart';
+import 'analysis_queue_manager.dart';
 
 class ImageService {
   final ImageRepo _repo = ImageRepo();
   final Uuid _uuid = const Uuid();
 
-  // ANALYSIS QUEUE
-  // Static queue ensures all instances share the same processing line
-  static final List<Future<void> Function()> _analysisQueue = [];
-  static bool _isProcessingQueue = false;
-
-  static void _enqueueAnalysis(
-    String debugLabel,
-    Future<void> Function() task,
-  ) {
-    debugPrint(
-      "[Queue] Enqueueing task: $debugLabel. (Queue size: ${_analysisQueue.length + 1})",
-    );
-    _analysisQueue.add(task);
-
-    if (!_isProcessingQueue) {
-      _processQueue();
+  // Checks if image is a draft (from ShareHandler) and updates it, or saves new
+  Future<String> saveOrUpdateImage(
+    File file,
+    int projectId, {
+    List<String> tags = const [],
+  }) async {
+    final existing = await _repo.getByFilePath(file.path);
+    if (existing != null) {
+      debugPrint("ImageService: Updating existing draft ${existing.id} -> Project $projectId");
+      await _repo.updateProject(existing.id, projectId);
+      await updateTags(existing.id, tags);
+      return existing.id;
+    } else {
+      debugPrint("ImageService: Saving new image");
+      return await saveImage(file, projectId, tags: tags);
     }
-  }
-
-  static Future<void> _processQueue() async {
-    if (_isProcessingQueue) return;
-    _isProcessingQueue = true;
-
-    debugPrint("[Queue] Queue processor started.");
-
-    while (_analysisQueue.isNotEmpty) {
-      final task = _analysisQueue.removeAt(0);
-
-      try {
-        debugPrint(
-          "[Queue] Starting next task. Remaining in queue: ${_analysisQueue.length}",
-        );
-        await task();
-        debugPrint("[Queue] Task completed");
-      } catch (e) {
-        debugPrint("[Queue] Task failed: $e");
-      }
-
-      // Small delay to let the UI update between heavy jobs
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
-
-    debugPrint("[Queue] Queue empty. All background jobs finished.");
-    _isProcessingQueue = false;
   }
 
   // --- PUBLIC METHODS ---
@@ -65,6 +37,7 @@ class ImageService {
     File file,
     int projectId, {
     List<String> tags = const [],
+    String? status,
   }) async {
     // 1. Prepare Directory
     final dir = await getApplicationDocumentsDirectory();
@@ -90,12 +63,13 @@ class ImageService {
       filePath: newPath,
       name: file.path.split('/').last,
       createdAt: DateTime.now(),
-      tags: [],
+      tags: tags,
+      status: status ?? 'pending',
     );
     await _repo.addImage(image);
 
-    // 4. Update Tags & Trigger Analysis
-    await updateTags(id, tags);
+    // 4. Trigger Analysis Queue (Always)
+    AnalysisQueueManager().processQueue();
 
     return id;
   }
@@ -119,37 +93,9 @@ class ImageService {
     // 1. Update Tags in Database
     await _repo.updateTags(imageId, newTags);
 
-    // 2. Fetch Image path
-    final image = await _repo.getById(imageId);
-    if (image != null) {
-      // 3. Enqueue Analysis
-      _enqueueAnalysis("Analyze $imageId", () async {
-        await _analyzeInBackground(imageId, image.filePath, tags: newTags);
-      });
-    }
-  }
-
-  Future<void> _analyzeInBackground(
-    String imageId,
-    String filePath, {
-    List<String> tags = const [],
-  }) async {
-    try {
-      Map<String, dynamic>? result;
-      if (tags.isEmpty) {
-        result = await ImageAnalyzerService.analyzeFullSuite(filePath);
-      } else {
-        result = await ImageAnalyzerService.analyzeSelected(filePath, tags);
-      }
-
-      if (result != null) {
-        final String jsonString = jsonEncode(result);
-        await _repo.updateAnalysis(imageId, jsonString);
-      }
-    } catch (e) {
-      // Re-throw so the queue knows it failed
-      throw Exception("Analysis failed for $imageId: $e");
-    }
+    // 2. Mark as pending and trigger queue
+    await _repo.updateStatus(imageId, 'pending');
+    AnalysisQueueManager().processQueue();
   }
 
   Future<void> updateAnalysis(String id, Map<String, dynamic> analysis) async {

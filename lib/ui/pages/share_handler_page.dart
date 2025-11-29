@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:adobe/services/download_service.dart';
 import 'package:adobe/services/instagram_download_service.dart';
+import 'package:adobe/services/image_service.dart';
 import 'package:adobe/ui/pages/share_to_moodboard_page.dart';
 
 class ShareHandlerPage extends StatefulWidget {
@@ -17,6 +18,7 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
   // Services
   final _downloadService = DownloadService();
   final _instagramService = InstagramDownloadService();
+  final _imageService = ImageService();
 
   // State
   bool _hasError = false;
@@ -30,12 +32,12 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
 
   Future<void> _processSharedContent() async {
     final sharedContent = widget.sharedText.trim();
-    List<File> finalFiles = [];
+    List<File> tempFiles = [];
 
     try {
       // CASE A: It's a Local File Path
       if (await File(sharedContent).exists()) {
-        finalFiles.add(File(sharedContent));
+        tempFiles.add(File(sharedContent));
       }
       // CASE B: It's a URL
       else {
@@ -49,13 +51,13 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
             // Instagram Logic
             final downloadedPaths = await _instagramService.downloadInstagramImage(url);
             if (downloadedPaths != null && downloadedPaths.isNotEmpty) {
-              finalFiles.addAll(downloadedPaths.map((path) => File(path)));
+              tempFiles.addAll(downloadedPaths.map((path) => File(path)));
             }
           } else {
             // Generic Download Logic
             final savedPath = await _downloadService.downloadAndSaveImage(url);
             if (savedPath != null) {
-              finalFiles.add(File(savedPath));
+              tempFiles.add(File(savedPath));
             }
           }
         } else {
@@ -63,13 +65,30 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
         }
       }
 
-      // SUCCESS: Navigate to ShareToMoodboardPage
-      if (finalFiles.isNotEmpty) {
+      // SUCCESS: Persist and Navigate
+      if (tempFiles.isNotEmpty) {
+        List<File> permanentFiles = [];
+
+        // PERSIST IMMEDIATELY
+        // Save to App Docs and DB (into Inbox) and status 'completed' (waiting for tags)
+        for (var file in tempFiles) {
+          final id = await _imageService.saveImage(
+            file,
+            0, // Project 0 = Inbox
+            tags: [],
+          );
+
+          final savedImage = await _imageService.getImage(id);
+          if (savedImage != null) {
+            permanentFiles.add(File(savedImage.filePath));
+          }
+        }
+
         if (mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => ShareToMoodboardPage(imageFiles: finalFiles),
+              builder: (_) => ShareToMoodboardPage(imageFiles: permanentFiles),
             ),
           );
         }

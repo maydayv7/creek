@@ -553,7 +553,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
 
         // 1. Save Image
         final tags = _tagsPerImage[i] ?? {};
-        final imageId = await _imageService.saveImage(
+        final imageId = await _imageService.saveOrUpdateImage(
           file,
           widget.projectId,
           tags: tags.toList(),

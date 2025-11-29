@@ -11,7 +11,7 @@ class ProjectRepo {
     final db = await AppDatabase.db;
     final res = await db.query(
       'projects',
-      where: 'parent_id IS NULL',
+      where: 'parent_id IS NULL AND id != 0',
       orderBy: 'last_accessed_at DESC',
       limit: lim,
     );
@@ -22,7 +22,7 @@ class ProjectRepo {
     final db = await AppDatabase.db;
     final res = await db.query(
       'projects',
-      // No 'where parent_id is null' check here, we want everything
+      where: 'id != 0',
       orderBy: 'last_accessed_at DESC',
       limit: 10,
     );
@@ -31,7 +31,11 @@ class ProjectRepo {
 
   Future<List<ProjectModel>> getAllProjectsAndEvents() async {
     final db = await AppDatabase.db;
-    final res = await db.query('projects', orderBy: 'title ASC');
+    final res = await db.query(
+      'projects',
+      where: 'id != 0',
+      orderBy: 'title ASC'
+    );
     return res.map((e) => ProjectModel.fromMap(e)).toList();
   }
 
@@ -39,7 +43,7 @@ class ProjectRepo {
     final db = await AppDatabase.db;
     final res = await db.query(
       'projects',
-      where: 'parent_id IS NULL',
+      where: 'parent_id IS NULL AND id != 0',
       orderBy: 'last_accessed_at DESC',
     );
     return res.map((e) => ProjectModel.fromMap(e)).toList();
