@@ -6,6 +6,7 @@ import 'package:adobe/data/repos/image_repo.dart';
 import 'package:adobe/services/project_service.dart';
 import 'project_detail_page.dart';
 import 'image_analysis_page.dart';
+import 'define_brand_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -66,89 +67,19 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _createProjectDialog() async {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-
-    if (!mounted) return;
-
-    await showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text(
-              "Create New Project",
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontWeight: FontWeight.w600,
-              ),
+  Future<void> _createNewProject() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => const DefineBrandPage(
+              projectName: "",
+              projectDescription: null,
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    hintText: "Project Name",
-                    labelText: "Name",
-                    border: OutlineInputBorder(),
-                  ),
-                  autofocus: true,
-                  style: const TextStyle(fontFamily: 'GeneralSans'),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    hintText: "Description (optional)",
-                    labelText: "Description",
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                  style: const TextStyle(fontFamily: 'GeneralSans'),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  "Cancel",
-                  style: TextStyle(fontFamily: 'GeneralSans'),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (nameController.text.trim().isNotEmpty) {
-                    try {
-                      await _projectService.createProject(
-                        nameController.text.trim(),
-                        description:
-                            descriptionController.text.trim().isEmpty
-                                ? null
-                                : descriptionController.text.trim(),
-                      );
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        _loadData();
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error creating project: $e')),
-                        );
-                      }
-                    }
-                  }
-                },
-                child: const Text(
-                  "Create",
-                  style: TextStyle(fontFamily: 'GeneralSans'),
-                ),
-              ),
-            ],
-          ),
-    );
+      ),
+    ).then((result) {
+      _loadData();
+    });
   }
 
   void _openProject(ProjectModel project) {
@@ -357,7 +288,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _createProjectDialog,
+        onPressed: _createNewProject,
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
         child: const Icon(Icons.add),

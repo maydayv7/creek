@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:adobe/ui/styles/variables.dart';
 import 'package:adobe/ui/widgets/top_bar.dart';
-import 'package:adobe/ui/widgets/bottom_bar.dart'; 
+import 'package:adobe/ui/widgets/bottom_bar.dart';
 import '../../data/models/project_model.dart';
 import '../../data/models/image_model.dart';
 import '../../data/repos/project_repo.dart';
+import '../../data/repos/note_repo.dart';
 import '../../data/repos/image_repo.dart';
 import 'project_tag_page.dart';
 import 'project_board_page_alternate.dart';
@@ -25,9 +26,11 @@ class ProjectBoardPage extends StatefulWidget {
 class _ProjectBoardPageState extends State<ProjectBoardPage> {
   final _projectRepo = ProjectRepo();
   final _imageRepo = ImageRepo();
+  final _noteRepo = NoteRepo();
   final ImagePicker _picker = ImagePicker();
 
-  final GlobalKey<ProjectBoardPageAlternateState> _alternatePageKey = GlobalKey();
+  final GlobalKey<ProjectBoardPageAlternateState> _alternatePageKey =
+      GlobalKey();
 
   ProjectModel? _currentProject;
   Map<String, List<ImageModel>> _categorizedImages = {};
@@ -61,30 +64,58 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
     if (_currentProject?.id == null) return;
     if (!_showAlternateView) {
       setState(() => _isLoading = true);
-      final images = await _imageRepo.getImages(_currentProject!.id!);
-      _categorizeImages(images);
+
+      try {
+        final images = await _imageRepo.getImages(_currentProject!.id!);
+        final Map<String, List<ImageModel>> tempMap = {};
+        await Future.wait(
+          images.map((img) async {
+            final Set<String> distinctCategories = {...img.tags};
+            final notes = await _noteRepo.getNotesForImage(img.id);
+            for (var note in notes) {
+              if (note.category.isNotEmpty) {
+                distinctCategories.add(note.category);
+              }
+            }
+            if (distinctCategories.isEmpty) {
+              tempMap.putIfAbsent('Uncategorized', () => []).add(img);
+            } else {
+              for (var category in distinctCategories) {
+                final list = tempMap.putIfAbsent(category, () => []);
+                if (!list.any((i) => i.id == img.id)) {
+                  list.add(img);
+                }
+              }
+            }
+          }),
+        );
+
+        _categorizedImages = tempMap;
+      } catch (e) {
+        debugPrint("Error loading images and note categories: $e");
+      }
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _categorizeImages(List<ImageModel> images) {
-    _categorizedImages.clear();
-    for (var img in images) {
-      if (img.tags.isEmpty) {
-        if (!_categorizedImages.containsKey('Uncategorized')) {
-          _categorizedImages['Uncategorized'] = [];
-        }
-        _categorizedImages['Uncategorized']!.add(img);
-      } else {
-        for (var tag in img.tags) {
-          if (!_categorizedImages.containsKey(tag)) {
-            _categorizedImages[tag] = [];
-          }
-          _categorizedImages[tag]!.add(img);
-        }
-      }
-    }
-  }
+  // void _categorizeImages(List<ImageModel> images) {
+  //   _categorizedImages.clear();
+  //   for (var img in images) {
+  //     if (img.tags.isEmpty) {
+  //       if (!_categorizedImages.containsKey('Uncategorized')) {
+  //         _categorizedImages['Uncategorized'] = [];
+  //       }
+  //       _categorizedImages['Uncategorized']!.add(img);
+  //     } else {
+  //       for (var tag in img.tags) {
+  //         if (!_categorizedImages.containsKey(tag)) {
+  //           _categorizedImages[tag] = [];
+  //         }
+  //         _categorizedImages[tag]!.add(img);
+  //       }
+  //     }
+  //   }
+  // }
 
   void _onProjectChanged(ProjectModel newProject) {
     if (newProject.id != _currentProject?.id) {
@@ -95,7 +126,7 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
         _loadImagesForSelected();
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-           _alternatePageKey.currentState?.refreshData();
+          _alternatePageKey.currentState?.refreshData();
         });
       }
     }
@@ -104,19 +135,20 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
   Future<void> _pickAndRedirect() async {
     try {
       final List<XFile> pickedFiles = await _picker.pickMultiImage();
-      
+
       if (pickedFiles.isNotEmpty && _currentProject != null) {
         if (!mounted) return;
-        
+
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ImageSavePage(
-              imagePaths: pickedFiles.map((e) => e.path).toList(),
-              projectId: _currentProject!.id!,
-              projectName: _currentProject!.title,
-              isFromShare: false,
-            ),
+            builder:
+                (_) => ImageSavePage(
+                  imagePaths: pickedFiles.map((e) => e.path).toList(),
+                  projectId: _currentProject!.id!,
+                  projectName: _currentProject!.title,
+                  isFromShare: false,
+                ),
           ),
         ).then((_) {
           if (!_showAlternateView) {
@@ -161,7 +193,10 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 12.0,
+            ),
             child: Row(
               children: [
                 InkWell(
@@ -173,7 +208,10 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Variables.surfaceSubtle,
                       borderRadius: BorderRadius.circular(20),
@@ -183,7 +221,9 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _showAlternateView ? Icons.dashboard : Icons.view_agenda_outlined,
+                          _showAlternateView
+                              ? Icons.dashboard
+                              : Icons.view_agenda_outlined,
                           size: 18,
                           color: Variables.textPrimary,
                         ),
@@ -207,7 +247,10 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Variables.surfaceSubtle,
                         borderRadius: BorderRadius.circular(20),
@@ -237,12 +280,13 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
             ),
           ),
           Expanded(
-            child: _showAlternateView 
-                ? ProjectBoardPageAlternate(
-                    key: _alternatePageKey, 
-                    projectId: _currentProject!.id!,
-                  )
-                : _buildCategorizedView(),
+            child:
+                _showAlternateView
+                    ? ProjectBoardPageAlternate(
+                      key: _alternatePageKey,
+                      projectId: _currentProject!.id!,
+                    )
+                    : _buildCategorizedView(),
           ),
         ],
       ),
@@ -270,7 +314,7 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
           // Keep this clipping so the scrolling list cuts off cleanly at the border
-          clipBehavior: Clip.antiAlias, 
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(color: Variables.borderSubtle),
@@ -285,10 +329,11 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ProjectTagPage(
-                          projectId: _currentProject!.id!,
-                          tag: category,
-                        ),
+                        builder:
+                            (_) => ProjectTagPage(
+                              projectId: _currentProject!.id!,
+                              tag: category,
+                            ),
                       ),
                     );
                   }
@@ -330,11 +375,12 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => ImageDetailsPage(
-                                imagePath: image.filePath,
-                                imageId: image.id,
-                                projectId: _currentProject!.id!,
-                              ),
+                              builder:
+                                  (_) => ImageDetailsPage(
+                                    imagePath: image.filePath,
+                                    imageId: image.id,
+                                    projectId: _currentProject!.id!,
+                                  ),
                             ),
                           ).then((_) => _loadImagesForSelected());
                         }
@@ -355,10 +401,14 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                               Image.file(
                                 File(image.filePath),
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  color: Variables.surfaceSubtle,
-                                  child: const Icon(Icons.broken_image, color: Variables.textDisabled),
-                                ),
+                                errorBuilder:
+                                    (_, __, ___) => Container(
+                                      color: Variables.surfaceSubtle,
+                                      child: const Icon(
+                                        Icons.broken_image,
+                                        color: Variables.textDisabled,
+                                      ),
+                                    ),
                               ),
                             ],
                           ),

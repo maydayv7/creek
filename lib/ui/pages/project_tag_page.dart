@@ -7,6 +7,7 @@ import 'package:adobe/ui/widgets/bottom_bar.dart';
 import '../../data/models/image_model.dart';
 import '../../data/repos/image_repo.dart';
 import '../../data/repos/project_repo.dart';
+import '../../data/repos/note_repo.dart';
 import 'image_save_page.dart';
 import 'image_details_page.dart';
 
@@ -14,11 +15,7 @@ class ProjectTagPage extends StatefulWidget {
   final int projectId;
   final String tag;
 
-  const ProjectTagPage({
-    super.key,
-    required this.projectId,
-    required this.tag,
-  });
+  const ProjectTagPage({super.key, required this.projectId, required this.tag});
 
   @override
   State<ProjectTagPage> createState() => _ProjectTagPageState();
@@ -27,8 +24,9 @@ class ProjectTagPage extends StatefulWidget {
 class _ProjectTagPageState extends State<ProjectTagPage> {
   final _imageRepo = ImageRepo();
   final _projectRepo = ProjectRepo();
+  final _noteRepo = NoteRepo();
   final ImagePicker _picker = ImagePicker();
-  
+
   List<ImageModel> _images = [];
   String _projectName = "Project";
   bool _isLoading = true;
@@ -44,12 +42,35 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
     if (project != null) _projectName = project.title;
 
     final allImages = await _imageRepo.getImages(widget.projectId);
-    final filtered = allImages.where((img) {
-      if (widget.tag == 'Uncategorized') {
-        return img.tags.isEmpty;
-      }
-      return img.tags.contains(widget.tag);
-    }).toList();
+    final List<ImageModel> filtered = [];
+
+    // Process logic in parallel for speed
+    await Future.wait(
+      allImages.map((img) async {
+        bool matches = false;
+
+        if (widget.tag == 'Uncategorized') {
+          if (img.tags.isEmpty) {
+            final notes = await _noteRepo.getNotesForImage(img.id);
+            final hasCategorizedNote = notes.any((n) => n.category.isNotEmpty);
+            if (!hasCategorizedNote) matches = true;
+          }
+        } else {
+          if (img.tags.contains(widget.tag)) {
+            matches = true;
+          } else {
+            final notes = await _noteRepo.getNotesForImage(img.id);
+            if (notes.any((n) => n.category == widget.tag)) {
+              matches = true;
+            }
+          }
+        }
+
+        if (matches) {
+          filtered.add(img);
+        }
+      }),
+    );
 
     if (mounted) {
       setState(() {
@@ -67,12 +88,13 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ImageSavePage(
-              imagePaths: pickedFiles.map((e) => e.path).toList(),
-              projectId: widget.projectId,
-              projectName: _projectName,
-              isFromShare: false,
-            ),
+            builder:
+                (_) => ImageSavePage(
+                  imagePaths: pickedFiles.map((e) => e.path).toList(),
+                  projectId: widget.projectId,
+                  projectName: _projectName,
+                  isFromShare: false,
+                ),
           ),
         ).then((_) => _loadData());
       }
@@ -98,7 +120,7 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
 
     return Scaffold(
       backgroundColor: Variables.background,
-      
+
       appBar: TopBar(
         currentProjectId: widget.projectId,
         titleOverride: widget.tag.toUpperCase(),
@@ -116,53 +138,65 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
         foregroundColor: Variables.background,
         child: const Icon(Icons.add_photo_alternate_outlined),
       ),
-      
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _images.isEmpty
+
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _images.isEmpty
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.image_not_supported_outlined,
-                          size: 64, color: Variables.textDisabled),
-                      const SizedBox(height: 16),
-                      Text(
-                        "No images found for '${widget.tag}'",
-                        style: Variables.bodyStyle.copyWith(color: Variables.textSecondary),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.image_not_supported_outlined,
+                      size: 64,
+                      color: Variables.textDisabled,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "No images found for '${widget.tag}'",
+                      style: Variables.bodyStyle.copyWith(
+                        color: Variables.textSecondary,
                       ),
-                    ],
-                  ),
-                )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          children: leftColumn
-                              .map((e) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: e,
-                                  ))
-                              .toList(),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          children: rightColumn
-                              .map((e) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: e,
-                                  ))
-                              .toList(),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              )
+              : SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children:
+                            leftColumn
+                                .map(
+                                  (e) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: e,
+                                  ),
+                                )
+                                .toList(),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        children:
+                            rightColumn
+                                .map(
+                                  (e) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: e,
+                                  ),
+                                )
+                                .toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
     );
   }
 
@@ -172,11 +206,12 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ImageDetailsPage(
-              imagePath: image.filePath,
-              imageId: image.id,
-              projectId: widget.projectId,
-            ),
+            builder:
+                (_) => ImageDetailsPage(
+                  imagePath: image.filePath,
+                  imageId: image.id,
+                  projectId: widget.projectId,
+                ),
           ),
         ).then((_) => _loadData());
       },
@@ -198,12 +233,16 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
                 File(image.filePath),
                 fit: BoxFit.cover,
                 width: double.infinity,
-                errorBuilder: (_, __, ___) => Container(
-                  color: Variables.surfaceSubtle,
-                  child: const Center(
-                    child: Icon(Icons.broken_image, color: Variables.textDisabled),
-                  ),
-                ),
+                errorBuilder:
+                    (_, __, ___) => Container(
+                      color: Variables.surfaceSubtle,
+                      child: const Center(
+                        child: Icon(
+                          Icons.broken_image,
+                          color: Variables.textDisabled,
+                        ),
+                      ),
+                    ),
               ),
             ],
           ),
