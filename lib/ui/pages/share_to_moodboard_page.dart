@@ -214,7 +214,7 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
     }
   }
 
-  void _navigateToSavePage(int projectId, String projectName) {
+  void _navigateToSavePage(int projectId, String projectName, {String? parentProjectName}) {
     _projectService.openProject(projectId);
     ReceiveSharingIntent.instance.reset();
 
@@ -227,6 +227,7 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
               projectId: projectId,
               projectName: projectName,
               isFromShare: true,
+              parentProjectName: parentProjectName,
             ),
       ),
     );
@@ -379,7 +380,7 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () => _navigateToSavePage(vm.id, vm.title),
+        onTap: () => _navigateToSavePage(vm.id, vm.title, parentProjectName: vm.parentTitle),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(12),
@@ -526,7 +527,9 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
                   children:
                       g.events.map((e) {
                         return ListTile(
-                          onTap: () => _navigateToSavePage(e.id, e.title),
+                          onTap: () => _navigateToSavePage(e.id, e.title,
+                                parentProjectName: g.project.title,
+                              ),
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 28,
                             vertical: 6,

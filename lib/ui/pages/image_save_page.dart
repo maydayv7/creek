@@ -29,6 +29,7 @@ class ImageSavePage extends StatefulWidget {
   final int projectId;
   final String projectName;
   final bool isFromShare;
+  final String? parentProjectName;
 
   const ImageSavePage({
     Key? key,
@@ -36,6 +37,7 @@ class ImageSavePage extends StatefulWidget {
     required this.projectId,
     required this.projectName,
     this.isFromShare = true,
+    this.parentProjectName,
   }) : super(key: key);
 
   @override
@@ -384,6 +386,12 @@ class _ImageSavePageState extends State<ImageSavePage> {
   @override
   Widget build(BuildContext context) {
     final currentTags = _tagsPerImage[_currentImageIndex] ?? {};
+    final String parentName = widget.parentProjectName?.trim() ?? '';
+
+    final String titleText =
+        parentName.isNotEmpty
+            ? '$parentName / ${widget.projectName}'
+            : widget.projectName;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -399,7 +407,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          widget.projectName,
+          titleText,
           style: const TextStyle(
             color: Colors.black,
             fontSize: 18,
