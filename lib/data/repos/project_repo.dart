@@ -34,7 +34,7 @@ class ProjectRepo {
     final res = await db.query(
       'projects',
       where: 'id != 0',
-      orderBy: 'title ASC'
+      orderBy: 'title ASC',
     );
     return res.map((e) => ProjectModel.fromMap(e)).toList();
   }

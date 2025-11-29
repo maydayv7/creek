@@ -40,7 +40,8 @@ class ImageModel {
       projectId: map['project_id'],
       filePath: map['file_path'],
       name: map['name'] ?? 'Untitled',
-      tags: map['tags'] != null ? List<String>.from(jsonDecode(map['tags'])) : [],
+      tags:
+          map['tags'] != null ? List<String>.from(jsonDecode(map['tags'])) : [],
       analysisData: map['analysis_data'],
       createdAt: DateTime.parse(map['created_at']),
       status: map['status'] ?? 'pending',

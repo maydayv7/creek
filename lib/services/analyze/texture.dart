@@ -13,18 +13,21 @@ class TextureAnalyzerService {
 
   // DINOv2 Small (S14) Config
   static const int INPUT_SIZE = 224;
-  static const int EMBED_DIM = 384; 
-  
+  static const int EMBED_DIM = 384;
+
   // Logic params matching your Python script
   static const double RELATIVE_THRESH = 0.85;
   static const double ABSOLUTE_FLOOR = 0.05; // Updated to match Python
 
-  Future<void> initialize({required String modelPath, required String jsonPath}) async {
+  Future<void> initialize({
+    required String modelPath,
+    required String jsonPath,
+  }) async {
     if (_session != null) return;
 
     try {
       debugPrint("Initializing Texture Service (DINOv2 S14)...");
-      
+
       OrtEnv.instance.init();
 
       // 1. Load Model
@@ -37,19 +40,21 @@ class TextureAnalyzerService {
       final Map<String, dynamic> jsonMap = json.decode(jsonStr);
       _centroids = {};
       jsonMap.forEach((k, v) => _centroids![k] = List<double>.from(v));
-
     } catch (e) {
       debugPrint("Texture Service Init Error: $e");
     }
   }
 
-  Future<Map<String, dynamic>> analyze(String path, {
-    String? modelPath, 
-    String? jsonPath
+  Future<Map<String, dynamic>> analyze(
+    String path, {
+    String? modelPath,
+    String? jsonPath,
   }) async {
-    if (modelPath == null || jsonPath == null) return {'success': false, 'scores': {}, 'error': 'Paths missing'};
+    if (modelPath == null || jsonPath == null)
+      return {'success': false, 'scores': {}, 'error': 'Paths missing'};
     await initialize(modelPath: modelPath, jsonPath: jsonPath);
-    if (_session == null || _centroids == null) return {'success': false, 'scores': {}, 'error': 'Init failed'};
+    if (_session == null || _centroids == null)
+      return {'success': false, 'scores': {}, 'error': 'Init failed'};
 
     OrtValueTensor? inputOrt;
     OrtRunOptions? runOptions;
@@ -59,11 +64,19 @@ class TextureAnalyzerService {
       // 1. Preprocess (Standard ImageNet Normalization)
       final bytes = await File(path).readAsBytes();
       final image = img.decodeImage(bytes);
-      if (image == null) return {'success': false, 'scores': {}, 'error': 'Decode failed'};
+      if (image == null)
+        return {'success': false, 'scores': {}, 'error': 'Decode failed'};
 
-      final resized = img.copyResize(image, width: INPUT_SIZE, height: INPUT_SIZE);
-      final List<double> inputFloats = List.filled(1 * 3 * INPUT_SIZE * INPUT_SIZE, 0.0);
-      
+      final resized = img.copyResize(
+        image,
+        width: INPUT_SIZE,
+        height: INPUT_SIZE,
+      );
+      final List<double> inputFloats = List.filled(
+        1 * 3 * INPUT_SIZE * INPUT_SIZE,
+        0.0,
+      );
+
       // ImageNet Stats
       const mean = [0.485, 0.456, 0.406];
       const std = [0.229, 0.224, 0.225];
@@ -75,34 +88,44 @@ class TextureAnalyzerService {
           // R
           inputFloats[pixelIndex] = ((pixel.r / 255.0) - mean[0]) / std[0];
           // G
-          inputFloats[pixelIndex + (INPUT_SIZE * INPUT_SIZE)] = ((pixel.g / 255.0) - mean[1]) / std[1];
+          inputFloats[pixelIndex + (INPUT_SIZE * INPUT_SIZE)] =
+              ((pixel.g / 255.0) - mean[1]) / std[1];
           // B
-          inputFloats[pixelIndex + (2 * INPUT_SIZE * INPUT_SIZE)] = ((pixel.b / 255.0) - mean[2]) / std[2];
+          inputFloats[pixelIndex + (2 * INPUT_SIZE * INPUT_SIZE)] =
+              ((pixel.b / 255.0) - mean[2]) / std[2];
           pixelIndex++;
         }
       }
 
-      final float32List = Float32List.fromList(inputFloats); 
+      final float32List = Float32List.fromList(inputFloats);
 
       // 2. Inference
-      inputOrt = OrtValueTensor.createTensorWithDataList(float32List, [1, 3, INPUT_SIZE, INPUT_SIZE]);
+      inputOrt = OrtValueTensor.createTensorWithDataList(float32List, [
+        1,
+        3,
+        INPUT_SIZE,
+        INPUT_SIZE,
+      ]);
       runOptions = OrtRunOptions();
-      
+
       // Run Inference
       // Note: 'input' is standard for tf2onnx/torch.onnx exports
-      outputs = _session!.run(runOptions, {"input": inputOrt}); 
-      
+      outputs = _session!.run(runOptions, {"input": inputOrt});
+
       if (outputs.isEmpty) throw Exception("No output");
 
       // 3. Extract Feature Vector
       // The Python export script baked "Mean Pooling" into the model.
       // So we get a single vector [1, 384] directly. No need to loop patches!
-      final rawOutput = outputs[0]?.value as List; 
+      final rawOutput = outputs[0]?.value as List;
       final List<double> embedding = [];
       void flatten(dynamic data) {
-        if (data is num) embedding.add(data.toDouble());
-        else if (data is List) for (var item in data) flatten(item);
+        if (data is num)
+          embedding.add(data.toDouble());
+        else if (data is List)
+          for (var item in data) flatten(item);
       }
+
       flatten(rawOutput);
 
       // 4. Normalize Embedding (L2 Norm)
@@ -117,7 +140,9 @@ class TextureAnalyzerService {
       });
 
       // 6. Filter & Sort
-      var sorted = rawScores.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      var sorted =
+          rawScores.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
       Map<String, dynamic> finalResults = {};
 
       if (sorted.isNotEmpty) {
@@ -125,17 +150,12 @@ class TextureAnalyzerService {
         for (var entry in sorted) {
           if (entry.value < ABSOLUTE_FLOOR) continue;
           if (entry.value < (topScore * RELATIVE_THRESH)) break;
-          
+
           finalResults[entry.key] = entry.value;
         }
       }
-      
-      return {
-        'success': true,
-        'scores': finalResults,
-        'error': null,
-      };
 
+      return {'success': true, 'scores': finalResults, 'error': null};
     } catch (e) {
       debugPrint("Texture Analysis Failed: $e");
       return {'success': false, 'scores': {}, 'error': e.toString()};

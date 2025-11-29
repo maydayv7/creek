@@ -11,10 +11,7 @@ import 'package:adobe/services/python_service.dart';
 class StylesheetPage extends StatefulWidget {
   final int projectId;
 
-  const StylesheetPage({
-    super.key, 
-    required this.projectId,
-  });
+  const StylesheetPage({super.key, required this.projectId});
 
   @override
   State<StylesheetPage> createState() => _StylesheetPageState();
@@ -34,22 +31,22 @@ class _StylesheetPageState extends State<StylesheetPage> {
 
   Future<void> _loadSavedStylesheet() async {
     final project = await ProjectRepo().getProjectById(_currentProjectId);
-    if (project?.globalStylesheet != null && project!.globalStylesheet!.isNotEmpty) {
+    if (project?.globalStylesheet != null &&
+        project!.globalStylesheet!.isNotEmpty) {
       try {
         final parsed = jsonDecode(project.globalStylesheet!);
         const encoder = JsonEncoder.withIndent('  ');
         setState(() {
           _resultJson = encoder.convert(parsed);
         });
-      } catch (_) {
-      }
+      } catch (_) {}
     }
   }
 
   Future<void> _generateStylesheet() async {
     setState(() {
       _isLoading = true;
-      _resultJson = null; 
+      _resultJson = null;
     });
 
     try {
@@ -57,19 +54,24 @@ class _StylesheetPageState extends State<StylesheetPage> {
       final images = await ImageRepo().getImages(_currentProjectId);
 
       // 2. Extract valid analysis data
-      final List<String> analysisDataList = images
-          .map((img) => img.analysisData)
-          .where((data) => data != null && data.isNotEmpty)
-          .cast<String>()
-          .toList();
+      final List<String> analysisDataList =
+          images
+              .map((img) => img.analysisData)
+              .where((data) => data != null && data.isNotEmpty)
+              .cast<String>()
+              .toList();
 
       if (analysisDataList.isEmpty) {
         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("No analyzed images found for this project.")),
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("No analyzed images found for this project."),
+            ),
           );
         }
-        setState(() { _isLoading = false; });
+        setState(() {
+          _isLoading = false;
+        });
         return;
       }
 
@@ -94,9 +96,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
     } catch (e) {
       debugPrint("Error generating stylesheet: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error: $e")));
       }
     } finally {
       if (mounted) {
@@ -111,7 +113,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Variables.background,
-      
+
       appBar: TopBar(
         currentProjectId: _currentProjectId,
         onBack: () => Navigator.of(context).pop(),
@@ -129,18 +131,19 @@ class _StylesheetPageState extends State<StylesheetPage> {
           return SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight,
-              ),
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 20,
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       // No saved result
                       if (_resultJson == null && !_isLoading) ...[
-                         Text(
+                        Text(
                           "Are you ready to start\nbuilding the visual identity?",
                           textAlign: TextAlign.center,
                           style: Variables.headerStyle,
@@ -150,7 +153,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
 
                       // Loading
                       if (_isLoading)
-                        const CircularProgressIndicator(color: Variables.textPrimary),
+                        const CircularProgressIndicator(
+                          color: Variables.textPrimary,
+                        ),
 
                       // Result JSON
                       if (_resultJson != null)
@@ -165,7 +170,10 @@ class _StylesheetPageState extends State<StylesheetPage> {
                           ),
                           child: Text(
                             _resultJson!,
-                            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                            ),
                           ),
                         ),
 
@@ -187,7 +195,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  _resultJson == null ? "Generate Stylesheet" : "Regenerate Stylesheet",
+                                  _resultJson == null
+                                      ? "Generate Stylesheet"
+                                      : "Regenerate Stylesheet",
                                   style: Variables.buttonTextStyle,
                                 ),
                                 const SizedBox(width: 8),

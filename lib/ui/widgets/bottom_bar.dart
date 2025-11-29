@@ -4,11 +4,7 @@ import 'package:adobe/ui/styles/variables.dart';
 import 'package:adobe/ui/pages/project_board_page.dart';
 import 'package:adobe/ui/pages/stylesheet_page.dart';
 
-enum BottomBarItem {
-  moodboard,
-  stylesheet,
-  files
-}
+enum BottomBarItem { moodboard, stylesheet, files }
 
 class BottomBar extends StatelessWidget {
   final BottomBarItem currentTab;
@@ -92,10 +88,10 @@ class BottomBar extends StatelessWidget {
   }
 
   Widget _buildNavItem(
-      BuildContext context,
-      BottomBarItem item,
-      String label,
-      String assetPath,
+    BuildContext context,
+    BottomBarItem item,
+    String label,
+    String assetPath,
   ) {
     final bool isSelected = item == currentTab;
     final Color color =

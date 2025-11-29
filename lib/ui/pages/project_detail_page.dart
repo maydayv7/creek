@@ -33,14 +33,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     setState(() => _isLoading = true);
     try {
       final project = await _projectRepo.getProjectById(widget.projectId);
-      
+
       // If project not found, handle exit
       if (project == null) {
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Project not found')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Project not found')));
         }
         return;
       }
@@ -73,87 +73,85 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          "Create New Event",
-          style: TextStyle(
-            fontFamily: 'GeneralSans',
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                hintText: "Event Name",
-                labelText: "Name",
-                border: OutlineInputBorder(),
+      builder:
+          (context) => AlertDialog(
+            title: const Text(
+              "Create New Event",
+              style: TextStyle(
+                fontFamily: 'GeneralSans',
+                fontWeight: FontWeight.w600,
               ),
-              autofocus: true,
-              style: const TextStyle(fontFamily: 'GeneralSans'),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                hintText: "Description (optional)",
-                labelText: "Description",
-                border: OutlineInputBorder(),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    hintText: "Event Name",
+                    labelText: "Name",
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                  style: const TextStyle(fontFamily: 'GeneralSans'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(
+                    hintText: "Description (optional)",
+                    labelText: "Description",
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  style: const TextStyle(fontFamily: 'GeneralSans'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancel"),
               ),
-              maxLines: 3,
-              style: const TextStyle(fontFamily: 'GeneralSans'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.trim().isNotEmpty) {
-                try {
-                  await _projectService.createProject(
-                    nameController.text.trim(),
-                    description: descriptionController.text.trim().isEmpty
-                        ? null
-                        : descriptionController.text.trim(),
-                    parentId: _project!.id,
-                  );
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    _loadData(); // Refresh to show new event
+              ElevatedButton(
+                onPressed: () async {
+                  if (nameController.text.trim().isNotEmpty) {
+                    try {
+                      await _projectService.createProject(
+                        nameController.text.trim(),
+                        description:
+                            descriptionController.text.trim().isEmpty
+                                ? null
+                                : descriptionController.text.trim(),
+                        parentId: _project!.id,
+                      );
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        _loadData(); // Refresh to show new event
+                      }
+                    } catch (e) {
+                      debugPrint("Error creating event: $e");
+                    }
                   }
-                } catch (e) {
-                  debugPrint("Error creating event: $e");
-                }
-              }
-            },
-            child: const Text("Create"),
+                },
+                child: const Text("Create"),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   void _navigateToBoard(int projectId) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ProjectBoardPage(projectId: projectId),
-      ),
+      MaterialPageRoute(builder: (_) => ProjectBoardPage(projectId: projectId)),
     ).then((_) => _loadData());
   }
 
   void _navigateToStylesheet(int projectId) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => StylesheetPage(projectId: projectId),
-      ),
+      MaterialPageRoute(builder: (_) => StylesheetPage(projectId: projectId)),
     ).then((_) => _loadData());
   }
 
@@ -198,7 +196,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               // 1. Main Project Details & Actions
               _buildSectionHeader("Project Overview", theme),
               const SizedBox(height: 8),
-              if (_project!.description != null && _project!.description!.isNotEmpty)
+              if (_project!.description != null &&
+                  _project!.description!.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
@@ -210,7 +209,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     ),
                   ),
                 ),
-              
+
               // Actions for Main Project
               _buildActionRow(_project!.id!, theme, isDark),
 
@@ -223,9 +222,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   _buildSectionHeader("Events", theme),
                   IconButton(
                     onPressed: _createEventDialog,
-                    icon: Icon(Icons.add_circle, color: theme.colorScheme.primary),
+                    icon: Icon(
+                      Icons.add_circle,
+                      color: theme.colorScheme.primary,
+                    ),
                     tooltip: "Add Event",
-                  )
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -264,7 +266,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     return _buildEventCard(event, theme, isDark);
                   },
                 ),
-                
+
               const SizedBox(height: 40),
             ],
           ),
@@ -300,7 +302,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             color: Colors.black.withOpacity(0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
-          )
+          ),
         ],
       ),
       padding: const EdgeInsets.all(16),
@@ -344,7 +346,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   /// Reusable row of actions (Moodboard, Stylesheet, Files)
-  Widget _buildActionRow(int targetId, ThemeData theme, bool isDark, {bool isSmall = false}) {
+  Widget _buildActionRow(
+    int targetId,
+    ThemeData theme,
+    bool isDark, {
+    bool isSmall = false,
+  }) {
     return Row(
       children: [
         Expanded(

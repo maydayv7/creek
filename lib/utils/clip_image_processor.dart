@@ -13,14 +13,14 @@ class ClipImageProcessor {
   static Future<Float32List?> preprocess(String filePath) async {
     final bytes = await File(filePath).readAsBytes();
     final image = img.decodeImage(bytes);
-    
+
     if (image == null) return null;
 
     // 1. Resize (Shortest side to 224)
     int w = image.width;
     int h = image.height;
     int target = 224;
-    
+
     img.Image resized;
     if (w < h) {
       resized = img.copyResize(image, width: target);
@@ -34,7 +34,7 @@ class ClipImageProcessor {
     // 3. Convert to Float32 List (NCHW format: Batch, Channels, Height, Width)
     // Size: 1 * 3 * 224 * 224 = 150,528 float values
     final Float32List inputData = Float32List(1 * 3 * 224 * 224);
-    
+
     int pixelIndex = 0;
     // Iterate pixels and separate channels
     // Planar format (RRRR... GGGG... BBBB...)
@@ -45,7 +45,7 @@ class ClipImageProcessor {
     for (var y = 0; y < 224; y++) {
       for (var x = 0; x < 224; x++) {
         final pixel = cropped.getPixel(x, y);
-        
+
         // Normalize: (Value/255 - Mean) / Std
         double r = (pixel.r / 255.0 - mean[0]) / std[0];
         double g = (pixel.g / 255.0 - mean[1]) / std[1];
@@ -54,7 +54,7 @@ class ClipImageProcessor {
         inputData[rOffset + pixelIndex] = r;
         inputData[gOffset + pixelIndex] = g;
         inputData[bOffset + pixelIndex] = b;
-        
+
         pixelIndex++;
       }
     }

@@ -10,12 +10,15 @@ class EmbeddingAnalyzerService {
   List<List<double>>? _centroids;
   List<String>? _classes;
 
-  Future<void> initialize({required String modelPath, required String jsonPath}) async {
+  Future<void> initialize({
+    required String modelPath,
+    required String jsonPath,
+  }) async {
     if (_session != null) return;
 
     try {
       debugPrint("Initializing Embeddings (Dino/CLIP)...");
-      
+
       // Initialize FFI Env
       OrtEnv.instance.init();
 
@@ -26,22 +29,28 @@ class EmbeddingAnalyzerService {
 
       final jsonString = await File(jsonPath).readAsString();
       final jsonData = json.decode(jsonString);
-      
+
       _classes = List<String>.from(jsonData['classes']);
-      _centroids = (jsonData['centroids'] as List).map((e) => List<double>.from(e)).toList();
+      _centroids =
+          (jsonData['centroids'] as List)
+              .map((e) => List<double>.from(e))
+              .toList();
     } catch (e) {
       debugPrint("Embeddings Init Error: $e");
     }
   }
 
-  Future<Map<String, dynamic>?> analyze(String imagePath, {
-    String? modelPath, 
-    String? jsonPath
+  Future<Map<String, dynamic>?> analyze(
+    String imagePath, {
+    String? modelPath,
+    String? jsonPath,
   }) async {
     // Safety check
-    if (modelPath == null || jsonPath == null) return {'success': false, 'scores': {}, 'error': 'Paths missing'};
+    if (modelPath == null || jsonPath == null)
+      return {'success': false, 'scores': {}, 'error': 'Paths missing'};
     await initialize(modelPath: modelPath, jsonPath: jsonPath);
-    if (_session == null || _centroids == null) return {'success': false, 'scores': {}, 'error': 'Init failed'};
+    if (_session == null || _centroids == null)
+      return {'success': false, 'scores': {}, 'error': 'Init failed'};
 
     OrtValueTensor? inputOrt;
     OrtRunOptions? runOptions;
@@ -49,30 +58,33 @@ class EmbeddingAnalyzerService {
 
     try {
       final float32Input = await ClipImageProcessor.preprocess(imagePath);
-      if (float32Input == null) return {'success': false, 'scores': {}, 'error': 'Image decode failed'};
+      if (float32Input == null)
+        return {'success': false, 'scores': {}, 'error': 'Image decode failed'};
 
       // Create Tensor
       // Note: ensure ClipImageProcessor returns a flat List<double>
-      inputOrt = OrtValueTensor.createTensorWithDataList(
-        float32Input, 
-        [1, 3, 224, 224]
-      );
+      inputOrt = OrtValueTensor.createTensorWithDataList(float32Input, [
+        1,
+        3,
+        224,
+        224,
+      ]);
 
       runOptions = OrtRunOptions();
 
       // Run Inference
-      // 'image' is the input name for CLIP. 
+      // 'image' is the input name for CLIP.
       outputs = _session!.run(runOptions, {"image": inputOrt});
-      
+
       if (outputs.isEmpty) throw Exception("No output from model");
 
       // Get Output
       // FFI returns list of outputs. Usually index 0.
-      final dynamic outputRaw = outputs[0]?.value; 
+      final dynamic outputRaw = outputs[0]?.value;
 
       // Flatten Output
       final List<double> imgFeat = [];
-      
+
       void flatten(dynamic data) {
         if (data is num) {
           imgFeat.add(data.toDouble());
@@ -82,12 +94,13 @@ class EmbeddingAnalyzerService {
           }
         }
       }
+
       flatten(outputRaw);
 
       // Normalize & Compare
       final normFeat = l2Normalize(imgFeat);
       Map<String, double> scores = {};
-      
+
       for (int i = 0; i < _classes!.length; i++) {
         double score = dotProduct(normFeat, _centroids![i]);
         scores[_classes![i]] = score * 100.0;
@@ -95,17 +108,10 @@ class EmbeddingAnalyzerService {
 
       scores = Map.fromEntries(
         (scores.entries.toList()
-          ..sort((a, b) => b.value
-          .compareTo(a.value))
-        )//.take(3)
+          ..sort((a, b) => b.value.compareTo(a.value))), //.take(3)
       );
 
-      return {
-        "success": true,
-        "scores": scores,
-        "error": null,
-      };
-
+      return {"success": true, "scores": scores, "error": null};
     } catch (e) {
       debugPrint("Embeddings Analysis Error: $e");
       return {'success': false, 'scores': {}, 'error': e.toString()};

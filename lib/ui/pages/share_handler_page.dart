@@ -49,7 +49,8 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
 
           if (url.contains('instagram.com')) {
             // Instagram Logic
-            final downloadedPaths = await _instagramService.downloadInstagramImage(url);
+            final downloadedPaths = await _instagramService
+                .downloadInstagramImage(url);
             if (downloadedPaths != null && downloadedPaths.isNotEmpty) {
               tempFiles.addAll(downloadedPaths.map((path) => File(path)));
             }
@@ -111,36 +112,45 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
       backgroundColor: Colors.white,
       appBar: AppBar(title: const Text("Processing")),
       body: Center(
-        child: _hasError
-            ? Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
+        child:
+            _hasError
+                ? Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.red,
+                        size: 50,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Error processing media",
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _errorMessage ?? "Unknown Error",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Close"),
+                      ),
+                    ],
+                  ),
+                )
+                : const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 50),
-                    const SizedBox(height: 16),
-                    Text("Error processing media",
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    Text(_errorMessage ?? "Unknown Error",
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.grey)),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("Close"),
-                    ),
+                    CircularProgressIndicator(),
+                    SizedBox(height: 20),
+                    Text("Downloading media..."),
                   ],
                 ),
-              )
-            : const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 20),
-                  Text("Downloading media..."),
-                ],
-              ),
       ),
     );
   }

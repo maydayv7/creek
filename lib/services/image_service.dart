@@ -20,7 +20,9 @@ class ImageService {
   }) async {
     final existing = await _repo.getByFilePath(file.path);
     if (existing != null) {
-      debugPrint("ImageService: Updating existing draft ${existing.id} -> Project $projectId");
+      debugPrint(
+        "ImageService: Updating existing draft ${existing.id} -> Project $projectId",
+      );
       await _repo.updateProject(existing.id, projectId);
       await updateTags(existing.id, tags);
       return existing.id;

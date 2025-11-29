@@ -586,7 +586,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
         if (widget.isFromShare) {
           SystemNavigator.pop();
         } else {
-          Navigator.popUntil(context, (route) => route.isFirst);
+          Navigator.pop(context);
         }
       }
     } catch (e) {

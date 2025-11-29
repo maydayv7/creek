@@ -42,10 +42,13 @@ class AppDatabase {
         ''');
 
         // Create Inbox Project (ID 0) for Drafts
-        await db.rawInsert('''
+        await db.rawInsert(
+          '''
           INSERT INTO projects (id, title, description, last_accessed_at, created_at)
           VALUES (0, 'Inbox', 'Holding area for shared images', ?, ?)
-        ''', [DateTime.now().toIso8601String(), DateTime.now().toIso8601String()]);
+        ''',
+          [DateTime.now().toIso8601String(), DateTime.now().toIso8601String()],
+        );
 
         // 2. IMAGES (Moodboard)
         await db.execute('''

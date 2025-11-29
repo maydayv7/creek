@@ -14,7 +14,7 @@ class FileRepo {
       'files',
       where: 'project_id = ?',
       whereArgs: [projectId],
-      orderBy: 'last_updated DESC', 
+      orderBy: 'last_updated DESC',
     );
     return res.map((e) => FileModel.fromMap(e)).toList();
   }
@@ -26,10 +26,15 @@ class FileRepo {
     return null;
   }
 
-  Future<void> updateDetails(String id, {String? name, String? description, List<String>? tags}) async {
+  Future<void> updateDetails(
+    String id, {
+    String? name,
+    String? description,
+    List<String>? tags,
+  }) async {
     final db = await AppDatabase.db;
     final Map<String, dynamic> updates = {
-      'last_updated': DateTime.now().toIso8601String()
+      'last_updated': DateTime.now().toIso8601String(),
     };
     if (name != null) updates['name'] = name;
     if (description != null) updates['description'] = description;
@@ -41,10 +46,10 @@ class FileRepo {
   Future<void> touchFile(String id) async {
     final db = await AppDatabase.db;
     await db.update(
-      'files', 
-      {'last_updated': DateTime.now().toIso8601String()}, 
-      where: 'id = ?', 
-      whereArgs: [id]
+      'files',
+      {'last_updated': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 
@@ -53,11 +58,15 @@ class FileRepo {
     await db.delete('files', where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<List<String>> getAllFilePathsForProjectIds(List<int> projectIds) async {
+  Future<List<String>> getAllFilePathsForProjectIds(
+    List<int> projectIds,
+  ) async {
     if (projectIds.isEmpty) return [];
     final db = await AppDatabase.db;
     final idList = projectIds.join(',');
-    final res = await db.rawQuery('SELECT file_path FROM files WHERE project_id IN ($idList)');
+    final res = await db.rawQuery(
+      'SELECT file_path FROM files WHERE project_id IN ($idList)',
+    );
     return res.map((e) => e['file_path'] as String).toList();
   }
 }

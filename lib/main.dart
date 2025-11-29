@@ -44,13 +44,15 @@ class _MyAppState extends State<MyApp> {
       _intentStreamSubscription = ReceiveSharingIntent.instance
           .getMediaStream()
           .listen((List<SharedMediaFile> value) {
-        if (value.isNotEmpty) {
-          _handleShare(value.first.path);
-        }
-      }, onError: (err) => debugPrint("Share error: $err"));
+            if (value.isNotEmpty) {
+              _handleShare(value.first.path);
+            }
+          }, onError: (err) => debugPrint("Share error: $err"));
 
       // 3. Cold Start
-      ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile> value) {
+      ReceiveSharingIntent.instance.getInitialMedia().then((
+        List<SharedMediaFile> value,
+      ) {
         if (value.isNotEmpty) {
           _handleShare(value.first.path);
           ReceiveSharingIntent.instance.reset();
@@ -70,9 +72,7 @@ class _MyAppState extends State<MyApp> {
     if (context == null) return;
 
     _navigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (_) => ShareHandlerPage(sharedText: content),
-      ),
+      MaterialPageRoute(builder: (_) => ShareHandlerPage(sharedText: content)),
     );
   }
 
@@ -92,7 +92,10 @@ class _MyAppState extends State<MyApp> {
     if (!_isReady) {
       return const MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: Scaffold(backgroundColor: Colors.white, body: Center(child: CircularProgressIndicator())),
+        home: Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(child: CircularProgressIndicator()),
+        ),
       );
     }
 

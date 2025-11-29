@@ -10,7 +10,11 @@ class ProjectService {
   final _imageRepo = ImageRepo();
   final _fileRepo = FileRepo();
 
-  Future<int> createProject(String title, {String? description, int? parentId}) async {
+  Future<int> createProject(
+    String title, {
+    String? description,
+    int? parentId,
+  }) async {
     final project = ProjectModel(
       title: title.trim(),
       description: description,
@@ -21,16 +25,27 @@ class ProjectService {
     return await _projectRepo.createProject(project);
   }
 
-  Future<void> updateProjectDetails(int projectId, {String? title, String? description}) async {
+  Future<void> updateProjectDetails(
+    int projectId, {
+    String? title,
+    String? description,
+  }) async {
     if (title != null && title.trim().isEmpty) return; // Prevent empty titles
-    await _projectRepo.updateProject(projectId, title: title?.trim(), description: description?.trim());
+    await _projectRepo.updateProject(
+      projectId,
+      title: title?.trim(),
+      description: description?.trim(),
+    );
   }
 
   Future<void> openProject(int id) async {
     await _projectRepo.touchProject(id);
   }
 
-  Future<void> saveStylesheet(int projectId, Map<String, dynamic> stylesheet) async {
+  Future<void> saveStylesheet(
+    int projectId,
+    Map<String, dynamic> stylesheet,
+  ) async {
     final jsonString = jsonEncode(stylesheet);
     await _projectRepo.updateStylesheet(projectId, jsonString);
   }
@@ -41,8 +56,12 @@ class ProjectService {
     allIdsToDelete.addAll(subEventIds);
 
     List<String> pathsToDelete = [];
-    pathsToDelete.addAll(await _imageRepo.getAllFilePathsForProjectIds(allIdsToDelete));
-    pathsToDelete.addAll(await _fileRepo.getAllFilePathsForProjectIds(allIdsToDelete));
+    pathsToDelete.addAll(
+      await _imageRepo.getAllFilePathsForProjectIds(allIdsToDelete),
+    );
+    pathsToDelete.addAll(
+      await _fileRepo.getAllFilePathsForProjectIds(allIdsToDelete),
+    );
 
     for (var path in pathsToDelete) {
       try {

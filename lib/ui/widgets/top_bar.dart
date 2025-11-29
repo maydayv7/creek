@@ -50,8 +50,9 @@ class _TopBarState extends State<TopBar> {
 
   Future<void> _loadData() async {
     try {
-      final current =
-          await _projectRepo.getProjectById(widget.currentProjectId);
+      final current = await _projectRepo.getProjectById(
+        widget.currentProjectId,
+      );
       if (current == null) {
         setState(() => _isLoading = false);
         return;
@@ -101,7 +102,10 @@ class _TopBarState extends State<TopBar> {
                 // 1. Back Button
                 if (widget.onBack != null) ...[
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Variables.textPrimary),
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Variables.textPrimary,
+                    ),
                     onPressed: widget.onBack,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -111,40 +115,45 @@ class _TopBarState extends State<TopBar> {
 
                 // 2. Title & Selector
                 Expanded(
-                  child: widget.titleOverride != null
-                      ? Text(
-                          widget.titleOverride!,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: Variables.textPrimary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      : (!_isLoading && _currentProject != null && _rootProject != null)
+                  child:
+                      widget.titleOverride != null
+                          ? Text(
+                            widget.titleOverride!,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: Variables.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          )
+                          : (!_isLoading &&
+                              _currentProject != null &&
+                              _rootProject != null)
                           ? Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    _rootProject!.title,
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w600,
-                                      color: Variables.textPrimary,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _rootProject!.title,
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w600,
+                                    color: Variables.textPrimary,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(width: 8),
-                              ],
-                            )
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                          )
                           : const SizedBox(),
                 ),
-                if  (!_isLoading && _currentProject != null && _rootProject != null)
+                if (!_isLoading &&
+                    _currentProject != null &&
+                    _rootProject != null)
                   PopupMenuButton<ProjectModel>(
                     padding: EdgeInsets.zero,
-                    onSelected: (project) =>
-                        widget.onProjectChanged?.call(project),
+                    onSelected:
+                        (project) => widget.onProjectChanged?.call(project),
                     color: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -183,20 +192,21 @@ class _TopBarState extends State<TopBar> {
                     ),
                     itemBuilder: (context) {
                       return _contextList.map((project) {
-                        final isSelected =
-                            project.id == _currentProject!.id;
+                        final isSelected = project.id == _currentProject!.id;
                         final isRoot = project.id == _rootProject!.id;
                         return PopupMenuItem<ProjectModel>(
                           value: project,
                           child: Text(
                             isRoot ? "Main Project" : project.title,
                             style: Variables.bodyStyle.copyWith(
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: isSelected
-                                  ? Variables.textPrimary
-                                  : Variables.textSecondary,
+                              fontWeight:
+                                  isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                              color:
+                                  isSelected
+                                      ? Variables.textPrimary
+                                      : Variables.textSecondary,
                             ),
                           ),
                         );
@@ -207,8 +217,10 @@ class _TopBarState extends State<TopBar> {
 
                 // 3. Settings Icon
                 IconButton(
-                  icon: const Icon(Icons.settings_outlined,
-                      color: Variables.textPrimary),
+                  icon: const Icon(
+                    Icons.settings_outlined,
+                    color: Variables.textPrimary,
+                  ),
                   onPressed: widget.onSettingsPressed,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),

@@ -5,7 +5,8 @@ import '../data/repos/image_repo.dart';
 import 'analyze/image_analyzer.dart';
 
 class AnalysisQueueManager {
-  static final AnalysisQueueManager _instance = AnalysisQueueManager._internal();
+  static final AnalysisQueueManager _instance =
+      AnalysisQueueManager._internal();
   factory AnalysisQueueManager() => _instance;
   AnalysisQueueManager._internal();
 
@@ -32,25 +33,31 @@ class AnalysisQueueManager {
 
           // 2. Run Analysis
           if (image.tags.isEmpty) {
-             debugPrint("[Queue]: Analyzing Full Suite: ${image.name}");
-             result = await ImageAnalyzerService.analyzeFullSuite(image.filePath);
+            debugPrint("[Queue]: Analyzing Full Suite: ${image.name}");
+            result = await ImageAnalyzerService.analyzeFullSuite(
+              image.filePath,
+            );
           } else {
-             debugPrint("[Queue]: Analyzing Selected: ${image.name} with tags: ${image.tags}");
-             result = await ImageAnalyzerService.analyzeSelected(image.filePath, image.tags);
+            debugPrint(
+              "[Queue]: Analyzing Selected: ${image.name} with tags: ${image.tags}",
+            );
+            result = await ImageAnalyzerService.analyzeSelected(
+              image.filePath,
+              image.tags,
+            );
           }
 
           // 3. Handle Result
           if (result['success'] == true && result['data'] != null) {
-             final resultsMap = result['data']['results'] ?? {};
-             final jsonString = jsonEncode(resultsMap);
-             await _repo.updateAnalysis(image.id, jsonString);
-             await _repo.updateStatus(image.id, 'completed');
-             debugPrint("[Queue]: Completed: ${image.name}");
+            final resultsMap = result['data']['results'] ?? {};
+            final jsonString = jsonEncode(resultsMap);
+            await _repo.updateAnalysis(image.id, jsonString);
+            await _repo.updateStatus(image.id, 'completed');
+            debugPrint("[Queue]: Completed: ${image.name}");
           } else {
-             await _repo.updateStatus(image.id, 'failed');
-             debugPrint("[Queue]: Failed: ${result['error']}");
+            await _repo.updateStatus(image.id, 'failed');
+            debugPrint("[Queue]: Failed: ${result['error']}");
           }
-
         } catch (e) {
           debugPrint("[Queue]: Analysis Exception: $e");
           await _repo.updateStatus(image.id, 'failed');
