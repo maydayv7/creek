@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 class PythonService {
   static const MethodChannel _channel = MethodChannel('com.example.adobe/methods');
 
-  /// 1. Layout Analysis (OpenCV)
+  // 1. Layout Analysis (OpenCV)
   Future<Map<String, dynamic>> analyzeLayout(String imagePath) async {
     try {
       final String? result = await _channel.invokeMethod('analyzeLayout', {'imagePath': imagePath});
@@ -17,7 +17,7 @@ class PythonService {
     }
   }
 
-  /// 2. Color Style Analysis (Scikit-Learn)
+  // 2. Color Style Analysis (Scikit-Learn)
   Future<Map<String, dynamic>> analyzeColorStyle(String imagePath) async {
     try {
       final String? result = await _channel.invokeMethod('analyzeColorStyle', {'imagePath': imagePath});
@@ -29,7 +29,7 @@ class PythonService {
     }
   }
 
-  /// 3. Instagram Downloader
+  // 3. Instagram Downloader
   Future<Map<String, dynamic>?> downloadInstagramImage(String url, String outputDir) async {
     try {
       final String? result = await _channel.invokeMethod('downloadInstagramImage', {
@@ -39,6 +39,19 @@ class PythonService {
       return result != null ? json.decode(result) : null;
     } catch (e) {
       debugPrint("Instagram Download Error: $e");
+      return null;
+    }
+  }
+
+  // 4. Stylesheet Generation
+  Future<Map<String, dynamic>?> generateStylesheet(List<String> jsonList) async {
+    try {
+      final String? result = await _channel.invokeMethod('generateStylesheet', {
+        'jsonList': jsonList,
+      });
+      return result != null ? json.decode(result) : null;
+    } catch (e) {
+      debugPrint("Stylesheet Generation Error: $e");
       return null;
     }
   }

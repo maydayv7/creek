@@ -38,6 +38,10 @@ class MainActivity : FlutterActivity() {
                             val outputDir = call.argument<String>("outputDir")!!
                             ImageAnalyzer.downloadInstagramImage(url, outputDir)
                         }
+                        "generateStylesheet" -> {
+                            val jsonList = call.argument<List<String>>("jsonList")!!
+                            ImageAnalyzer.generateStylesheet(jsonList)
+                        }
                         else -> null
                     }
 
@@ -49,9 +53,9 @@ class MainActivity : FlutterActivity() {
                             if (call.method == "downloadInstagramImage") {
                                 // Specific error handling for downloader if needed
                                 result.error("ERROR", "Download returned null", null)
-                            } else if (response == null && (call.method == "analyzeLayout" || call.method == "analyzeColorStyle")) {
+                            } else if (response == null) {
                                 // Python returned null (error inside script)
-                                result.error("ANALYSIS_ERROR", "Python returned null", null)
+                                result.error("PYTHON_ERROR", "Python returned null for ${call.method}", null)
                             } else {
                                 result.notImplemented()
                             }
