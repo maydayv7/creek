@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
-// --- MAIN WIDGET: TOOLS OVERLAY ---
 class MagicDrawTools extends StatefulWidget {
   final bool isActive;
   final Color selectedColor;
   final double strokeWidth;
   final bool isEraser;
-  final VoidCallback onClose;
   final Function(Color) onColorChanged;
   final Function(double) onWidthChanged;
   final Function(bool) onEraserToggle;
@@ -18,7 +16,6 @@ class MagicDrawTools extends StatefulWidget {
     required this.selectedColor,
     required this.strokeWidth,
     required this.isEraser,
-    required this.onClose,
     required this.onColorChanged,
     required this.onWidthChanged,
     required this.onEraserToggle,
@@ -35,44 +32,20 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
   Widget build(BuildContext context) {
     if (!widget.isActive) return const SizedBox.shrink();
 
-    return Stack(
-      children: [
-        // 1. Close Button (Top Left - Safe Area)
-        Positioned(
-          top: 0,
-          left: 16,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 10.0),
-              child: Material(
-                type: MaterialType.circle,
-                color: Colors.white,
-                elevation: 4,
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.black),
-                  onPressed: widget.onClose,
-                ),
-              ),
-            ),
-          ),
-        ),
-
-        // 2. Floating Tools UI (Bottom)
-        // MOVED UP: Changed bottom from 100 to 140
-        Positioned(
-          bottom: 140,
-          left: 16,
-          right: 16,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_showStrokeSlider) _buildTaperedStrokeSlider(),
-              const SizedBox(height: 8),
-              _buildMagicDrawPanel(),
-            ],
-          ),
-        ),
-      ],
+    // Only displaying the bottom tool panel now.
+    // The top header is handled by the main Scaffold AppBar.
+    return Positioned(
+      bottom: 140,
+      left: 16,
+      right: 16,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_showStrokeSlider) _buildTaperedStrokeSlider(),
+          const SizedBox(height: 8),
+          _buildMagicDrawPanel(),
+        ],
+      ),
     );
   }
 
@@ -265,7 +238,6 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
     );
   }
 
-  // --- NEW ADVANCED COLOR PICKER ---
   void _showAdvancedColorPicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -281,7 +253,6 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
   }
 }
 
-// --- PAINTER FOR SLIDER ---
 class _TaperedSliderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -302,10 +273,6 @@ class _TaperedSliderPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ==========================================
-//      ADVANCED COLOR PICKER WIDGET
-// ==========================================
-
 class _AdvancedColorPickerSheet extends StatefulWidget {
   final Color initialColor;
   final ValueChanged<Color> onColorChanged;
@@ -325,12 +292,11 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
   late TabController _tabController;
   late Color _currentColor;
 
-  // Dummy Brand Palette (Simulating StyleSheet Fetch)
   final List<Color> _brandPalette = [
     Colors.blue,
-    const Color(0xFFCCFF00), // Neon Lime
+    const Color(0xFFCCFF00),
     Colors.purpleAccent,
-    const Color(0xFFF0F0F0), // Off White
+    const Color(0xFFF0F0F0),
     Colors.black,
   ];
 
@@ -371,7 +337,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
       child: SafeArea(
         child: Column(
           children: [
-            // --- HEADER ---
             const SizedBox(height: 8),
             Container(
               width: 40,
@@ -382,8 +347,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
               ),
             ),
             const SizedBox(height: 16),
-
-            // --- TABS ---
             TabBar(
               controller: _tabController,
               labelColor: Colors.black,
@@ -396,70 +359,11 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
                 Tab(text: 'Sliders'),
               ],
             ),
-
             const SizedBox(height: 16),
-
-            // --- HEX Preview ---
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      children: const [
-                        Text("Hex", style: TextStyle(fontSize: 12)),
-                        Icon(Icons.arrow_drop_down, size: 16),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: _currentColor,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        "#${_currentColor.value.toRadixString(16).toUpperCase().substring(2)}",
-                        style: const TextStyle(fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.edit, size: 18, color: Colors.grey),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // --- TAB VIEWS ---
             Expanded(
               child: TabBarView(
                 controller: _tabController,
-                physics:
-                    const NeverScrollableScrollPhysics(), // Prevent swipe conflict
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildGridTab(),
                   _buildSpectrumTab(),
@@ -467,8 +371,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
                 ],
               ),
             ),
-
-            // --- SHARED FOOTER (Recently Used, Brand, Gradients) ---
             _buildSharedFooter(),
           ],
         ),
@@ -476,7 +378,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
     );
   }
 
-  // --- TAB 1: GRID ---
   Widget _buildGridTab() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -494,7 +395,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
                 ),
                 itemCount: 100,
                 itemBuilder: (context, index) {
-                  // Generate a varied color grid
                   final double hue = (index % 10) * 36.0;
                   final double saturation = ((index ~/ 10) + 1) / 10.0;
                   final color =
@@ -516,7 +416,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
     );
   }
 
-  // --- TAB 2: SPECTRUM ---
   Widget _buildSpectrumTab() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -529,10 +428,9 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
               enableAlpha: false,
               displayThumbColor: true,
               paletteType: PaletteType.hsvWithHue,
-              labelTypes: const [], // Hide default text inputs
+              labelTypes: const [],
               pickerAreaHeightPercent: 0.8,
               pickerAreaBorderRadius: BorderRadius.circular(12),
-              // We hide standard sliders to use our custom ones to match design
             ),
           ),
         ],
@@ -540,7 +438,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
     );
   }
 
-  // --- TAB 3: SLIDERS ---
   Widget _buildSlidersTab() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -579,8 +476,7 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
                   trackHeight: 36,
                   activeTrackColor: activeColor,
                   inactiveTrackColor: activeColor.withOpacity(0.2),
-                  thumbColor:
-                      Colors.transparent, // Hide knob, make it look like a bar
+                  thumbColor: Colors.transparent,
                   thumbShape: const RoundSliderThumbShape(
                     enabledThumbRadius: 0,
                   ),
@@ -618,8 +514,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
     );
   }
 
-  // --- SHARED COMPONENTS ---
-
   Widget _buildHueSlider() {
     return SizedBox(
       height: 15,
@@ -641,7 +535,7 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
           displayThumbColor: true,
           paletteType: PaletteType.hsv,
           labelTypes: const [],
-          pickerAreaHeightPercent: 0.0, // Only sliders
+          pickerAreaHeightPercent: 0.0,
         ),
       ),
     );

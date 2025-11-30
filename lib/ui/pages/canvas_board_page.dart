@@ -31,6 +31,13 @@ class DrawingPath {
   });
 }
 
+// Helper to snapshot the entire canvas state for undo/redo
+class CanvasState {
+  final List<Map<String, dynamic>> elements;
+  final List<DrawingPath> paths;
+  CanvasState(this.elements, this.paths);
+}
+
 class CanvasBoardPage extends StatefulWidget {
   final String projectId;
   final double width;
@@ -49,36 +56,39 @@ class CanvasBoardPage extends StatefulWidget {
 }
 
 class _CanvasBoardPageState extends State<CanvasBoardPage> {
-  // --- EXISTING STATE ---
+  // --- STATE ---
   final ChangeStack _changeStack = ChangeStack();
   final ImagePicker _picker = ImagePicker();
+
   List<Map<String, dynamic>> elements = [];
+  List<DrawingPath> _paths = [];
+
+  // Snapshots for undo grouping
+  CanvasState? _gestureStartSnapshot;
+
   String? selectedId;
-  Offset? _dragStartPosition;
   late Size _canvasSize;
 
-  // --- NEW TOOL STATE ---
+  // --- TOOLS ---
   bool _isMagicDrawActive = false;
   bool _isTextToolsActive = false;
 
-  // --- INLINE EDITING STATE ---
+  // --- EDITING ---
   bool _isEditingText = false;
   final TextEditingController _textEditingController = TextEditingController();
   final FocusNode _textFocusNode = FocusNode();
 
-  // Drawing Data
-  List<DrawingPath> _paths = [];
+  // --- DRAWING ---
   List<DrawingPoint> _currentPoints = [];
   Color _selectedColor = const Color(0xFFFF4081);
   double _strokeWidth = 10.0;
   bool _isEraser = false;
-
-  // Key to capture the drawing
   final GlobalKey _drawingKey = GlobalKey();
 
-  // --- VIEWPORT CONTROLLER ---
-  final TransformationController _transformationController = TransformationController();
-  bool _hasInitializedView = false; // To ensure auto-zoom happens only once
+  // --- VIEWPORT ---
+  final TransformationController _transformationController =
+      TransformationController();
+  bool _hasInitializedView = false;
 
   @override
   void initState() {
@@ -105,13 +115,47 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     super.dispose();
   }
 
-  // --- TEXT FEATURE LOGIC ---
+  // --- UNDO/REDO ---
+
+  // Robust undo function: call this AFTER a change is made, passing the OLD state
+  void _recordChange(CanvasState oldState) {
+    // Capture NEW state
+    final newState = CanvasState(
+      _deepCopyElements(elements),
+      List.from(_paths),
+    );
+
+    _changeStack.add(
+      Change(
+        oldState,
+        () {
+          // REDO
+          setState(() {
+            elements = _deepCopyElements(newState.elements);
+            _paths = List.from(newState.paths);
+          });
+        },
+        (val) {
+          // UNDO
+          setState(() {
+            elements = _deepCopyElements(val.elements);
+            _paths = List.from(val.paths);
+          });
+        },
+      ),
+    );
+  }
+
+  CanvasState _getCurrentState() {
+    return CanvasState(_deepCopyElements(elements), List.from(_paths));
+  }
+
+  // --- ACTIONS ---
 
   void _toggleTextTools() {
     setState(() {
       _isTextToolsActive = !_isTextToolsActive;
-      _isMagicDrawActive = false; // Disable drawing if text is active
-      // If closing toolbar, finalize edits and deselect
+      _isMagicDrawActive = false;
       if (!_isTextToolsActive) {
         _exitEditMode();
         selectedId = null;
@@ -120,24 +164,21 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   }
 
   void _addTextElement() {
-    final oldList = _deepCopy(elements);
+    final oldState = _getCurrentState();
     final id = 'text_${DateTime.now().millisecondsSinceEpoch}';
 
-    // Place roughly in visual center
+    final double defaultFontSize = (_canvasSize.width / 25).clamp(24.0, 96.0);
     final initialPos = Offset(
-      _canvasSize.width / 2 - 110, 
-      _canvasSize.height / 2 - 40
+      _canvasSize.width / 2 - 150,
+      _canvasSize.height / 2 - 50,
     );
-
-    // Scale font size so it's visible on large posters
-    final double defaultFontSize = (_canvasSize.width / 20).clamp(24.0, 96.0);
 
     final newElement = {
       'id': id,
       'type': 'text',
-      'content': 'Tap to edit', 
+      'content': 'Double tap to edit',
       'position': initialPos,
-      'size': Size(220, defaultFontSize * 2), 
+      'size': Size(300, defaultFontSize * 2),
       'rotation': 0.0,
       'style_color': Colors.black.value,
       'style_fontSize': defaultFontSize,
@@ -145,18 +186,14 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 
     setState(() {
       elements.add(newElement);
-      _bringToFront(id); // Ensure it's on top
-      selectedId = id; 
-      _isTextToolsActive = true; 
+      // Bring to front
+      elements.remove(newElement);
+      elements.add(newElement);
+      selectedId = id;
+      _isTextToolsActive = true;
     });
 
-    _changeStack.add(Change(
-      oldList,
-      () => setState(() => elements = _deepCopy(elements)),
-      (val) => setState(() => elements = val),
-    ));
-
-    // Immediately start editing
+    _recordChange(oldState);
     _enterEditMode(newElement);
   }
 
@@ -166,11 +203,10 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       _isEditingText = true;
       _textEditingController.text = element['content'];
       _textEditingController.selection = TextSelection.fromPosition(
-        TextPosition(offset: _textEditingController.text.length)
+        TextPosition(offset: _textEditingController.text.length),
       );
     });
 
-    // Request focus after build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_textFocusNode.canRequestFocus) {
         _textFocusNode.requestFocus();
@@ -182,17 +218,16 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     if (_isEditingText && selectedId != null) {
       final index = elements.indexWhere((e) => e['id'] == selectedId);
       if (index != -1) {
-        // Save changes
-        final oldList = _deepCopy(elements);
-        setState(() {
-          elements[index]['content'] = _textEditingController.text;
-          _isEditingText = false;
-        });
-        _changeStack.add(Change(
-          oldList,
-          () => setState(() => elements = _deepCopy(elements)),
-          (val) => setState(() => elements = val),
-        ));
+        if (elements[index]['content'] != _textEditingController.text) {
+          final oldState = _getCurrentState();
+          setState(() {
+            elements[index]['content'] = _textEditingController.text;
+            _isEditingText = false;
+          });
+          _recordChange(oldState);
+        } else {
+          setState(() => _isEditingText = false);
+        }
       } else {
         setState(() => _isEditingText = false);
       }
@@ -204,90 +239,105 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     if (selectedId == null) return;
     final index = elements.indexWhere((e) => e['id'] == selectedId);
     if (index == -1) return;
+
+    final oldState = _getCurrentState();
     setState(() {
       elements[index][key] = value;
     });
+    _recordChange(oldState);
   }
 
   void _deleteSelectedElement() {
     if (selectedId == null) return;
-    final oldList = _deepCopy(elements);
+    final oldState = _getCurrentState();
     setState(() {
       elements.removeWhere((e) => e['id'] == selectedId);
       selectedId = null;
       _isEditingText = false;
     });
     _textFocusNode.unfocus();
-    _changeStack.add(Change(
-        oldList, 
-        () => setState(() => elements = _deepCopy(elements)), 
-        (val) => setState(() => elements = val)
-    ));
+    _recordChange(oldState);
   }
 
-  void _bringToFront(String id) {
+  void _handleGestureStart() {
+    _gestureStartSnapshot = _getCurrentState();
+  }
+
+  void _handleElementUpdate(
+    String id,
+    Offset newPos,
+    Size newSize,
+    double newRotation,
+  ) {
     final index = elements.indexWhere((e) => e['id'] == id);
-    if (index != -1 && index != elements.length - 1) {
-      setState(() {
-        final item = elements.removeAt(index);
-        elements.add(item);
-      });
+    if (index == -1) return;
+
+    setState(() {
+      elements[index]['position'] = newPos;
+      elements[index]['size'] = newSize;
+      elements[index]['rotation'] = newRotation;
+    });
+  }
+
+  void _handleGestureEnd() {
+    if (_gestureStartSnapshot != null) {
+      _recordChange(_gestureStartSnapshot!);
+      _gestureStartSnapshot = null;
     }
   }
 
-  Map<String, dynamic>? get _selectedElementData {
-    if (selectedId == null) return null;
-    try {
-      return elements.firstWhere((e) => e['id'] == selectedId);
-    } catch (_) {
-      return null;
-    }
-  }
+  // --- BUILD ---
 
+  @override
   Widget build(BuildContext context) {
-    // Determine overlay state
-    final selectedEl = _selectedElementData;
-    final bool isTextSelected = selectedEl != null && selectedEl['type'] == 'text';
+    Map<String, dynamic>? selectedEl;
+    try {
+      selectedEl = elements.firstWhere((e) => e['id'] == selectedId);
+    } catch (_) {}
+
+    final bool isTextSelected =
+        selectedEl != null && selectedEl['type'] == 'text';
     final bool showTextOverlay = _isTextToolsActive || isTextSelected;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFE0E0E0), // Darker BG to see canvas bounds
-      appBar: !_isMagicDrawActive ? _buildAppBar() : null,
+      backgroundColor: const Color(0xFFE0E0E0),
+      appBar: _buildAppBar(),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          // --- AUTO-ZOOM LOGIC ---
-          // Automatically fit large canvases (like Posters) to screen on load
           if (!_hasInitializedView) {
             _hasInitializedView = true;
-            final double scaleX = (constraints.maxWidth - 40) / _canvasSize.width;
-            final double scaleY = (constraints.maxHeight - 40) / _canvasSize.height;
-            final double initialScale = math.min(scaleX, scaleY).clamp(0.01, 1.0);
-            
-            final double transX = (constraints.maxWidth - (_canvasSize.width * initialScale)) / 2;
-            final double transY = (constraints.maxHeight - (_canvasSize.height * initialScale)) / 2;
+            final double scaleX =
+                (constraints.maxWidth - 40) / _canvasSize.width;
+            final double scaleY =
+                (constraints.maxHeight - 40) / _canvasSize.height;
+            final double initialScale = math
+                .min(scaleX, scaleY)
+                .clamp(0.01, 1.0);
 
-            _transformationController.value = Matrix4.identity()
-              ..translate(transX, transY)
-              ..scale(initialScale);
+            final double transX =
+                (constraints.maxWidth - (_canvasSize.width * initialScale)) / 2;
+            final double transY =
+                (constraints.maxHeight - (_canvasSize.height * initialScale)) /
+                2;
+
+            _transformationController.value =
+                Matrix4.identity()
+                  ..translate(transX, transY)
+                  ..scale(initialScale);
           }
 
           return Stack(
             children: [
-              // -------------------------------------------
-              // LAYER 1: INTERACTIVE CANVAS + DRAWING LAYER
-              // -------------------------------------------
               GestureDetector(
-                // Tap outside to deselect
                 onTap: () {
                   if (!_isMagicDrawActive) {
                     _exitEditMode();
                     setState(() => selectedId = null);
                   }
                 },
-                behavior: HitTestBehavior.translucent, // Catches clicks on empty space
+                behavior: HitTestBehavior.translucent,
                 child: InteractiveViewer(
                   transformationController: _transformationController,
-                  // Disable constrained to allow full size posters (e.g. 3000px height)
                   constrained: false,
                   boundaryMargin: const EdgeInsets.all(double.infinity),
                   minScale: 0.01,
@@ -298,9 +348,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                     width: _canvasSize.width,
                     height: _canvasSize.height,
                     child: Stack(
-                      alignment: Alignment.center,
                       children: [
-                        // THE WHITE BOARD CONTAINER
+                        // Background
                         Container(
                           width: double.infinity,
                           height: double.infinity,
@@ -308,42 +357,109 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                             color: Colors.white,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 30,
+                                color: Colors.black.withOpacity(0.15),
+                                blurRadius: 40,
                                 offset: const Offset(0, 10),
                               ),
                             ],
                           ),
-                          child: ClipRect(
-                            child: Stack(
-                              children: [
-                                // 1. Existing Images/Elements
-                                ...elements.map((e) => _buildCanvasElement(e)),
+                        ),
 
-                                // 2. THE DRAWING LAYER
-                                if (_isMagicDrawActive)
-                                  RepaintBoundary(
-                                    key: _drawingKey,
-                                    child: GestureDetector(
-                                      onPanStart: _onPanStart,
-                                      onPanUpdate: _onPanUpdate,
-                                      onPanEnd: _onPanEnd,
-                                      child: CustomPaint(
-                                        size: Size.infinite,
-                                        painter: CanvasPainter(
-                                          paths: _paths,
-                                          currentPoints: _currentPoints,
-                                          currentColor:
-                                              _isEraser
-                                                  ? Colors.transparent
-                                                  : _selectedColor,
-                                          currentWidth: _strokeWidth,
-                                          isEraser: _isEraser,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                        // Elements
+                        ...elements.map((e) {
+                          final bool isSelected = selectedId == e['id'];
+                          return _ManipulatingBox(
+                            key: ValueKey(e['id']),
+                            id: e['id'],
+                            position: e['position'],
+                            size: e['size'],
+                            rotation: e['rotation'],
+                            type: e['type'],
+                            content: e['content'],
+                            styleData: e,
+                            isSelected: isSelected && !_isMagicDrawActive,
+                            isEditing:
+                                isSelected &&
+                                _isEditingText &&
+                                e['type'] == 'text',
+                            viewScale:
+                                _transformationController.value
+                                    .getMaxScaleOnAxis(),
+                            onTap: () {
+                              if (!_isMagicDrawActive) {
+                                if (_isEditingText && selectedId != e['id'])
+                                  _exitEditMode();
+                                setState(() {
+                                  selectedId = e['id'];
+                                  if (e['type'] == 'text')
+                                    _isTextToolsActive = true;
+                                });
+                                setState(() {
+                                  elements.remove(e);
+                                  elements.add(e);
+                                });
+                              }
+                            },
+                            onDoubleTap: () {
+                              if (e['type'] == 'text') _enterEditMode(e);
+                            },
+                            onDragStart: _handleGestureStart,
+                            onUpdate: (newPos, newSize, newRot) {
+                              _handleElementUpdate(
+                                e['id'],
+                                newPos,
+                                newSize,
+                                newRot,
+                              );
+                            },
+                            onDragEnd: (newPos, newSize, newRot) {
+                              _handleElementUpdate(
+                                e['id'],
+                                newPos,
+                                newSize,
+                                newRot,
+                              );
+                              _handleGestureEnd();
+                            },
+                            textController:
+                                isSelected ? _textEditingController : null,
+                            focusNode: isSelected ? _textFocusNode : null,
+                            // Fix: pass the controller to listen for zooms
+                            transformationController: _transformationController,
+                          );
+                        }),
+
+                        // Drawing Layer
+                        IgnorePointer(
+                          ignoring: !_isMagicDrawActive,
+                          child: RepaintBoundary(
+                            key: _drawingKey,
+                            child: GestureDetector(
+                              onPanStart: (details) {
+                                // Save state before drawing stroke
+                                _gestureStartSnapshot = _getCurrentState();
+                              },
+                              onPanUpdate: _onPanUpdate,
+                              onPanEnd: (details) {
+                                _onPanEnd(details);
+                                if (_gestureStartSnapshot != null) {
+                                  _recordChange(_gestureStartSnapshot!);
+                                  _gestureStartSnapshot = null;
+                                }
+                              },
+                              child: CustomPaint(
+                                size: Size.infinite,
+                                painter: CanvasPainter(
+                                  paths: _paths,
+                                  currentPoints: _currentPoints,
+                                  currentColor:
+                                      _isEraser
+                                          ? Colors.transparent
+                                          : _selectedColor,
+                                  currentWidth: _strokeWidth,
+                                  isEraser: _isEraser,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -353,26 +469,24 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                 ),
               ),
 
-              // -------------------------------------------
-              // LAYER 2: OVERLAYS (Magic Draw & Text Tools)
-              // -------------------------------------------
               MagicDrawTools(
                 isActive: _isMagicDrawActive,
                 selectedColor: _selectedColor,
                 strokeWidth: _strokeWidth,
                 isEraser: _isEraser,
-                onClose: _saveAndCloseMagicDraw,
                 onColorChanged: (c) => setState(() => _selectedColor = c),
                 onWidthChanged: (w) => setState(() => _strokeWidth = w),
                 onEraserToggle: (e) => setState(() => _isEraser = e),
               ),
 
-              // Text Toolbar Overlay
               TextToolsOverlay(
                 isActive: showTextOverlay && !_isMagicDrawActive,
                 isTextSelected: isTextSelected,
-                currentColor: Color(selectedEl?['style_color'] ?? Colors.black.value),
-                currentFontSize: (selectedEl?['style_fontSize'] ?? 24.0) as double,
+                currentColor: Color(
+                  selectedEl?['style_color'] ?? Colors.black.value,
+                ),
+                currentFontSize:
+                    (selectedEl?['style_fontSize'] ?? 24.0) as double,
                 onClose: () {
                   _exitEditMode();
                   setState(() {
@@ -380,32 +494,33 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                     selectedId = null;
                   });
                 },
-                onAddText: _addTextElement, 
+                onAddText: _addTextElement,
                 onDelete: _deleteSelectedElement,
-                onColorChanged: (c) => _updateSelectedTextProperty('style_color', c.value),
-                onFontSizeChanged: (s) => _updateSelectedTextProperty('style_fontSize', s),
+                onColorChanged:
+                    (c) => _updateSelectedTextProperty('style_color', c.value),
+                onFontSizeChanged:
+                    (s) => _updateSelectedTextProperty('style_fontSize', s),
               ),
 
-              // -------------------------------------------
-              // LAYER 3: BOTTOM NAVIGATION
-              // -------------------------------------------
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
                 child: CanvasBottomBar(
-                  activeItem: _isMagicDrawActive ? "Magic Draw" : (_isTextToolsActive ? "Text" : null),
+                  activeItem:
+                      _isMagicDrawActive
+                          ? "Magic Draw"
+                          : (_isTextToolsActive ? "Text" : null),
                   onMagicDraw:
-                      () =>
-                          setState(() {
-                            _isMagicDrawActive = !_isMagicDrawActive;
-                            _isTextToolsActive = false;
-                            _exitEditMode();
-                          }),
+                      () => setState(() {
+                        _isMagicDrawActive = !_isMagicDrawActive;
+                        _isTextToolsActive = false;
+                        _exitEditMode();
+                      }),
                   onMedia: _pickImageFromGallery,
                   onStylesheet: () => _showComingSoon('Stylesheet'),
                   onTools: () => _showComingSoon('Tools'),
-                  onText: _toggleTextTools, // UPDATED: Toggles text tools
+                  onText: _toggleTextTools,
                   onSelect: () => _showComingSoon('Select'),
                   onPlugins: () => _showComingSoon('Plugins'),
                 ),
@@ -417,21 +532,12 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     );
   }
 
-  // --- DRAWING LOGIC ---
-
-  void _onPanStart(DragStartDetails details) {
-    // No logic needed here for now
-  }
+  // --- BOILERPLATE HELPERS ---
 
   void _onPanUpdate(DragUpdateDetails details) {
     setState(() {
       _currentPoints.add(
-        DrawingPoint(
-          offset:
-              details
-                  .localPosition, // Uses local coordinates relative to White Board
-          paint: Paint(),
-        ),
+        DrawingPoint(offset: details.localPosition, paint: Paint()),
       );
     });
   }
@@ -452,67 +558,9 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     });
   }
 
-  // --- SAVE & CLOSE LOGIC ---
-
   Future<void> _saveAndCloseMagicDraw() async {
-    // 1. If nothing was drawn, just close
-    if (_paths.isEmpty && _currentPoints.isEmpty) {
-      setState(() => _isMagicDrawActive = false);
-      return;
-    }
-
-    try {
-      // 2. Capture the Drawing Layer as an Image
-      RenderRepaintBoundary boundary =
-          _drawingKey.currentContext!.findRenderObject()
-              as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0); // High res
-      ByteData? byteData = await image.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
-      Uint8List pngBytes = byteData!.buffer.asUint8List();
-
-      // 3. Save to File
-      final directory = await getApplicationDocumentsDirectory();
-      final String filePath =
-          '${directory.path}/drawing_${DateTime.now().millisecondsSinceEpoch}.png';
-      File imgFile = File(filePath);
-      await imgFile.writeAsBytes(pngBytes);
-
-      // 4. Add as a new Element to the Board
-      final oldList = _deepCopy(elements);
-      setState(() {
-        elements.add({
-          'id': 'drawing_${DateTime.now().millisecondsSinceEpoch}',
-          'type': 'file_image',
-          'content': filePath,
-          // Position it over the whole canvas since that's where we drew it
-          'position': const Offset(0, 0),
-          'size': _canvasSize,
-          'rotation': 0.0,
-        });
-
-        // 5. Clear the drawing paths and close mode
-        _paths.clear();
-        _currentPoints.clear();
-        _isMagicDrawActive = false;
-      });
-
-      // Add to Undo Stack
-      _changeStack.add(
-        Change(
-          oldList,
-          () => setState(() => elements = _deepCopy(elements)),
-          (val) => setState(() => elements = val),
-        ),
-      );
-    } catch (e) {
-      debugPrint("Error saving drawing: $e");
-      setState(() => _isMagicDrawActive = false);
-    }
+    setState(() => _isMagicDrawActive = false);
   }
-
-  // --- EXISTING LOGIC ---
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -524,8 +572,15 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
               icon: SvgPicture.asset(
                 'assets/icons/arrow-left-s-line.svg',
                 width: 22,
+                colorFilter: ColorFilter.mode(Colors.black, BlendMode.srcIn),
               ),
-              onPressed: () => Navigator.of(context).maybePop(),
+              onPressed: () {
+                if (_isMagicDrawActive) {
+                  _saveAndCloseMagicDraw();
+                } else {
+                  Navigator.of(context).maybePop();
+                }
+              },
             ),
             IconButton(
               icon: SvgPicture.asset(
@@ -570,7 +625,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                   'assets/icons/file-image-line.svg',
                   width: 22,
                 ),
-                onPressed: _openLayers,
+                onPressed: _pickImageFromGallery,
               ),
               IconButton(
                 icon: SvgPicture.asset(
@@ -594,296 +649,41 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     );
   }
 
-  Widget _buildCanvasElement(Map<String, dynamic> e) {
-    final isSelected = selectedId == e['id'];
-    final position = e['position'] as Offset;
-    final size = e['size'] as Size;
-    final rotation = (e['rotation'] ?? 0.0) as double;
-    final type = e['type'];
-    final isEditingThis = isSelected && _isEditingText && type == 'text';
-
-    return Positioned(
-      left: position.dx,
-      top: position.dy,
-      child: Transform.rotate(
-        angle: rotation,
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent, // Ensures taps work on transparent areas
-          onTap: () {
-            if (!_isMagicDrawActive) {
-              if (_isEditingText && selectedId != e['id']) {
-                _exitEditMode();
-              }
-              setState(() {
-                selectedId = e['id'];
-                if (type == 'text') _isTextToolsActive = true;
-              });
-              _bringToFront(e['id']);
-            }
-          },
-          onDoubleTap: () {
-            if (type == 'text') {
-              _enterEditMode(e);
-            }
-          },
-          child: Stack(
-            clipBehavior: Clip.none, // Allow handles to be visible outside element bounds
-            children: [
-              // Main Element Container
-              Container(
-                width: size.width,
-                height: size.height,
-                decoration: BoxDecoration(
-                  border:
-                      isSelected
-                          // Fix border width scaling so it looks consistent at zoom levels
-                          ? Border.all(
-                              color: Colors.blue, 
-                              width: 2.0 / (_transformationController.value.getMaxScaleOnAxis())
-                            )
-                          : type == 'text'
-                              // Dashed-like grey border for unselected text
-                              ? Border.all(color: Colors.grey.withOpacity(0.5), width: 1.0)
-                              : null,
-                  color: type == 'text' ? Colors.white.withOpacity(0.01) : null,
-                ),
-                child:
-                    e['type'] == 'file_image'
-                        ? Image.file(File(e['content']), fit: BoxFit.contain)
-                        : e['type'] == 'text'
-                            ? _buildTextContent(e, isEditingThis)
-                            : Container(),
-              ),
-
-              // Transform Controls (only when selected and not editing text)
-              if (isSelected && !_isMagicDrawActive && !isEditingThis) ...[
-                // Resize Handle - Bottom Right
-                Positioned(
-                  right: -12,
-                  bottom: -12,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onPanUpdate: (details) {
-                      setState(() {
-                        final newWidth = (size.width + details.delta.dx).clamp(
-                          50.0,
-                          _canvasSize.width,
-                        );
-                        final newHeight = (size.height + details.delta.dy)
-                            .clamp(30.0, _canvasSize.height);
-                        e['size'] = Size(newWidth, newHeight);
-                      });
-                    },
-                    child: _buildHandle(Icons.zoom_out_map, Colors.blue),
-                  ),
-                ),
-
-                // Rotate Handle - Top Right
-                Positioned(
-                  right: -12,
-                  top: -12,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onPanUpdate: (details) {
-                      setState(() {
-                        final center = Offset(
-                          position.dx + size.width / 2,
-                          position.dy + size.height / 2,
-                        );
-                        final angle =
-                            (details.globalPosition - center).direction;
-                        e['rotation'] = angle;
-                      });
-                    },
-                    child: _buildHandle(Icons.rotate_right, Colors.green),
-                  ),
-                ),
-
-                // Move Handle - Full Overlay
-                Positioned.fill(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onPanStart: (details) {
-                      setState(() {
-                        _dragStartPosition = position;
-                      });
-                    },
-                    onPanUpdate: (details) {
-                      setState(() {
-                        // Apply zoom scaling to drag distance
-                        final scale = _transformationController.value.getMaxScaleOnAxis();
-                        final newPosition = position + (details.delta / scale);
-                        e['position'] = newPosition;
-                      });
-                    },
-                    onPanEnd: (details) {
-                      if (_dragStartPosition != null &&
-                          _dragStartPosition != position) {
-                        _addDragToUndoStack(
-                          e['id'],
-                          _dragStartPosition!,
-                          position,
-                        );
-                      }
-                      _dragStartPosition = null;
-                    },
-                    child: Container(color: Colors.transparent),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextContent(Map<String, dynamic> e, bool isEditing) {
-    final style = TextStyle(
-      fontSize: (e['style_fontSize'] ?? 24.0) as double,
-      color: Color(e['style_color'] ?? Colors.black.value),
-      fontFamily: 'GeneralSans',
-    );
-
-    if (isEditing) {
-      // Auto-growing TextField
-      return Center(
-        child: IntrinsicWidth(
-          child: TextField(
-            controller: _textEditingController,
-            focusNode: _textFocusNode,
-            autofocus: true,
-            maxLines: null,
-            textAlign: TextAlign.center,
-            style: style,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
-              isDense: true,
-            ),
-            onChanged: (text) {
-              final span = TextSpan(text: text, style: style);
-              final tp = TextPainter(text: span, textDirection: TextDirection.ltr);
-              tp.layout(maxWidth: _canvasSize.width); 
-              setState(() {
-                // Resize element to fit text
-                e['size'] = Size(tp.width + 40, tp.height + 40); 
-              });
-            },
-          ),
-        ),
-      );
-    } else {
-      return Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Center(
-          child: Text(
-            e['content'],
-            textAlign: TextAlign.center,
-            style: style,
-          ),
-        ),
-      );
-    }
-  }
-
-  Widget _buildHandle(IconData icon, Color color) {
-    // Keep handles consistent size regardless of zoom
-    final double scale = 1 / _transformationController.value.getMaxScaleOnAxis();
-    return Transform.scale(
-      scale: scale.clamp(1.0, 5.0),
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2),
-          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
-        ),
-        child: Icon(
-          icon,
-          size: 14,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-
   Future<void> _pickImageFromGallery() async {
     final List<XFile> images = await _picker.pickMultiImage();
     if (images.isNotEmpty) {
-      final oldList = _deepCopy(elements);
-
-      // Smart grid layout for multiple images
-      final double imageSize = 150.0;
-      final double padding = 20.0;
-      final int columns = ((_canvasSize.width - padding * 2) /
-              (imageSize + padding))
-          .floor()
-          .clamp(1, 100);
-
+      final oldState = _getCurrentState();
       setState(() {
         for (int i = 0; i < images.length; i++) {
-          final int row = i ~/ columns;
-          final int col = i % columns;
-
-          final double x = padding + (col * (imageSize + padding));
-          final double y = padding + (row * (imageSize + padding));
-
           elements.add({
             'id': '${DateTime.now().millisecondsSinceEpoch}_$i',
             'type': 'file_image',
             'content': images[i].path,
-            'position': Offset(
-              x.clamp(padding, _canvasSize.width - imageSize - padding),
-              y.clamp(padding, _canvasSize.height - imageSize - padding),
-            ),
+            'position': const Offset(50, 50),
             'size': const Size(150, 150),
             'rotation': 0.0,
           });
         }
       });
-
-      _changeStack.add(
-        Change(
-          oldList,
-          () => setState(() => elements = _deepCopy(elements)),
-          (val) => setState(() => elements = val),
-        ),
-      );
+      _recordChange(oldState);
     }
   }
 
-  void _addDragToUndoStack(String id, Offset oldPos, Offset newPos) {
-    final oldList = _deepCopy(elements);
-    final oldItem = oldList.firstWhere((x) => x['id'] == id);
-    oldItem['position'] = oldPos;
-    final newList = _deepCopy(elements);
-    _changeStack.add(
-      Change(
-        oldList,
-        () => setState(() => elements = newList),
-        (val) => setState(() => elements = val),
-      ),
-    );
-  }
-
-  List<Map<String, dynamic>> _deepCopy(List<Map<String, dynamic>> source) {
+  List<Map<String, dynamic>> _deepCopyElements(
+    List<Map<String, dynamic>> source,
+  ) {
     return source.map((e) {
       final copy = Map<String, dynamic>.from(e);
-      if (e['position'] is Offset) {
+      if (e['position'] is Offset)
         copy['position'] = Offset(
           (e['position'] as Offset).dx,
           (e['position'] as Offset).dy,
         );
-      }
-      if (e['size'] is Size) {
+      if (e['size'] is Size)
         copy['size'] = Size(
           (e['size'] as Size).width,
           (e['size'] as Size).height,
         );
-      }
       return copy;
     }).toList();
   }
@@ -891,20 +691,304 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   void _openLayers() => _showComingSoon('Layers');
   void _exportProject() => _showComingSoon('Export');
   void _openSettings() => _showComingSoon('Settings');
-  void _showComingSoon(String feature) => ScaffoldMessenger.of(
+  void _showComingSoon([dynamic feature]) => ScaffoldMessenger.of(
     context,
-  ).showSnackBar(SnackBar(content: Text('$feature coming soon')));
+  ).showSnackBar(const SnackBar(content: Text('Coming soon')));
+}
+
+// =============================================================================
+//  MANIPULATING BOX WIDGET
+// =============================================================================
+
+class _ManipulatingBox extends StatefulWidget {
+  final String id;
+  final Offset position;
+  final Size size;
+  final double rotation;
+  final String type;
+  final String content;
+  final Map<String, dynamic> styleData;
+  final bool isSelected;
+  final bool isEditing;
+  final double viewScale;
+
+  // Passed controller for real-time zoom updates
+  final TransformationController transformationController;
+
+  final VoidCallback onTap;
+  final VoidCallback onDoubleTap;
+  final VoidCallback onDragStart;
+  final Function(Offset, Size, double) onUpdate;
+  final Function(Offset, Size, double) onDragEnd;
+  final TextEditingController? textController;
+  final FocusNode? focusNode;
+
+  const _ManipulatingBox({
+    Key? key,
+    required this.id,
+    required this.position,
+    required this.size,
+    required this.rotation,
+    required this.type,
+    required this.content,
+    required this.styleData,
+    required this.isSelected,
+    required this.isEditing,
+    required this.viewScale,
+    required this.transformationController, // Receive controller
+    required this.onTap,
+    required this.onDoubleTap,
+    required this.onDragStart,
+    required this.onUpdate,
+    required this.onDragEnd,
+    this.textController,
+    this.focusNode,
+  }) : super(key: key);
+
+  @override
+  State<_ManipulatingBox> createState() => _ManipulatingBoxState();
+}
+
+class _ManipulatingBoxState extends State<_ManipulatingBox> {
+  late Offset _pos;
+  late Size _size;
+  late double _rot;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateInternalState();
+  }
+
+  @override
+  void didUpdateWidget(_ManipulatingBox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.position != oldWidget.position ||
+        widget.size != oldWidget.size ||
+        widget.rotation != oldWidget.rotation) {
+      _updateInternalState();
+    }
+  }
+
+  void _updateInternalState() {
+    _pos = widget.position;
+    _size = widget.size;
+    _rot = widget.rotation;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Listen to the transformation controller to get real-time zoom updates
+    return ValueListenableBuilder(
+      valueListenable: widget.transformationController,
+      builder: (context, matrix, child) {
+        final double currentZoom = matrix.getMaxScaleOnAxis();
+        // Calculate inverse scale to keep handles visually constant
+        final double handleScale = (1.0 / currentZoom).clamp(0.1, 5.0);
+        final double touchTargetSize = 40.0 * handleScale;
+        final double visualSize = 24.0 * handleScale;
+
+        return Positioned(
+          left: _pos.dx,
+          top: _pos.dy,
+          child: Transform.rotate(
+            angle: _rot,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: widget.onTap,
+                  onDoubleTap: widget.onDoubleTap,
+                  onPanStart: (_) => widget.onDragStart(),
+                  onPanUpdate: (details) {
+                    if (widget.isSelected && !widget.isEditing) {
+                      // Use real-time zoom to normalize drag delta
+                      final delta = details.delta / currentZoom;
+                      final globalDelta = _rotateVector(delta, _rot);
+                      setState(() => _pos += globalDelta);
+                      widget.onUpdate(_pos, _size, _rot);
+                    }
+                  },
+                  onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
+                  child: Container(
+                    width: _size.width,
+                    height: _size.height,
+                    decoration: BoxDecoration(
+                      border:
+                          widget.isSelected
+                              ? Border.all(
+                                color: Colors.blue,
+                                width: 2.0 * handleScale,
+                              )
+                              : widget.type == 'text'
+                              ? Border.all(
+                                color: Colors.grey.withOpacity(0.3),
+                                width: 1.0 * handleScale,
+                              )
+                              : null,
+                    ),
+                    child:
+                        widget.type == 'file_image'
+                            ? Image.file(
+                              File(widget.content),
+                              fit: BoxFit.contain,
+                            )
+                            : _buildText(),
+                  ),
+                ),
+
+                if (widget.isSelected && !widget.isEditing) ...[
+                  Positioned(
+                    right: -visualSize / 2,
+                    bottom: -visualSize / 2,
+                    child: _buildHandle(
+                      touchSize: touchTargetSize,
+                      visualSize: visualSize,
+                      icon: Icons.zoom_out_map,
+                      color: Colors.blue,
+                      onDrag: (delta) {
+                        final normalizedDelta = delta / currentZoom;
+                        final localDelta = _rotateVector(
+                          normalizedDelta,
+                          -_rot,
+                        );
+                        setState(() {
+                          _size = Size(
+                            (_size.width + localDelta.dx).clamp(50.0, 10000.0),
+                            (_size.height + localDelta.dy).clamp(30.0, 10000.0),
+                          );
+                          final offset = Offset(
+                            localDelta.dx / 2,
+                            localDelta.dy / 2,
+                          );
+                          _pos += _rotateVector(offset, _rot);
+                        });
+                        widget.onUpdate(_pos, _size, _rot);
+                      },
+                    ),
+                  ),
+
+                  Positioned(
+                    right: -visualSize / 2,
+                    top: -visualSize / 2,
+                    child: _buildHandle(
+                      touchSize: touchTargetSize,
+                      visualSize: visualSize,
+                      icon: Icons.rotate_right,
+                      color: Colors.green,
+                      onDrag: (delta) {
+                        setState(() {
+                          _rot += (delta.dx + delta.dy) * 0.005;
+                        });
+                        widget.onUpdate(_pos, _size, _rot);
+                      },
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildText() {
+    final style = TextStyle(
+      fontSize: (widget.styleData['style_fontSize'] ?? 24.0) as double,
+      color: Color(widget.styleData['style_color'] ?? Colors.black.value),
+      fontFamily: 'GeneralSans',
+    );
+
+    if (widget.isEditing) {
+      return Center(
+        child: IntrinsicWidth(
+          child: TextField(
+            controller: widget.textController,
+            focusNode: widget.focusNode,
+            autofocus: true,
+            maxLines: null,
+            textAlign: TextAlign.center,
+            style: style,
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onChanged: (text) {
+              final span = TextSpan(text: text, style: style);
+              final tp = TextPainter(
+                text: span,
+                textDirection: TextDirection.ltr,
+              );
+              tp.layout(maxWidth: 10000);
+              setState(() {
+                _size = Size(tp.width + 40, tp.height + 40);
+              });
+              widget.onUpdate(_pos, _size, _rot);
+            },
+          ),
+        ),
+      );
+    }
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Text(widget.content, textAlign: TextAlign.center, style: style),
+      ),
+    );
+  }
+
+  Widget _buildHandle({
+    required double touchSize,
+    required double visualSize,
+    required IconData icon,
+    required Color color,
+    required Function(Offset) onDrag,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (_) => widget.onDragStart(),
+      onPanUpdate: (details) => onDrag(details.delta),
+      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
+      child: Container(
+        width: touchSize,
+        height: touchSize,
+        alignment: Alignment.center,
+        color: Colors.transparent,
+        child: Container(
+          width: visualSize,
+          height: visualSize,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+          ),
+          child: Icon(icon, size: visualSize * 0.6, color: Colors.white),
+        ),
+      ),
+    );
+  }
+
+  Offset _rotateVector(Offset vector, double angle) {
+    final cosA = math.cos(angle);
+    final sinA = math.sin(angle);
+    return Offset(
+      vector.dx * cosA - vector.dy * sinA,
+      vector.dx * sinA + vector.dy * cosA,
+    );
+  }
 }
 
 // --- PAINTER ---
-
 class CanvasPainter extends CustomPainter {
   final List<DrawingPath> paths;
   final List<DrawingPoint> currentPoints;
   final Color currentColor;
   final double currentWidth;
   final bool isEraser;
-
   CanvasPainter({
     required this.paths,
     required this.currentPoints,
@@ -912,12 +996,9 @@ class CanvasPainter extends CustomPainter {
     required this.currentWidth,
     required this.isEraser,
   });
-
   @override
   void paint(Canvas canvas, Size size) {
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
-
-    // Draw committed paths
     for (final path in paths) {
       final paint =
           Paint()
@@ -927,13 +1008,11 @@ class CanvasPainter extends CustomPainter {
             ..strokeCap = StrokeCap.round
             ..strokeJoin = StrokeJoin.round
             ..style = PaintingStyle.stroke;
-
       if (path.points.length > 1) {
         final Path p = Path();
         p.moveTo(path.points.first.offset.dx, path.points.first.offset.dy);
-        for (int i = 1; i < path.points.length; i++) {
+        for (int i = 1; i < path.points.length; i++)
           p.lineTo(path.points[i].offset.dx, path.points[i].offset.dy);
-        }
         canvas.drawPath(p, paint);
       } else if (path.points.isNotEmpty) {
         canvas.drawPoints(ui.PointMode.points, [
@@ -941,8 +1020,6 @@ class CanvasPainter extends CustomPainter {
         ], paint);
       }
     }
-
-    // Draw current stroke
     if (currentPoints.isNotEmpty) {
       final paint =
           Paint()
@@ -952,12 +1029,10 @@ class CanvasPainter extends CustomPainter {
             ..strokeCap = StrokeCap.round
             ..strokeJoin = StrokeJoin.round
             ..style = PaintingStyle.stroke;
-
       final Path p = Path();
       p.moveTo(currentPoints.first.offset.dx, currentPoints.first.offset.dy);
-      for (int i = 1; i < currentPoints.length; i++) {
+      for (int i = 1; i < currentPoints.length; i++)
         p.lineTo(currentPoints[i].offset.dx, currentPoints[i].offset.dy);
-      }
       canvas.drawPath(p, paint);
     }
     canvas.restore();
@@ -966,8 +1041,6 @@ class CanvasPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CanvasPainter oldDelegate) => true;
 }
-
-// --- BOTTOM BAR ---
 
 class CanvasBottomBar extends StatelessWidget {
   final String? activeItem;
@@ -978,7 +1051,6 @@ class CanvasBottomBar extends StatelessWidget {
   final VoidCallback onText;
   final VoidCallback onSelect;
   final VoidCallback onPlugins;
-
   const CanvasBottomBar({
     super.key,
     this.activeItem,
@@ -990,7 +1062,6 @@ class CanvasBottomBar extends StatelessWidget {
     required this.onSelect,
     required this.onPlugins,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1071,14 +1142,12 @@ class _BottomBarItem extends StatelessWidget {
   final String iconPath;
   final VoidCallback onTap;
   final bool isActive;
-
   const _BottomBarItem({
     required this.label,
     required this.iconPath,
     required this.onTap,
     this.isActive = false,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
