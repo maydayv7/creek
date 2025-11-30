@@ -411,137 +411,206 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
   // --- ADD NOTE INPUT DIALOG (FIXED KEYBOARD/MARGIN) ---
   void _showAddNoteInputDialog() {
     final TextEditingController newNoteController = TextEditingController();
-    String newCategory = 'Compositions';
+    // Default to the first tag or 'Compositions', ensure it exists in the list to prevent crashes
+    String newCategory =
+        _allAvailableTags.contains('Compositions')
+            ? 'Compositions'
+            : (_allAvailableTags.isNotEmpty
+                ? _allAvailableTags.first
+                : 'General');
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.transparent, // Crucial for the overlay wrapper
       builder: (context) {
         final mediaQuery = MediaQuery.of(context);
 
+        // 1. Wrap content in StatefulBuilder for Dropdown updates
         final modalContent = StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             return Column(
-              // mainAxisSize.min ensures the column takes only the height it needs
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 20, left: 20, right: 20),
-                  child: Text(
-                    "Add Note",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Category Dropdown
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: DropdownButtonFormField<String>(
-                    value: newCategory,
-                    decoration: InputDecoration(
-                      labelText: "Category",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 20,
+                  ),
+                  child: Column(
+                    children: [
+                      // --- ROW 1: Header (Avatar, Name, Pill Dropdown) ---
+                      Row(
+                        children: [
+                          // Avatar
+                          const CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Colors.grey,
+                            child: Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+
+                          // Name
+                          const Text(
+                            "User",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
+                          ),
+
+                          const Spacer(),
+
+                          // Dropdown
+                          Container(
+                            height: 40,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE0E5FF),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value:
+                                    _allAvailableTags.contains(newCategory)
+                                        ? newCategory
+                                        : null,
+                                hint: const Text("Type"),
+                                isDense: true,
+                                icon: const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  size: 20,
+                                  color: Colors.black54,
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                                focusColor: Colors.transparent,
+                                dropdownColor: Colors.white,
+                                items:
+                                    _allAvailableTags
+                                        .map(
+                                          (c) => DropdownMenuItem(
+                                            value: c,
+                                            child: Text(c),
+                                          ),
+                                        )
+                                        .toList(),
+                                onChanged: (v) {
+                                  // Update local state for the modal
+                                  setModalState(() {
+                                    newCategory = v!;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+
+                      const SizedBox(height: 20),
+
+                      // --- ROW 2: Input Field & Send Button ---
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: newNoteController,
+                              autofocus: true,
+                              maxLines: 1,
+                              style: const TextStyle(fontSize: 14),
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: const Color(0xFFF3F4F6),
+                                hintText: "Enter note details...",
+                                hintStyle: TextStyle(color: Colors.grey[600]),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+
+                          // Send Button with YOUR Logic
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 2),
+                            child: IconButton(
+                              icon: const Icon(Icons.send_outlined),
+                              color: Colors.black87,
+                              iconSize: 28,
+                              onPressed: () async {
+                                // --- YOUR ORIGINAL SAVE LOGIC ---
+                                if (newNoteController.text.isNotEmpty &&
+                                    _finalSelectionRect != null &&
+                                    _imageRenderSize != null) {
+                                  // Normalization logic
+                                  final normalizedRect =
+                                      _finalSelectionRect!.normalize();
+                                  final nX =
+                                      normalizedRect.center.dx /
+                                      _imageRenderSize!.width;
+                                  final nY =
+                                      normalizedRect.center.dy /
+                                      _imageRenderSize!.height;
+                                  final nW =
+                                      normalizedRect.width /
+                                      _imageRenderSize!.width;
+                                  final nH =
+                                      normalizedRect.height /
+                                      _imageRenderSize!.height;
+
+                                  await _noteService.addNote(
+                                    widget.imageId,
+                                    newNoteController.text.trim(),
+                                    newCategory,
+                                    normX: nX,
+                                    normY: nY,
+                                    normWidth: nW,
+                                    normHeight: nH,
+                                  );
+
+                                  final updatedNotes = await _noteService
+                                      .getNotesForImage(widget.imageId);
+
+                                  // Update the main state of ImageDetailsPage
+                                  if (mounted) {
+                                    setState(() {
+                                      _notes = updatedNotes;
+                                      _finalSelectionRect =
+                                          null; // Clear selection
+                                    });
+                                  }
+
+                                  Navigator.pop(context);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    items:
-                        _allAvailableTags
-                            .map(
-                              (c) => DropdownMenuItem(value: c, child: Text(c)),
-                            )
-                            .toList(),
-                    onChanged: (v) => setModalState(() => newCategory = v!),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                // Note Text
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: TextField(
-                    controller: newNoteController,
-                    autofocus: true,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: "Enter note details...",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Save Button
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () async {
-                        if (newNoteController.text.isNotEmpty &&
-                            _finalSelectionRect != null &&
-                            _imageRenderSize != null) {
-                          // Normalization logic
-                          final normalizedRect =
-                              _finalSelectionRect!.normalize();
-                          final nX =
-                              normalizedRect.center.dx /
-                              _imageRenderSize!.width;
-                          final nY =
-                              normalizedRect.center.dy /
-                              _imageRenderSize!.height;
-                          final nW =
-                              normalizedRect.width / _imageRenderSize!.width;
-                          final nH =
-                              normalizedRect.height / _imageRenderSize!.height;
-
-                          await _noteService.addNote(
-                            widget.imageId,
-                            newNoteController.text.trim(),
-                            newCategory,
-                            normX: nX,
-                            normY: nY,
-                            normWidth: nW,
-                            normHeight: nH,
-                          );
-
-                          final updatedNotes = await _noteService
-                              .getNotesForImage(widget.imageId);
-                          // Update the main state of ImageDetailsPage
-                          this.setState(() {
-                            _notes = updatedNotes;
-                            _finalSelectionRect = null; // Clear selection
-                          });
-
-                          Navigator.pop(context);
-                        }
-                      },
-                      child: const Text(
-                        "Save Note",
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 10),
               ],
             );
           },
         );
 
-        // Use the custom overlay for keyboard margin fix and no shadow/dimming
         return NoteModalOverlay(
           modalContent: modalContent,
           screenSize: mediaQuery.size,
@@ -935,7 +1004,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                                                     BorderRadius.circular(20),
                                               ),
                                               child: const Text(
-                                                "Adjust area or tap Checkmark to confirm",
+                                                "Adjust area or tap checkmark to confirm",
                                                 style: TextStyle(
                                                   color: Colors.white,
                                                   fontSize: 12,
