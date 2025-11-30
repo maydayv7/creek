@@ -100,6 +100,10 @@ class ImageService {
     AnalysisQueueManager().processQueue();
   }
 
+  Future<void> renameImage(String id, String newName) async {
+    await _repo.updateName(id, newName);
+  }
+
   Future<void> updateAnalysis(String id, Map<String, dynamic> analysis) async {
     final jsonString = jsonEncode(analysis);
     await _repo.updateAnalysis(id, jsonString);

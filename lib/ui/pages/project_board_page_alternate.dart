@@ -4,6 +4,7 @@ import 'package:adobe/ui/styles/variables.dart';
 import '../../data/models/image_model.dart';
 import '../../data/repos/image_repo.dart';
 import 'image_details_page.dart';
+import '../widgets/image_context_menu.dart';
 
 class ProjectBoardPageAlternate extends StatefulWidget {
   final int projectId;
@@ -313,91 +314,95 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
   }
 
   Widget _buildImageItem(ImageModel image, {required int index}) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (_) => ImageDetailsPage(
-                  imagePath: image.filePath,
-                  imageId: image.id,
-                  projectId: widget.projectId,
-                ),
-          ),
-        );
-      },
-      child: Container(
-        height: (index % 3 == 0) ? 240 : 180,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: Variables.surfaceSubtle,
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.file(
-              File(image.filePath),
-              fit: BoxFit.cover,
-              width: double.infinity,
-              errorBuilder:
-                  (_, __, ___) => const Center(
-                    child: Icon(
-                      Icons.broken_image,
-                      color: Variables.textDisabled,
-                    ),
+    return ImageContextMenu(
+      image: image,
+      onImageDeleted: () => refreshData(),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (_) => ImageDetailsPage(
+                    imagePath: image.filePath,
+                    imageId: image.id,
+                    projectId: widget.projectId,
                   ),
             ),
-            if (image.tags.isNotEmpty)
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.8),
-                        Colors.transparent,
-                      ],
+          );
+        },
+        child: Container(
+          height: (index % 3 == 0) ? 240 : 180,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Variables.surfaceSubtle,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.file(
+                File(image.filePath),
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder:
+                    (_, __, ___) => const Center(
+                      child: Icon(
+                        Icons.broken_image,
+                        color: Variables.textDisabled,
+                      ),
+                    ),
+              ),
+              if (image.tags.isNotEmpty)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.8),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children:
+                          image.tags.take(3).map((tag) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
+                              ),
+                              child: Text(
+                                tag.toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontFamily: 'GeneralSans',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          }).toList(),
                     ),
                   ),
-                  child: Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    children:
-                        image.tags.take(3).map((tag) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.1),
-                              ),
-                            ),
-                            child: Text(
-                              tag.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontFamily: 'GeneralSans',
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

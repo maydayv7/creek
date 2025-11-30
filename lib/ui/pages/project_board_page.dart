@@ -13,6 +13,7 @@ import 'project_tag_page.dart';
 import 'project_board_page_alternate.dart';
 import 'image_save_page.dart';
 import 'image_details_page.dart';
+import '../widgets/image_context_menu.dart';
 
 class ProjectBoardPage extends StatefulWidget {
   final int projectId;
@@ -97,25 +98,6 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
-  // void _categorizeImages(List<ImageModel> images) {
-  //   _categorizedImages.clear();
-  //   for (var img in images) {
-  //     if (img.tags.isEmpty) {
-  //       if (!_categorizedImages.containsKey('Uncategorized')) {
-  //         _categorizedImages['Uncategorized'] = [];
-  //       }
-  //       _categorizedImages['Uncategorized']!.add(img);
-  //     } else {
-  //       for (var tag in img.tags) {
-  //         if (!_categorizedImages.containsKey(tag)) {
-  //           _categorizedImages[tag] = [];
-  //         }
-  //         _categorizedImages[tag]!.add(img);
-  //       }
-  //     }
-  //   }
-  // }
 
   void _onProjectChanged(ProjectModel newProject) {
     if (newProject.id != _currentProject?.id) {
@@ -369,48 +351,52 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (context, imgIndex) {
                     final image = images[imgIndex];
-                    return GestureDetector(
-                      onTap: () {
-                        if (_currentProject?.id != null) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => ImageDetailsPage(
-                                    imagePath: image.filePath,
-                                    imageId: image.id,
-                                    projectId: _currentProject!.id!,
-                                  ),
-                            ),
-                          ).then((_) => _loadImagesForSelected());
-                        }
-                      },
-                      child: Container(
-                        width: 120,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: Variables.surfaceSubtle,
-                          border: Border.all(color: Variables.borderSubtle),
-                        ),
-                        // FIX: Explicitly clip image to border radius
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              Image.file(
-                                File(image.filePath),
-                                fit: BoxFit.cover,
-                                errorBuilder:
-                                    (_, __, ___) => Container(
-                                      color: Variables.surfaceSubtle,
-                                      child: const Icon(
-                                        Icons.broken_image,
-                                        color: Variables.textDisabled,
-                                      ),
+                    return ImageContextMenu(
+                      image: image,
+                      onImageDeleted: () => _loadImagesForSelected(),
+                      child: GestureDetector(
+                        onTap: () {
+                          if (_currentProject?.id != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (_) => ImageDetailsPage(
+                                      imagePath: image.filePath,
+                                      imageId: image.id,
+                                      projectId: _currentProject!.id!,
                                     ),
                               ),
-                            ],
+                            ).then((_) => _loadImagesForSelected());
+                          }
+                        },
+                        child: Container(
+                          width: 120,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: Variables.surfaceSubtle,
+                            border: Border.all(color: Variables.borderSubtle),
+                          ),
+                          // FIX: Explicitly clip image to border radius
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image.file(
+                                  File(image.filePath),
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (_, __, ___) => Container(
+                                        color: Variables.surfaceSubtle,
+                                        child: const Icon(
+                                          Icons.broken_image,
+                                          color: Variables.textDisabled,
+                                        ),
+                                      ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

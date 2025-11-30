@@ -48,6 +48,16 @@ class ImageRepo {
     );
   }
 
+  Future<void> updateName(String id, String newName) async {
+    final db = await AppDatabase.db;
+    await db.update(
+      'images',
+      {'name': newName},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<List<ImageModel>> getPendingImages() async {
     final db = await AppDatabase.db;
     final res = await db.query(
