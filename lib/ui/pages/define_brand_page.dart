@@ -1,4 +1,4 @@
-git import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:adobe/ui/styles/variables.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../services/project_service.dart';

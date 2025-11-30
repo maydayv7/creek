@@ -70,7 +70,7 @@ class ImageService {
     );
     await _repo.addImage(image);
 
-    // 4. Trigger Analysis Queue (Always)
+    // 4. Trigger Analysis Queue
     AnalysisQueueManager().processQueue();
 
     return id;

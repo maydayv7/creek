@@ -7,6 +7,7 @@ import 'package:adobe/ui/widgets/top_bar.dart';
 import 'package:adobe/data/repos/image_repo.dart';
 import 'package:adobe/data/repos/project_repo.dart';
 import 'package:adobe/services/python_service.dart';
+import 'package:adobe/data/repos/note_repo.dart';
 
 class StylesheetPage extends StatefulWidget {
   final int projectId;
@@ -121,24 +122,36 @@ class _StylesheetPageState extends State<StylesheetPage> {
     });
 
     try {
+      // 1. Fetch Image Analysis Data
       final images = await ImageRepo().getImages(_currentProjectId);
-      final analysisData = images
+      final List<String> analysisData = images
           .map((img) => img.analysisData)
           .where((data) => data != null && data.isNotEmpty)
           .cast<String>()
           .toList();
 
+      // 2. Fetch Note Analysis Data
+      final notes = await NoteRepo().getNotesByProjectId(_currentProjectId);
+      final List<String> noteAnalysisData = notes
+          .map((n) => n.analysisData)
+          .where((data) => data != null && data.isNotEmpty)
+          .cast<String>()
+          .toList();
+
+      // 3. Combine both
+      analysisData.addAll(noteAnalysisData);
+
       if (analysisData.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("No analyzed images found.")),
+            const SnackBar(content: Text("No analyzed images or notes found.")),
           );
         }
         return;
       }
 
       final result = await PythonService().generateStylesheet(analysisData);
-      
+
       if (mounted && result != null) {
         final jsonString = jsonEncode(result);
         await ProjectRepo().updateStylesheet(_currentProjectId, jsonString);
