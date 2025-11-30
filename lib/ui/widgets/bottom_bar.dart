@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:adobe/ui/styles/variables.dart';
 import 'package:adobe/ui/pages/project_board_page.dart';
 import 'package:adobe/ui/pages/stylesheet_page.dart';
+import 'package:adobe/ui/pages/project_file_page.dart';
 
 enum BottomBarItem { moodboard, stylesheet, files }
 
@@ -29,11 +30,8 @@ class BottomBar extends StatelessWidget {
         nextPage = StylesheetPage(projectId: projectId);
         break;
       case BottomBarItem.files:
-        // TODO
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Files page not implemented yet")),
-        );
-        return;
+        nextPage = ProjectFilePage(projectId: projectId);
+        break;
     }
 
     Navigator.pushReplacement(

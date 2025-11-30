@@ -4,7 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/file_model.dart';
 import '../../services/file_service.dart';
-import 'create_file_page.dart'; // 1. Add this import
+import '../widgets/bottom_bar.dart'; // Import BottomBar
+import 'create_file_page.dart';
 
 class ProjectFilePage extends StatefulWidget {
   final int projectId;
@@ -163,7 +164,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     }
   }
 
-  // 2. Navigation method for blank canvas
   void _navigateToCreateFile() {
     Navigator.push(
       context,
@@ -185,7 +185,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
         title: const Text("Project Files"),
         backgroundColor: theme.appBarTheme.backgroundColor,
         actions: [
-          // 3. The + button on top right
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: "Create New File",
@@ -193,11 +192,14 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
           ),
         ],
       ),
+      // Added BottomBar here
+      bottomNavigationBar: BottomBar(
+        currentTab: BottomBarItem.files,
+        projectId: widget.projectId,
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _pickAndAddFile,
-        child: const Icon(
-          Icons.upload_file,
-        ), // Changed to distinguish from top +
+        child: const Icon(Icons.upload_file),
       ),
       body:
           _isLoading
