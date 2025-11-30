@@ -5,6 +5,7 @@ import 'package:adobe/services/theme_service.dart';
 import 'package:adobe/ui/pages/share_handler_page.dart';
 import 'package:adobe/ui/pages/home_page.dart';
 import 'package:adobe/services/analysis_queue_manager.dart';
+import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,12 +68,29 @@ class _MyAppState extends State<MyApp> {
     if (mounted) setState(() => _isReady = true);
   }
 
-  void _handleShare(String content) {
+  Future<void> _handleShare(String content) async {
     final context = _navigatorKey.currentState?.overlay?.context;
     if (context == null) return;
 
+    // 1. Determine destination (Files vs Moodboards)
+    String shareDestination = 'moodboards'; // Default
+    try {
+      const platform = MethodChannel('com.example.adobe/methods');
+      final result = await platform.invokeMethod<String>('getShareSource');
+      if (result != null) shareDestination = result;
+    } catch (e) {
+      debugPrint("Error getting share source: $e");
+    }
+
+    // 2. Pass destination to the Handler Page
     _navigatorKey.currentState?.push(
-      MaterialPageRoute(builder: (_) => ShareHandlerPage(sharedText: content)),
+      MaterialPageRoute(
+        builder:
+            (_) => ShareHandlerPage(
+              sharedText: content,
+              destination: shareDestination, // Pass the destination here
+            ),
+      ),
     );
   }
 

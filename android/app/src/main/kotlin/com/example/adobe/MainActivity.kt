@@ -7,10 +7,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.content.Intent
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.adobe/methods"
     private val scope = CoroutineScope(Dispatchers.Default)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent) // This updates the activity's intent to the new one
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -41,6 +47,14 @@ class MainActivity : FlutterActivity() {
                         "generateStylesheet" -> {
                             val jsonList = call.argument<List<String>>("jsonList")!!
                             ImageAnalyzer.generateStylesheet(jsonList)
+                        }
+                        "getShareSource" -> {
+                            val componentName = intent.component?.className
+                            when {
+                                componentName?.contains("ShareToFiles") == true -> "files"
+                                componentName?.contains("ShareToMoodboards") == true -> "moodboards"
+                                else -> "moodboards"
+                            }
                         }
                         else -> null
                     }
