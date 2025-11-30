@@ -2,10 +2,12 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../services/image_service.dart';
 import '../../services/note_service.dart';
 import '../../data/models/note_model.dart';
 import '../../data/models/image_model.dart';
+import '../../utils/image_actions_helper.dart';
 
 // --- STATE MACHINE FOR SELECTION MODE ---
 enum DragHandle {
@@ -749,16 +751,55 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          _imageModel?.name ?? "Image Details",
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        centerTitle: true,
+        title:
+            (!isSelectionModeActive && _imageModel != null)
+                ? Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(
+                      0xFFF3F4F6,
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(30),
+                    onTap:
+                        () => ImageActionsHelper.sendToFiles(
+                          context,
+                          _imageModel!.filePath,
+                        ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SvgPicture.asset(
+                            'assets/icons/files_icon.svg',
+                            width: 18,
+                            height: 18,
+                            colorFilter: const ColorFilter.mode(
+                              Colors.black,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            "Send to File",
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+                : null,
         actions: [
-          // CONFIRM SELECTION BUTTON (Visible only in resizing mode)
+          // 1. CONFIRM SELECTION (Resizing mode)
           if (_isResizing && _finalSelectionRect != null)
             IconButton(
               icon: const Icon(
@@ -767,12 +808,48 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
               ),
               onPressed: _confirmSelectionAndShowModal,
             ),
-          // CANCEL SELECTION BUTTON (Visible only in drawing/resizing mode)
+
+          // 2. CANCEL SELECTION (Any selection mode)
           if (isSelectionModeActive)
             IconButton(
               icon: const Icon(Icons.close, color: Colors.black),
               onPressed: _resetSelectionMode,
             ),
+
+          // 3. STANDARD ACTIONS (when NOT selecting)
+          if (!isSelectionModeActive && _imageModel != null) ...[
+            // Share Button
+            IconButton(
+              onPressed:
+                  () => ImageActionsHelper.shareImage(
+                    context,
+                    _imageModel!.filePath,
+                  ),
+              icon: SvgPicture.asset(
+                'assets/icons/share_icon.svg',
+                width: 20,
+                height: 20,
+                colorFilter: const ColorFilter.mode(
+                  Colors.black,
+                  BlendMode.srcIn,
+                ),
+              ),
+            ),
+
+            // Rename Button
+            IconButton(
+              onPressed:
+                  () => ImageActionsHelper.renameImage(
+                    context,
+                    _imageModel!,
+                    () => _loadData(), // Refresh title after rename
+                  ),
+              icon: const Icon(
+                Icons.drive_file_rename_outline,
+                color: Colors.black,
+              ),
+            ),
+          ],
         ],
       ),
       body:
@@ -1151,7 +1228,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
   }
 }
 
-// --- NOTES LIST SHEET (Remains unchanged as it uses DraggableScrollableSheet) ---
+// --- NOTES LIST SHEET ---
 class _NotesListSheet extends StatefulWidget {
   final List<NoteModel> notes;
   final int? highlightId;
@@ -1323,7 +1400,7 @@ class __NotesListSheetState extends State<_NotesListSheet> {
   }
 }
 
-// --- REUSABLE WIDGETS FOR MODAL OVERLAY (Keyboard Fix and Shadow Removal) ---
+// --- REUSABLE WIDGETS FOR MODAL OVERLAY ---
 
 class NoteModalOverlay extends StatelessWidget {
   final Widget modalContent;

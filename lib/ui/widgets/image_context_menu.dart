@@ -2,10 +2,9 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../data/models/image_model.dart';
 import '../../services/image_service.dart';
-import '../pages/share_to_file_page.dart';
+import '../../utils/image_actions_helper.dart';
 import '../styles/variables.dart';
 
 class ImageContextMenu extends StatelessWidget {
@@ -104,101 +103,42 @@ class _RadialMenuOverlayState extends State<_RadialMenuOverlay> with SingleTicke
     });
   }
 
-  // --- ACTIONS ---
+  // ACTIONS
 
   Future<void> _shareImage() async {
     Navigator.of(context).pop();
-    final file = File(widget.image.filePath);
-    if (await file.exists()) {
-      await Share.shareXFiles([XFile(widget.image.filePath)]);
-    }
+    await ImageActionsHelper.shareImage(context, widget.image.filePath);
   }
 
   void _sendToFiles() {
     Navigator.of(context).pop();
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ShareToFilePage(sharedImage: File(widget.image.filePath)),
-      ),
-    );
+    ImageActionsHelper.sendToFiles(context, widget.image.filePath);
   }
 
   Future<void> _renameImage() async {
     // Hide buttons to not obstruct dialog
     _controller.reverse();
 
-    final TextEditingController nameController = TextEditingController(text: widget.image.name);
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Rename Image", style: TextStyle(fontFamily: 'GeneralSans', fontWeight: FontWeight.w600)),
-        content: TextField(
-          controller: nameController,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: "Enter new name",
-            filled: true,
-            fillColor: Variables.surfaceSubtle,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel", style: TextStyle(color: Variables.textSecondary, fontFamily: 'GeneralSans')),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (nameController.text.isNotEmpty) {
-                await ImageService().renameImage(widget.image.id, nameController.text.trim());
-                widget.onImageDeleted(); // Trigger Refresh
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text("Save", style: TextStyle(color: Variables.textPrimary, fontFamily: 'GeneralSans', fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
+    await ImageActionsHelper.renameImage(
+      context,
+      widget.image,
+      widget.onImageDeleted, // Triggers refresh in parent
     );
 
     if (mounted) Navigator.of(context).pop();
   }
 
   Future<void> _deleteImage() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Delete Image?", style: TextStyle(fontFamily: 'GeneralSans', fontWeight: FontWeight.w600)),
-        content: const Text(
-          "This action cannot be undone.",
-          style: TextStyle(fontFamily: 'GeneralSans', color: Variables.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("Cancel", style: TextStyle(color: Variables.textSecondary, fontFamily: 'GeneralSans')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.red, fontFamily: 'GeneralSans', fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
+    // Hide buttons
+    _controller.reverse();
+
+    await ImageActionsHelper.deleteImage(
+      context,
+      widget.image,
+      widget.onImageDeleted,
     );
 
-    if (confirm == true) {
-      await ImageService().deleteImage(widget.image.id);
-      widget.onImageDeleted();
-      if (mounted) Navigator.of(context).pop();
-    }
+    if (mounted) Navigator.of(context).pop();
   }
 
   void _notImplemented() {
