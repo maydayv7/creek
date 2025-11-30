@@ -69,4 +69,14 @@ class FileRepo {
     );
     return res.map((e) => e['file_path'] as String).toList();
   }
+
+  Future<List<FileModel>> getRecentFiles({int limit = 10}) async {
+    final db = await AppDatabase.db;
+    final res = await db.query(
+      'files',
+      orderBy: 'last_updated DESC',
+      limit: limit,
+    );
+    return res.map((e) => FileModel.fromMap(e)).toList();
+  }
 }
