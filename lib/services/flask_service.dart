@@ -4,67 +4,205 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
-class GenerateImageService {
-  // Replace with your actual server URL.
-  // Android Emulator: 'http://10.0.2.2:5000/generate'
-  // iOS Simulator: 'http://127.0.0.1:5000/generate'
-  // Physical Device: 'http://YOUR_PC_IP:5000/generate'
-  static const String _serverUrl = 'http://10.0.2.2:5000/generate';
+class FlaskService {
+  // ===========================================================================
+  // CONFIGURATION
+  // ===========================================================================
+  
+  static const String _serverUrl = 'https://locustlike-trieciously-rudolph.ngrok-free.dev';
+  static const Map<String, String> _headers = {'Content-Type': 'application/json'};
 
-  /// Sends a prompt to the Flask server, decodes the Base64 image,
-  /// saves it as a PNG, and returns the file path.
+  // ===========================================================================
+  // 1. PIPELINES (Complex workflows)
+  // ===========================================================================
+
+  /// [Sketch-to-Image Pipeline]
+  /// 1. Analyzes the sketch to get a text description.
+  /// 2. Combines User Prompt + Sketch Description + Style Prompt.
+  /// 3. Generates a new image based on this global prompt.
+  Future<String?> sketchToImage({
+    required String sketchPath,
+    required String userPrompt,
+    required String stylePrompt,
+  }) async {
+    debugPrint("🔗 [Pipeline] Starting Sketch-to-Image...");
+
+    // Step 1: Get the description of the sketch
+    // We use a specific prompt to ensure we get structural details
+    final String? sketchDescription = await describeImage(
+      imagePath: sketchPath, 
+      prompt: '<MORE_DETAILED_CAPTION>'
+    );
+
+    if (sketchDescription == null) {
+      debugPrint("❌ [Pipeline] Failed: Could not analyze sketch.");
+      return null;
+    }
+
+    // Step 2: Construct the Global Prompt
+    // Strategy: Style + User Intent + Content context
+    final String globalPrompt = 
+        "$stylePrompt. $userPrompt. The image features: $sketchDescription";
+
+    debugPrint("🔗 [Pipeline] Generated Global Prompt: \n$globalPrompt");
+
+    // Step 3: Generate the final image
+    return generateAndSaveImage(globalPrompt);
+  }
+
+  // ===========================================================================
+  // 2. GENERATION SERVICES (Returns File Path)
+  // ===========================================================================
+
+  /// [Text-to-Image]
   Future<String?> generateAndSaveImage(String prompt) async {
-    try {
-      debugPrint("🎨 Sending prompt to server: '$prompt'...");
+    return _performImageOperation(
+      endpoint: '/generate',
+      logPrefix: '🎨 Text-to-Image',
+      body: {'prompt': prompt},
+      filenamePrefix: prompt,
+    );
+  }
 
-      // 1. Send POST request to Flask API
-      final response = await http.post(
-        Uri.parse(_serverUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'prompt': prompt}),
-      );
+  /// [Inpainting]
+  Future<String?> inpaintImage({
+    required String imagePath,
+    required String maskPath,
+    required String prompt,
+  }) async {
+    final String? base64Image = await _encodeFile(imagePath);
+    final String? base64Mask = await _encodeFile(maskPath);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+    if (base64Image == null || base64Mask == null) return null;
 
-        if (data['image'] != null) {
-          final String base64String = data['image'];
+    return _performImageOperation(
+      endpoint: '/inpainting',
+      logPrefix: '🖌️ Inpainting',
+      body: {
+        'prompt': prompt,
+        'negative_prompt': 'blurry, bad quality, low res, ugly',
+        'image': base64Image,
+        'mask_image': base64Mask,
+      },
+      filenamePrefix: 'inpaint_$prompt',
+    );
+  }
 
-          // 2. Decode Base64 string to bytes
-          final Uint8List imageBytes = base64Decode(base64String);
+  /// [Background Removal]
+  Future<String?> generateAsset({required String imagePath}) async {
+    final String? base64Image = await _encodeFile(imagePath);
+    if (base64Image == null) return null;
 
-          // 3. Get directory to save the file
-          final directory = await getApplicationDocumentsDirectory();
-          final imagesDir = Directory('${directory.path}/generated_images');
-          if (!await imagesDir.exists()) {
-            await imagesDir.create(recursive: true);
-          }
+    return _performImageOperation(
+      endpoint: '/remove-background',
+      logPrefix: '✂️ Asset Gen',
+      body: {'image': base64Image},
+      filenamePrefix: 'asset',
+    );
+  }
 
-          // 4. Generate unique filename
-          final timestamp = DateTime.now().millisecondsSinceEpoch;
-          // Sanitize prompt for filename (remove special chars)
-          final safePrompt = prompt.replaceAll(RegExp(r'[^\w\s]'), '').trim().replaceAll(' ', '_');
-          // Limit filename length
-          final shortPrompt = safePrompt.length > 20 ? safePrompt.substring(0, 20) : safePrompt;
-          
-          final String filePath = '${imagesDir.path}/${shortPrompt}_$timestamp.png';
-          final File file = File(filePath);
+  // ===========================================================================
+  // 3. ANALYSIS SERVICES (Returns String)
+  // ===========================================================================
 
-          // 5. Save bytes to file
-          await file.writeAsBytes(imageBytes);
+  /// [Image Captioning]
+  Future<String?> describeImage({
+    required String imagePath,
+    String prompt = '<MORE_DETAILED_CAPTION>',
+  }) async {
+    debugPrint("👁️ [Describe] Preparing request...");
+    
+    final String? base64Image = await _encodeFile(imagePath);
+    if (base64Image == null) return null;
 
-          debugPrint("✅ Image saved successfully at: $filePath");
-          return filePath;
-        } else {
-          debugPrint("❌ Server response missing 'image' field.");
-          return null;
-        }
-      } else {
-        debugPrint("❌ Server Error: ${response.statusCode} - ${response.body}");
-        return null;
+    final response = await _postRequest(
+      endpoint: '/describe',
+      body: {
+        'image': base64Image,
+        'prompt': prompt,
+      },
+    );
+
+    if (response != null && response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['caption'] != null) {
+        debugPrint("✅ [Describe] Success: ${data['caption']}");
+        return data['caption'];
       }
+    }
+
+    debugPrint("❌ [Describe] Failed.");
+    return null;
+  }
+
+  // ===========================================================================
+  // PRIVATE HELPERS
+  // ===========================================================================
+
+  Future<String?> _performImageOperation({
+    required String endpoint,
+    required String logPrefix,
+    required Map<String, dynamic> body,
+    required String filenamePrefix,
+  }) async {
+    debugPrint("$logPrefix Sending request to $endpoint...");
+
+    final response = await _postRequest(endpoint: endpoint, body: body);
+
+    if (response != null && response.statusCode == 200) {
+      return _saveImageFromResponse(response, filenamePrefix);
+    }
+    
+    debugPrint("❌ $logPrefix Failed: ${response?.statusCode ?? 'No Connection'}");
+    return null;
+  }
+
+  Future<http.Response?> _postRequest({
+    required String endpoint,
+    required Map<String, dynamic> body,
+  }) async {
+    try {
+      return await http.post(
+        Uri.parse("$_serverUrl$endpoint"),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
     } catch (e) {
-      debugPrint("❌ Error generating image: $e");
+      debugPrint("❌ Network Error ($endpoint): $e");
+      return null;
+    }
+  }
+
+  Future<String?> _encodeFile(String path) async {
+    final file = File(path);
+    if (!file.existsSync()) {
+      debugPrint("❌ File not found: $path");
+      return null;
+    }
+    return base64Encode(await file.readAsBytes());
+  }
+
+  Future<String?> _saveImageFromResponse(http.Response response, String prefix) async {
+    try {
+      final data = jsonDecode(response.body);
+      if (data['image'] == null) return null;
+
+      final Uint8List imageBytes = base64Decode(data['image']);
+      
+      final directory = await getApplicationDocumentsDirectory();
+      final imagesDir = Directory('${directory.path}/generated_images');
+      if (!await imagesDir.exists()) await imagesDir.create(recursive: true);
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final safePrefix = prefix.replaceAll(RegExp(r'[^\w\s]'), '').trim().replaceAll(' ', '_');
+      final shortPrefix = safePrefix.length > 20 ? safePrefix.substring(0, 20) : safePrefix;
+      final String filePath = '${imagesDir.path}/${shortPrefix}_$timestamp.png';
+
+      await File(filePath).writeAsBytes(imageBytes);
+      debugPrint("✅ Image saved: $filePath");
+      return filePath;
+    } catch (e) {
+      debugPrint("❌ Error saving image: $e");
       return null;
     }
   }
