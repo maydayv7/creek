@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'canvas_board_page.dart';
 
 class CreateFilePage extends StatefulWidget {
   final File? file; // Made optional for blank canvas creation
@@ -357,18 +358,21 @@ class _CreateFilePageState extends State<CreateFilePage> {
   }
 
   void _navigateToEditor(int width, int height) {
-    // If widget.file is null, we create a blank canvas.
-    // If widget.file is not null, we can place that file on the canvas.
-    final mode = widget.file == null ? "Blank Canvas" : "Image Canvas";
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Selected: $width x $height ($mode)')),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => CanvasBoardPage(
+              // Generate a random ID for the project
+              projectId: 'proj_${DateTime.now().millisecondsSinceEpoch}',
+              // Pass the dimensions from the preset
+              width: width.toDouble(),
+              height: height.toDouble(),
+              // Pass the file if it exists (e.g. from "Image to Canvas" flow)
+              initialImage: widget.file,
+            ),
+      ),
     );
-
-    // TODO: Navigate to Editor Page passing:
-    // - width
-    // - height
-    // - widget.file (optional)
   }
 }
 
