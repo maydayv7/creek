@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:undo/undo.dart';
 import './canvas_toolbar/magic_draw_overlay.dart';
+import './canvas_toolbar/text_tools_overlay.dart';
 
 // --- MODELS ---
 class DrawingPoint {
@@ -55,8 +57,14 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   Offset? _dragStartPosition;
   late Size _canvasSize;
 
-  // --- NEW MAGIC DRAW STATE ---
+  // --- NEW TOOL STATE ---
   bool _isMagicDrawActive = false;
+  bool _isTextToolsActive = false;
+
+  // --- INLINE EDITING STATE ---
+  bool _isEditingText = false;
+  final TextEditingController _textEditingController = TextEditingController();
+  final FocusNode _textFocusNode = FocusNode();
 
   // Drawing Data
   List<DrawingPath> _paths = [];
@@ -67,6 +75,10 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 
   // Key to capture the drawing
   final GlobalKey _drawingKey = GlobalKey();
+
+  // --- VIEWPORT CONTROLLER ---
+  final TransformationController _transformationController = TransformationController();
+  bool _hasInitializedView = false; // To ensure auto-zoom happens only once
 
   @override
   void initState() {
@@ -85,121 +97,322 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     }
   }
 
+  @override
+  void dispose() {
+    _textEditingController.dispose();
+    _textFocusNode.dispose();
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  // --- TEXT FEATURE LOGIC ---
+
+  void _toggleTextTools() {
+    setState(() {
+      _isTextToolsActive = !_isTextToolsActive;
+      _isMagicDrawActive = false; // Disable drawing if text is active
+      // If closing toolbar, finalize edits and deselect
+      if (!_isTextToolsActive) {
+        _exitEditMode();
+        selectedId = null;
+      }
+    });
+  }
+
+  void _addTextElement() {
+    final oldList = _deepCopy(elements);
+    final id = 'text_${DateTime.now().millisecondsSinceEpoch}';
+
+    // Place roughly in visual center
+    final initialPos = Offset(
+      _canvasSize.width / 2 - 110, 
+      _canvasSize.height / 2 - 40
+    );
+
+    // Scale font size so it's visible on large posters
+    final double defaultFontSize = (_canvasSize.width / 20).clamp(24.0, 96.0);
+
+    final newElement = {
+      'id': id,
+      'type': 'text',
+      'content': 'Tap to edit', 
+      'position': initialPos,
+      'size': Size(220, defaultFontSize * 2), 
+      'rotation': 0.0,
+      'style_color': Colors.black.value,
+      'style_fontSize': defaultFontSize,
+    };
+
+    setState(() {
+      elements.add(newElement);
+      _bringToFront(id); // Ensure it's on top
+      selectedId = id; 
+      _isTextToolsActive = true; 
+    });
+
+    _changeStack.add(Change(
+      oldList,
+      () => setState(() => elements = _deepCopy(elements)),
+      (val) => setState(() => elements = val),
+    ));
+
+    // Immediately start editing
+    _enterEditMode(newElement);
+  }
+
+  void _enterEditMode(Map<String, dynamic> element) {
+    setState(() {
+      selectedId = element['id'];
+      _isEditingText = true;
+      _textEditingController.text = element['content'];
+      _textEditingController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _textEditingController.text.length)
+      );
+    });
+
+    // Request focus after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_textFocusNode.canRequestFocus) {
+        _textFocusNode.requestFocus();
+      }
+    });
+  }
+
+  void _exitEditMode() {
+    if (_isEditingText && selectedId != null) {
+      final index = elements.indexWhere((e) => e['id'] == selectedId);
+      if (index != -1) {
+        // Save changes
+        final oldList = _deepCopy(elements);
+        setState(() {
+          elements[index]['content'] = _textEditingController.text;
+          _isEditingText = false;
+        });
+        _changeStack.add(Change(
+          oldList,
+          () => setState(() => elements = _deepCopy(elements)),
+          (val) => setState(() => elements = val),
+        ));
+      } else {
+        setState(() => _isEditingText = false);
+      }
+      _textFocusNode.unfocus();
+    }
+  }
+
+  void _updateSelectedTextProperty(String key, dynamic value) {
+    if (selectedId == null) return;
+    final index = elements.indexWhere((e) => e['id'] == selectedId);
+    if (index == -1) return;
+    setState(() {
+      elements[index][key] = value;
+    });
+  }
+
+  void _deleteSelectedElement() {
+    if (selectedId == null) return;
+    final oldList = _deepCopy(elements);
+    setState(() {
+      elements.removeWhere((e) => e['id'] == selectedId);
+      selectedId = null;
+      _isEditingText = false;
+    });
+    _textFocusNode.unfocus();
+    _changeStack.add(Change(
+        oldList, 
+        () => setState(() => elements = _deepCopy(elements)), 
+        (val) => setState(() => elements = val)
+    ));
+  }
+
+  void _bringToFront(String id) {
+    final index = elements.indexWhere((e) => e['id'] == id);
+    if (index != -1 && index != elements.length - 1) {
+      setState(() {
+        final item = elements.removeAt(index);
+        elements.add(item);
+      });
+    }
+  }
+
+  Map<String, dynamic>? get _selectedElementData {
+    if (selectedId == null) return null;
+    try {
+      return elements.firstWhere((e) => e['id'] == selectedId);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Widget build(BuildContext context) {
+    // Determine overlay state
+    final selectedEl = _selectedElementData;
+    final bool isTextSelected = selectedEl != null && selectedEl['type'] == 'text';
+    final bool showTextOverlay = _isTextToolsActive || isTextSelected;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFE0E0E0), // Darker BG to see canvas bounds
       appBar: !_isMagicDrawActive ? _buildAppBar() : null,
-      body: Stack(
-        children: [
-          // -------------------------------------------
-          // LAYER 1: INTERACTIVE CANVAS + DRAWING LAYER
-          // -------------------------------------------
-          InteractiveViewer(
-            // Disable panning/zooming when drawing
-            scaleEnabled: !_isMagicDrawActive,
-            panEnabled: !_isMagicDrawActive,
-            boundaryMargin: const EdgeInsets.all(double.infinity),
-            minScale: 0.1,
-            maxScale: 5.0,
-            transformationController: TransformationController(
-              Matrix4.identity()
-                ..scale(0.85)
-                ..translate(40.0, 40.0),
-            ),
-            child: SizedBox(
-              width: 3000,
-              height: 3000,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // THE WHITE BOARD CONTAINER
-                  Container(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // --- AUTO-ZOOM LOGIC ---
+          // Automatically fit large canvases (like Posters) to screen on load
+          if (!_hasInitializedView) {
+            _hasInitializedView = true;
+            final double scaleX = (constraints.maxWidth - 40) / _canvasSize.width;
+            final double scaleY = (constraints.maxHeight - 40) / _canvasSize.height;
+            final double initialScale = math.min(scaleX, scaleY).clamp(0.01, 1.0);
+            
+            final double transX = (constraints.maxWidth - (_canvasSize.width * initialScale)) / 2;
+            final double transY = (constraints.maxHeight - (_canvasSize.height * initialScale)) / 2;
+
+            _transformationController.value = Matrix4.identity()
+              ..translate(transX, transY)
+              ..scale(initialScale);
+          }
+
+          return Stack(
+            children: [
+              // -------------------------------------------
+              // LAYER 1: INTERACTIVE CANVAS + DRAWING LAYER
+              // -------------------------------------------
+              GestureDetector(
+                // Tap outside to deselect
+                onTap: () {
+                  if (!_isMagicDrawActive) {
+                    _exitEditMode();
+                    setState(() => selectedId = null);
+                  }
+                },
+                behavior: HitTestBehavior.translucent, // Catches clicks on empty space
+                child: InteractiveViewer(
+                  transformationController: _transformationController,
+                  // Disable constrained to allow full size posters (e.g. 3000px height)
+                  constrained: false,
+                  boundaryMargin: const EdgeInsets.all(double.infinity),
+                  minScale: 0.01,
+                  maxScale: 10.0,
+                  scaleEnabled: !_isMagicDrawActive,
+                  panEnabled: !_isMagicDrawActive,
+                  child: SizedBox(
                     width: _canvasSize.width,
                     height: _canvasSize.height,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 24,
-                          offset: const Offset(0, 4),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // THE WHITE BOARD CONTAINER
+                        Container(
+                          width: double.infinity,
+                          height: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 30,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: ClipRect(
+                            child: Stack(
+                              children: [
+                                // 1. Existing Images/Elements
+                                ...elements.map((e) => _buildCanvasElement(e)),
+
+                                // 2. THE DRAWING LAYER
+                                if (_isMagicDrawActive)
+                                  RepaintBoundary(
+                                    key: _drawingKey,
+                                    child: GestureDetector(
+                                      onPanStart: _onPanStart,
+                                      onPanUpdate: _onPanUpdate,
+                                      onPanEnd: _onPanEnd,
+                                      child: CustomPaint(
+                                        size: Size.infinite,
+                                        painter: CanvasPainter(
+                                          paths: _paths,
+                                          currentPoints: _currentPoints,
+                                          currentColor:
+                                              _isEraser
+                                                  ? Colors.transparent
+                                                  : _selectedColor,
+                                          currentWidth: _strokeWidth,
+                                          isEraser: _isEraser,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                    child: ClipRect(
-                      child: Stack(
-                        children: [
-                          // 1. Existing Images/Elements
-                          ...elements.map((e) => _buildCanvasElement(e)),
-
-                          // 2. THE DRAWING LAYER (Only visible when active)
-                          // Positioned exactly on top, clipped to the board
-                          if (_isMagicDrawActive)
-                            RepaintBoundary(
-                              key: _drawingKey,
-                              child: GestureDetector(
-                                onPanStart: _onPanStart,
-                                onPanUpdate: _onPanUpdate,
-                                onPanEnd: _onPanEnd,
-                                child: CustomPaint(
-                                  size: Size.infinite,
-                                  painter: CanvasPainter(
-                                    paths: _paths,
-                                    currentPoints: _currentPoints,
-                                    currentColor:
-                                        _isEraser
-                                            ? Colors.transparent
-                                            : _selectedColor,
-                                    currentWidth: _strokeWidth,
-                                    isEraser: _isEraser,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
 
-          // -------------------------------------------
-          // LAYER 2: MAGIC DRAW TOOLS (Floating UI)
-          // -------------------------------------------
-          MagicDrawTools(
-            isActive: _isMagicDrawActive,
-            selectedColor: _selectedColor,
-            strokeWidth: _strokeWidth,
-            isEraser: _isEraser,
-            onClose: _saveAndCloseMagicDraw, // This saves the drawing!
-            onColorChanged: (c) => setState(() => _selectedColor = c),
-            onWidthChanged: (w) => setState(() => _strokeWidth = w),
-            onEraserToggle: (e) => setState(() => _isEraser = e),
-          ),
+              // -------------------------------------------
+              // LAYER 2: OVERLAYS (Magic Draw & Text Tools)
+              // -------------------------------------------
+              MagicDrawTools(
+                isActive: _isMagicDrawActive,
+                selectedColor: _selectedColor,
+                strokeWidth: _strokeWidth,
+                isEraser: _isEraser,
+                onClose: _saveAndCloseMagicDraw,
+                onColorChanged: (c) => setState(() => _selectedColor = c),
+                onWidthChanged: (w) => setState(() => _strokeWidth = w),
+                onEraserToggle: (e) => setState(() => _isEraser = e),
+              ),
 
-          // -------------------------------------------
-          // LAYER 3: BOTTOM NAVIGATION
-          // -------------------------------------------
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: CanvasBottomBar(
-              activeItem: _isMagicDrawActive ? "Magic Draw" : null,
-              onMagicDraw:
-                  () =>
-                      setState(() => _isMagicDrawActive = !_isMagicDrawActive),
-              onMedia: _pickImageFromGallery,
-              onStylesheet: () => _showComingSoon('Stylesheet'),
-              onTools: () => _showComingSoon('Tools'),
-              onText: () => _showComingSoon('Text'),
-              onSelect: () => _showComingSoon('Select'),
-              onPlugins: () => _showComingSoon('Plugins'),
-            ),
-          ),
-        ],
+              // Text Toolbar Overlay
+              TextToolsOverlay(
+                isActive: showTextOverlay && !_isMagicDrawActive,
+                isTextSelected: isTextSelected,
+                currentColor: Color(selectedEl?['style_color'] ?? Colors.black.value),
+                currentFontSize: (selectedEl?['style_fontSize'] ?? 24.0) as double,
+                onClose: () {
+                  _exitEditMode();
+                  setState(() {
+                    _isTextToolsActive = false;
+                    selectedId = null;
+                  });
+                },
+                onAddText: _addTextElement, 
+                onDelete: _deleteSelectedElement,
+                onColorChanged: (c) => _updateSelectedTextProperty('style_color', c.value),
+                onFontSizeChanged: (s) => _updateSelectedTextProperty('style_fontSize', s),
+              ),
+
+              // -------------------------------------------
+              // LAYER 3: BOTTOM NAVIGATION
+              // -------------------------------------------
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: CanvasBottomBar(
+                  activeItem: _isMagicDrawActive ? "Magic Draw" : (_isTextToolsActive ? "Text" : null),
+                  onMagicDraw:
+                      () =>
+                          setState(() {
+                            _isMagicDrawActive = !_isMagicDrawActive;
+                            _isTextToolsActive = false;
+                            _exitEditMode();
+                          }),
+                  onMedia: _pickImageFromGallery,
+                  onStylesheet: () => _showComingSoon('Stylesheet'),
+                  onTools: () => _showComingSoon('Tools'),
+                  onText: _toggleTextTools, // UPDATED: Toggles text tools
+                  onSelect: () => _showComingSoon('Select'),
+                  onPlugins: () => _showComingSoon('Plugins'),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -386,6 +599,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     final position = e['position'] as Offset;
     final size = e['size'] as Size;
     final rotation = (e['rotation'] ?? 0.0) as double;
+    final type = e['type'];
+    final isEditingThis = isSelected && _isEditingText && type == 'text';
 
     return Positioned(
       left: position.dx,
@@ -393,34 +608,61 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       child: Transform.rotate(
         angle: rotation,
         child: GestureDetector(
+          behavior: HitTestBehavior.translucent, // Ensures taps work on transparent areas
           onTap: () {
-            if (!_isMagicDrawActive) setState(() => selectedId = e['id']);
+            if (!_isMagicDrawActive) {
+              if (_isEditingText && selectedId != e['id']) {
+                _exitEditMode();
+              }
+              setState(() {
+                selectedId = e['id'];
+                if (type == 'text') _isTextToolsActive = true;
+              });
+              _bringToFront(e['id']);
+            }
+          },
+          onDoubleTap: () {
+            if (type == 'text') {
+              _enterEditMode(e);
+            }
           },
           child: Stack(
+            clipBehavior: Clip.none, // Allow handles to be visible outside element bounds
             children: [
-              // Main Image Container
+              // Main Element Container
               Container(
                 width: size.width,
                 height: size.height,
                 decoration: BoxDecoration(
                   border:
                       isSelected
-                          ? Border.all(color: Colors.blue, width: 2)
-                          : null,
+                          // Fix border width scaling so it looks consistent at zoom levels
+                          ? Border.all(
+                              color: Colors.blue, 
+                              width: 2.0 / (_transformationController.value.getMaxScaleOnAxis())
+                            )
+                          : type == 'text'
+                              // Dashed-like grey border for unselected text
+                              ? Border.all(color: Colors.grey.withOpacity(0.5), width: 1.0)
+                              : null,
+                  color: type == 'text' ? Colors.white.withOpacity(0.01) : null,
                 ),
                 child:
                     e['type'] == 'file_image'
                         ? Image.file(File(e['content']), fit: BoxFit.contain)
-                        : Container(),
+                        : e['type'] == 'text'
+                            ? _buildTextContent(e, isEditingThis)
+                            : Container(),
               ),
 
-              // Transform Controls (only when selected)
-              if (isSelected && !_isMagicDrawActive) ...[
+              // Transform Controls (only when selected and not editing text)
+              if (isSelected && !_isMagicDrawActive && !isEditingThis) ...[
                 // Resize Handle - Bottom Right
                 Positioned(
-                  right: -8,
-                  bottom: -8,
+                  right: -12,
+                  bottom: -12,
                   child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onPanUpdate: (details) {
                       setState(() {
                         final newWidth = (size.width + details.delta.dx).clamp(
@@ -428,32 +670,20 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                           _canvasSize.width,
                         );
                         final newHeight = (size.height + details.delta.dy)
-                            .clamp(50.0, _canvasSize.height);
+                            .clamp(30.0, _canvasSize.height);
                         e['size'] = Size(newWidth, newHeight);
                       });
                     },
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Icon(
-                        Icons.zoom_out_map,
-                        size: 12,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: _buildHandle(Icons.zoom_out_map, Colors.blue),
                   ),
                 ),
 
                 // Rotate Handle - Top Right
                 Positioned(
-                  right: -8,
-                  top: -8,
+                  right: -12,
+                  top: -12,
                   child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onPanUpdate: (details) {
                       setState(() {
                         final center = Offset(
@@ -465,26 +695,14 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                         e['rotation'] = angle;
                       });
                     },
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Icon(
-                        Icons.rotate_right,
-                        size: 12,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: _buildHandle(Icons.rotate_right, Colors.green),
                   ),
                 ),
 
-                // Move Handle - Center
+                // Move Handle - Full Overlay
                 Positioned.fill(
                   child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
                     onPanStart: (details) {
                       setState(() {
                         _dragStartPosition = position;
@@ -492,17 +710,10 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                     },
                     onPanUpdate: (details) {
                       setState(() {
-                        final newPosition = position + details.delta;
-                        e['position'] = Offset(
-                          newPosition.dx.clamp(
-                            0,
-                            _canvasSize.width - size.width,
-                          ),
-                          newPosition.dy.clamp(
-                            0,
-                            _canvasSize.height - size.height,
-                          ),
-                        );
+                        // Apply zoom scaling to drag distance
+                        final scale = _transformationController.value.getMaxScaleOnAxis();
+                        final newPosition = position + (details.delta / scale);
+                        e['position'] = newPosition;
                       });
                     },
                     onPanEnd: (details) {
@@ -522,6 +733,78 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextContent(Map<String, dynamic> e, bool isEditing) {
+    final style = TextStyle(
+      fontSize: (e['style_fontSize'] ?? 24.0) as double,
+      color: Color(e['style_color'] ?? Colors.black.value),
+      fontFamily: 'GeneralSans',
+    );
+
+    if (isEditing) {
+      // Auto-growing TextField
+      return Center(
+        child: IntrinsicWidth(
+          child: TextField(
+            controller: _textEditingController,
+            focusNode: _textFocusNode,
+            autofocus: true,
+            maxLines: null,
+            textAlign: TextAlign.center,
+            style: style,
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
+            ),
+            onChanged: (text) {
+              final span = TextSpan(text: text, style: style);
+              final tp = TextPainter(text: span, textDirection: TextDirection.ltr);
+              tp.layout(maxWidth: _canvasSize.width); 
+              setState(() {
+                // Resize element to fit text
+                e['size'] = Size(tp.width + 40, tp.height + 40); 
+              });
+            },
+          ),
+        ),
+      );
+    } else {
+      return Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Center(
+          child: Text(
+            e['content'],
+            textAlign: TextAlign.center,
+            style: style,
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildHandle(IconData icon, Color color) {
+    // Keep handles consistent size regardless of zoom
+    final double scale = 1 / _transformationController.value.getMaxScaleOnAxis();
+    return Transform.scale(
+      scale: scale.clamp(1.0, 5.0),
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+        ),
+        child: Icon(
+          icon,
+          size: 14,
+          color: Colors.white,
         ),
       ),
     );
@@ -760,6 +1043,7 @@ class CanvasBottomBar extends StatelessWidget {
                   label: "Text",
                   iconPath: "assets/icons/text.svg",
                   onTap: onText,
+                  isActive: activeItem == "Text",
                 ),
                 const SizedBox(width: 24),
                 _BottomBarItem(
