@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:adobe/services/download_service.dart';
 import 'package:adobe/services/instagram_download_service.dart';
+import 'package:adobe/services/image_service.dart';
 import 'package:adobe/ui/pages/share_to_moodboard_page.dart';
 
 class ShareHandlerPage extends StatefulWidget {
@@ -17,6 +18,7 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
   // Services
   final _downloadService = DownloadService();
   final _instagramService = InstagramDownloadService();
+  final _imageService = ImageService();
 
   // State
   bool _hasError = false;
@@ -30,12 +32,12 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
 
   Future<void> _processSharedContent() async {
     final sharedContent = widget.sharedText.trim();
-    List<File> finalFiles = [];
+    List<File> tempFiles = [];
 
     try {
       // CASE A: It's a Local File Path
       if (await File(sharedContent).exists()) {
-        finalFiles.add(File(sharedContent));
+        tempFiles.add(File(sharedContent));
       }
       // CASE B: It's a URL
       else {
@@ -47,15 +49,16 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
 
           if (url.contains('instagram.com')) {
             // Instagram Logic
-            final downloadedPaths = await _instagramService.downloadInstagramImage(url);
+            final downloadedPaths = await _instagramService
+                .downloadInstagramImage(url);
             if (downloadedPaths != null && downloadedPaths.isNotEmpty) {
-              finalFiles.addAll(downloadedPaths.map((path) => File(path)));
+              tempFiles.addAll(downloadedPaths.map((path) => File(path)));
             }
           } else {
             // Generic Download Logic
             final savedPath = await _downloadService.downloadAndSaveImage(url);
             if (savedPath != null) {
-              finalFiles.add(File(savedPath));
+              tempFiles.add(File(savedPath));
             }
           }
         } else {
@@ -63,13 +66,30 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
         }
       }
 
-      // SUCCESS: Navigate to ShareToMoodboardPage
-      if (finalFiles.isNotEmpty) {
+      // SUCCESS: Persist and Navigate
+      if (tempFiles.isNotEmpty) {
+        List<File> permanentFiles = [];
+
+        // PERSIST IMMEDIATELY
+        // Save to App Docs and DB (into Inbox) and status 'completed' (waiting for tags)
+        for (var file in tempFiles) {
+          final id = await _imageService.saveImage(
+            file,
+            0, // Project 0 = Inbox
+            tags: [],
+          );
+
+          final savedImage = await _imageService.getImage(id);
+          if (savedImage != null) {
+            permanentFiles.add(File(savedImage.filePath));
+          }
+        }
+
         if (mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => ShareToMoodboardPage(imageFiles: finalFiles),
+              builder: (_) => ShareToMoodboardPage(imageFiles: permanentFiles),
             ),
           );
         }
@@ -92,36 +112,45 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
       backgroundColor: Colors.white,
       appBar: AppBar(title: const Text("Processing")),
       body: Center(
-        child: _hasError
-            ? Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
+        child:
+            _hasError
+                ? Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.red,
+                        size: 50,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Error processing media",
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _errorMessage ?? "Unknown Error",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Close"),
+                      ),
+                    ],
+                  ),
+                )
+                : const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 50),
-                    const SizedBox(height: 16),
-                    Text("Error processing media",
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    Text(_errorMessage ?? "Unknown Error",
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.grey)),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("Close"),
-                    ),
+                    CircularProgressIndicator(),
+                    SizedBox(height: 20),
+                    Text("Downloading media..."),
                   ],
                 ),
-              )
-            : const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 20),
-                  Text("Downloading media..."),
-                ],
-              ),
       ),
     );
   }

@@ -9,7 +9,7 @@ import 'models/note_model.dart';
 
 class AppDatabase {
   static Database? _db;
-  static const String _dbName = 'database_v3.db';
+  static const String _dbName = 'database_v5.db';
 
   static Future<Database> get db async {
     if (_db != null) return _db!;
@@ -41,6 +41,15 @@ class AppDatabase {
           )
         ''');
 
+        // Create Inbox Project (ID 0) for Drafts
+        await db.rawInsert(
+          '''
+          INSERT INTO projects (id, title, description, last_accessed_at, created_at)
+          VALUES (0, 'Inbox', 'Holding area for shared images', ?, ?)
+        ''',
+          [DateTime.now().toIso8601String(), DateTime.now().toIso8601String()],
+        );
+
         // 2. IMAGES (Moodboard)
         await db.execute('''
           CREATE TABLE images (
@@ -51,6 +60,7 @@ class AppDatabase {
             tags TEXT DEFAULT '[]', 
             analysis_data TEXT,
             created_at TEXT,
+            status TEXT DEFAULT 'pending',
             FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
           )
         ''');

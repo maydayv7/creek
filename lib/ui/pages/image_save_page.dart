@@ -44,6 +44,16 @@ class ImageSavePage extends StatefulWidget {
   State<ImageSavePage> createState() => _ImageSavePageState();
 }
 
+// --- STATE MACHINE FOR SELECTION MODE ---
+enum DragHandle {
+  none,
+  topLeft,
+  topRight,
+  bottomLeft,
+  bottomRight,
+  center, // For dragging the entire box
+}
+
 class _ImageSavePageState extends State<ImageSavePage> {
   // --- SERVICES ---
   final ImageService _imageService = ImageService();
@@ -64,11 +74,18 @@ class _ImageSavePageState extends State<ImageSavePage> {
   String _selectedCategory = 'Compositions';
   bool _isSaving = false;
 
-  // --- DRAWING STATE ---
-  bool _isDrawMode = false;
+  // --- DRAWING/RESIZING STATE ---
+  bool _isDrawMode =
+      false; // True when initial drag is happening (to create box)
+  bool _isResizing =
+      false; // True when a selection box is visible and resizable
   Offset? _startPos;
   Offset? _currentPos;
   Rect? _finalSelectionRect;
+
+  // Resizing state
+  DragHandle _activeHandle = DragHandle.none;
+  Offset? _startDragLocalOffset; // Used for moving the entire rect
 
   // FIXED: Store render size per image index
   final Map<int, Size> _imageRenderSizes = {};
@@ -126,11 +143,33 @@ class _ImageSavePageState extends State<ImageSavePage> {
   // --- ACTIONS ---
   void _activateSelectionMode() {
     setState(() {
-      _isDrawMode = true;
+      _isDrawMode = true; // Start initial drawing mode
+      _isResizing = false;
       _finalSelectionRect = null;
       _startPos = null;
       _currentPos = null;
     });
+  }
+
+  void _resetSelectionMode() {
+    setState(() {
+      _isDrawMode = false;
+      _isResizing = false;
+      _finalSelectionRect = null;
+      _startPos = null;
+      _currentPos = null;
+      _activeHandle = DragHandle.none;
+    });
+  }
+
+  void _confirmSelectionAndShowModal() {
+    if (_finalSelectionRect != null) {
+      // Exit resizing mode before showing the modal to prevent visual conflict
+      setState(() {
+        _isResizing = false;
+      });
+      _showNoteModal();
+    }
   }
 
   void _toggleTag(String tag) {
@@ -144,10 +183,12 @@ class _ImageSavePageState extends State<ImageSavePage> {
     });
   }
 
-  // --- DRAWING GESTURES (FIXED LOGIC) ---
+  // --- DRAWING/RESIZING GESTURES (UPDATED LOGIC) ---
+  final double _handleSize =
+      25.0; // The size of the touch area for resizing handles
+
   // Helper: Convert global screen touch to local image coordinates
   Offset? _getLocalPosition(Offset globalPosition) {
-    // Get the key for the currently visible image
     final currentKey = _imageKeys[_currentImageIndex];
     final RenderBox? box =
         currentKey.currentContext?.findRenderObject() as RenderBox?;
@@ -159,13 +200,14 @@ class _ImageSavePageState extends State<ImageSavePage> {
     // Convert global to local
     final local = box.globalToLocal(globalPosition);
 
-    // Clamp coordinates to ensure we don't draw outside the image
+    // Clamp coordinates to ensure we don't draw/drag outside the image
     final dx = local.dx.clamp(0.0, box.size.width);
     final dy = local.dy.clamp(0.0, box.size.height);
 
     return Offset(dx, dy);
   }
 
+  // --- INITIAL DRAWING HANDLERS ---
   void _onPanStart(DragStartDetails details) {
     if (!_isDrawMode) return;
 
@@ -192,113 +234,344 @@ class _ImageSavePageState extends State<ImageSavePage> {
   void _onPanEnd(DragEndDetails details) {
     if (!_isDrawMode || _startPos == null || _currentPos == null) return;
 
-    // Create the rect from the corrected local positions
-    final rect = Rect.fromPoints(_startPos!, _currentPos!);
-    _finalSelectionRect = rect;
+    // Create the rect from the corrected local positions, normalizing points
+    final rect = Rect.fromPoints(_startPos!, _currentPos!).normalize();
+
+    // Check if the selected area is too small
+    if (rect.width < 10 || rect.height < 10) {
+      _resetSelectionMode();
+      return;
+    }
 
     setState(() {
       _isDrawMode = false;
+      _isResizing = true; // Enter resizing/confirming mode
+      _finalSelectionRect = rect;
       _startPos = null;
       _currentPos = null;
     });
-
-    _showNoteModal();
   }
 
-  // --- ADD NOTE MODAL ---
+  // --- RESIZING HANDLERS ---
+  DragHandle _getDragHandle(Offset pos) {
+    if (_finalSelectionRect == null) return DragHandle.none;
+
+    final rect = _finalSelectionRect!;
+    // final center = rect.center; // Not used but helpful for context
+    // final top = rect.top;
+    // final bottom = rect.bottom;
+    // final left = rect.left;
+    // final right = rect.right;
+
+    // Check corners
+    if (Rect.fromCircle(
+      center: rect.topLeft,
+      radius: _handleSize,
+    ).contains(pos)) {
+      return DragHandle.topLeft;
+    } else if (Rect.fromCircle(
+      center: rect.topRight,
+      radius: _handleSize,
+    ).contains(pos)) {
+      return DragHandle.topRight;
+    } else if (Rect.fromCircle(
+      center: rect.bottomLeft,
+      radius: _handleSize,
+    ).contains(pos)) {
+      return DragHandle.bottomLeft;
+    } else if (Rect.fromCircle(
+      center: rect.bottomRight,
+      radius: _handleSize,
+    ).contains(pos)) {
+      return DragHandle.bottomRight;
+    }
+    // Check if dragging the whole box (center)
+    else if (rect.contains(pos)) {
+      // Only allow center drag if we are not actively drawing (i.e. we are in resizing mode)
+      return DragHandle.center;
+    }
+
+    return DragHandle.none;
+  }
+
+  void _onResizeStart(DragStartDetails details) {
+    if (!_isResizing || _finalSelectionRect == null) return;
+
+    final pos = _getLocalPosition(details.globalPosition);
+    if (pos == null) return;
+
+    final handle = _getDragHandle(pos);
+    if (handle != DragHandle.none) {
+      setState(() {
+        _activeHandle = handle;
+        // Calculate offset for moving the entire rect, not for resizing
+        if (handle == DragHandle.center) {
+          _startDragLocalOffset = pos - _finalSelectionRect!.topLeft;
+        }
+      });
+    }
+  }
+
+  void _onResizeUpdate(DragUpdateDetails details) {
+    if (!_isResizing ||
+        _finalSelectionRect == null ||
+        _activeHandle == DragHandle.none)
+      return;
+
+    final pos = _getLocalPosition(details.globalPosition);
+    if (pos == null) return;
+
+    setState(() {
+      Rect newRect = _finalSelectionRect!;
+      final newPoint = pos;
+
+      switch (_activeHandle) {
+        case DragHandle.topLeft:
+          newRect = Rect.fromLTRB(
+            newPoint.dx,
+            newPoint.dy,
+            newRect.right,
+            newRect.bottom,
+          );
+          break;
+        case DragHandle.topRight:
+          newRect = Rect.fromLTRB(
+            newRect.left,
+            newPoint.dy,
+            newPoint.dx,
+            newRect.bottom,
+          );
+          break;
+        case DragHandle.bottomLeft:
+          newRect = Rect.fromLTRB(
+            newPoint.dx,
+            newRect.top,
+            newRect.right,
+            newPoint.dy,
+          );
+          break;
+        case DragHandle.bottomRight:
+          newRect = Rect.fromLTRB(
+            newRect.left,
+            newRect.top,
+            newPoint.dx,
+            newPoint.dy,
+          );
+          break;
+        case DragHandle.center:
+          if (_startDragLocalOffset != null) {
+            final newTopLeft = newPoint - _startDragLocalOffset!;
+            newRect = Rect.fromLTWH(
+              newTopLeft.dx,
+              newTopLeft.dy,
+              newRect.width,
+              newRect.height,
+            );
+          }
+          break;
+        case DragHandle.none:
+          return;
+      }
+
+      // Clamp the final rectangle to the image boundaries (0,0 to width, height)
+      final imageSize = _imageRenderSizes[_currentImageIndex];
+      if (imageSize != null) {
+        final clampedLeft = newRect.left.clamp(0.0, imageSize.width);
+        final clampedTop = newRect.top.clamp(0.0, imageSize.height);
+        final clampedRight = newRect.right.clamp(0.0, imageSize.width);
+        final clampedBottom = newRect.bottom.clamp(0.0, imageSize.height);
+
+        newRect =
+            Rect.fromLTRB(
+              clampedLeft,
+              clampedTop,
+              clampedRight,
+              clampedBottom,
+            ).normalize();
+      } else {
+        newRect = newRect.normalize();
+      }
+
+      // Ensure min size
+      if (newRect.width > 10 && newRect.height > 10) {
+        _finalSelectionRect = newRect;
+      }
+    });
+  }
+
+  void _onResizeEnd(DragEndDetails details) {
+    if (!_isResizing) return;
+    setState(() {
+      _activeHandle = DragHandle.none;
+      _startDragLocalOffset = null;
+    });
+  }
+
+  //ADD NOTE MODAL
   void _showNoteModal() {
     _commentController.clear();
+    // Ensure we have a valid selection to proceed
+    if (_finalSelectionRect == null) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            padding: const EdgeInsets.all(20),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Add Note",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        final mediaQuery = MediaQuery.of(context);
+
+        // 1. Wrap the content variable in StatefulBuilder
+        final modalContent = StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 20,
                   ),
-                  const SizedBox(height: 16),
-                  // Category Dropdown
-                  DropdownButtonFormField<String>(
-                    value: _selectedCategory,
-                    decoration: InputDecoration(
-                      labelText: "Category",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    children: [
+                      // --- ROW 1: Header ---
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Colors.grey,
+                            child: Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+
+                          const Text(
+                            "User",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
+                          ),
+
+                          const Spacer(),
+
+                          //  Dropdown ---
+                          Container(
+                            height: 40,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE0E5FF),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value:
+                                    _categories.contains(_selectedCategory)
+                                        ? _selectedCategory
+                                        : null,
+                                hint: const Text("Type"),
+                                isDense: true,
+                                icon: const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  size: 20,
+                                  color: Colors.black54,
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                                focusColor: Colors.transparent,
+                                dropdownColor: Colors.white,
+                                items:
+                                    _categories
+                                        .map(
+                                          (c) => DropdownMenuItem(
+                                            value: c,
+                                            child: Text(c),
+                                          ),
+                                        )
+                                        .toList(),
+
+                                onChanged: (v) {
+                                  setModalState(() {
+                                    _selectedCategory = v!;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+
+                      const SizedBox(height: 20),
+
+                      // --- ROW 2: Input & Send ---
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _commentController,
+                              autofocus: true,
+                              maxLines: 1,
+                              style: const TextStyle(fontSize: 14),
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: const Color(0xFFF3F4F6),
+                                hintText: "Enter details...",
+                                hintStyle: TextStyle(color: Colors.grey[600]),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 12),
+
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 2),
+                            child: IconButton(
+                              icon: const Icon(Icons.send_outlined),
+                              color: Colors.black87,
+                              iconSize: 28,
+                              onPressed: () {
+                                _addTempNote();
+                                Navigator.pop(context);
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    items:
-                        _categories
-                            .map(
-                              (c) => DropdownMenuItem(value: c, child: Text(c)),
-                            )
-                            .toList(),
-                    onChanged: (v) => setState(() => _selectedCategory = v!),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  // Note Text
-                  TextField(
-                    controller: _commentController,
-                    autofocus: true,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      hintText: "Enter details...",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        _addTempNote();
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        "Save Note",
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+                ),
+                const SizedBox(height: 10),
+              ],
+            );
+          },
+        );
+
+        // Return your custom overlay wrapper with the stateful content inside
+        return NoteModalOverlay(
+          modalContent: modalContent,
+          screenSize: mediaQuery.size,
         );
       },
     );
   }
 
   void _addTempNote() {
-    // FIXED: Use the stored render size for the current image index
+    // Use the stored render size for the current image index
     final imageSize = _imageRenderSizes[_currentImageIndex];
 
     if (_finalSelectionRect != null &&
@@ -321,6 +594,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
 
       setState(() {
         _notesPerImage[_currentImageIndex]?.add(newNote);
+        _finalSelectionRect = null; // Clear selection after saving note
       });
     }
   }
@@ -337,7 +611,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
 
         // 1. Save Image
         final tags = _tagsPerImage[i] ?? {};
-        final imageId = await _imageService.saveImage(
+        final imageId = await _imageService.saveOrUpdateImage(
           file,
           widget.projectId,
           tags: tags.toList(),
@@ -359,6 +633,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
       }
 
       if (mounted) {
+        // Find the most suitable ScaffoldMessengerState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('All images saved successfully!'),
@@ -369,7 +644,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
         if (widget.isFromShare) {
           SystemNavigator.pop();
         } else {
-          Navigator.popUntil(context, (route) => route.isFirst);
+          Navigator.pop(context);
         }
       }
     } catch (e) {
@@ -392,7 +667,12 @@ class _ImageSavePageState extends State<ImageSavePage> {
             ? '$parentName / ${widget.projectName}'
             : widget.projectName;
 
+    // Determine if user can pan/zoom the image carousel
+    final isPageLocked = _isDrawMode || _isResizing;
+
     return Scaffold(
+      // FIX: Prevents the main screen/image from pushing up when the keyboard opens.
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -413,6 +693,23 @@ class _ImageSavePageState extends State<ImageSavePage> {
             fontWeight: FontWeight.w600,
           ),
         ),
+        actions: [
+          // CONFIRM SELECTION BUTTON (Visible only in resizing mode)
+          if (_isResizing && _finalSelectionRect != null)
+            IconButton(
+              icon: const Icon(
+                Icons.check_circle_outline,
+                color: Color(0xFF7C4DFF),
+              ),
+              onPressed: _confirmSelectionAndShowModal,
+            ),
+          // CANCEL SELECTION BUTTON (Visible only in drawing/resizing mode)
+          if (_isDrawMode || _isResizing)
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.black),
+              onPressed: _resetSelectionMode,
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -432,30 +729,47 @@ class _ImageSavePageState extends State<ImageSavePage> {
                   children: [
                     PageView.builder(
                       controller: _pageController,
+                      // Disable page view scrolling if a selection process is active
+                      physics:
+                          isPageLocked
+                              ? const NeverScrollableScrollPhysics()
+                              : const PageScrollPhysics(),
                       itemCount: widget.imagePaths.length,
                       onPageChanged: (index) {
                         setState(() {
                           _currentImageIndex = index;
-                          _isDrawMode = false;
-                          _finalSelectionRect = null;
+                          _resetSelectionMode(); // Reset selection mode on page change
                         });
                       },
                       itemBuilder: (context, index) {
                         return LayoutBuilder(
                           builder: (context, constraints) {
+                            // Determine the gesture handler based on the mode
+                            final onPanStartHandler =
+                                _isDrawMode
+                                    ? _onPanStart
+                                    : (_isResizing ? _onResizeStart : null);
+                            final onPanUpdateHandler =
+                                _isDrawMode
+                                    ? _onPanUpdate
+                                    : (_isResizing ? _onResizeUpdate : null);
+                            final onPanEndHandler =
+                                _isDrawMode
+                                    ? _onPanEnd
+                                    : (_isResizing ? _onResizeEnd : null);
+
                             return Stack(
                               fit: StackFit.expand,
                               children: [
                                 InteractiveViewer(
-                                  panEnabled: !_isDrawMode,
-                                  scaleEnabled: !_isDrawMode,
+                                  // Disable pan/scale if selection or resizing is active
+                                  panEnabled: !isPageLocked,
+                                  scaleEnabled: !isPageLocked,
                                   child: Center(
                                     child: GestureDetector(
-                                      onPanStart:
-                                          _isDrawMode ? _onPanStart : null,
-                                      onPanUpdate:
-                                          _isDrawMode ? _onPanUpdate : null,
-                                      onPanEnd: _isDrawMode ? _onPanEnd : null,
+                                      onPanStart: onPanStartHandler,
+                                      onPanUpdate: onPanUpdateHandler,
+                                      onPanEnd: onPanEndHandler,
                                       child: Stack(
                                         children: [
                                           // THE IMAGE WITH UNIQUE KEY
@@ -465,7 +779,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                             fit: BoxFit.contain,
                                             width: double.infinity,
                                           ),
-                                          // DRAWING OVERLAY (Only if drawing on THIS page)
+                                          // DRAWING OVERLAY (if in drawing mode)
                                           if (_isDrawMode &&
                                               index == _currentImageIndex &&
                                               _startPos != null &&
@@ -478,6 +792,23 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                                         _startPos!,
                                                         _currentPos!,
                                                       ),
+                                                      isResizing: false,
+                                                    ),
+                                              ),
+                                            ),
+                                          // FINAL SELECTION RECT (if in resizing mode)
+                                          if (_isResizing &&
+                                              index == _currentImageIndex &&
+                                              _finalSelectionRect != null)
+                                            Positioned.fill(
+                                              child: CustomPaint(
+                                                painter:
+                                                    SelectionOverlayPainter(
+                                                      rect:
+                                                          _finalSelectionRect!,
+                                                      isResizing: true,
+                                                      activeHandle:
+                                                          _activeHandle,
                                                     ),
                                               ),
                                             ),
@@ -486,119 +817,166 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                     ),
                                   ),
                                 ),
-                                // EXISTING NOTE INDICATORS (Dots)
-                                ...(_notesPerImage[index] ?? []).map((note) {
-                                  return Positioned(
-                                    left:
-                                        (note.normX * constraints.maxWidth) -
-                                        10,
-                                    top:
-                                        (note.normY * constraints.maxHeight) -
-                                        10,
-                                    child: Container(
-                                      width: 20,
-                                      height: 20,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.3,
+                                // EXISTING NOTE INDICATORS (Dots) - visible only if no selection is active
+                                if (!isPageLocked)
+                                  ...(_notesPerImage[index] ?? []).map((note) {
+                                    return Positioned(
+                                      left:
+                                          (note.normX * constraints.maxWidth) -
+                                          10,
+                                      top:
+                                          (note.normY * constraints.maxHeight) -
+                                          10,
+                                      child: Container(
+                                        width: 20,
+                                        height: 20,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                0.3,
+                                              ),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 1),
                                             ),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 1),
+                                          ],
+                                          border: Border.all(
+                                            color: const Color(0xFF7C4DFF),
+                                            width: 2,
                                           ),
-                                        ],
-                                        border: Border.all(
-                                          color: const Color(0xFF7C4DFF),
-                                          width: 2,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                // PAGE DOTS
+                                if (widget.imagePaths.length > 1 &&
+                                    !isPageLocked)
+                                  Positioned(
+                                    bottom: 12,
+                                    left: 0,
+                                    right: 0,
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: List.generate(
+                                        widget.imagePaths.length,
+                                        (index) => Container(
+                                          margin: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                          ),
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color:
+                                                _currentImageIndex == index
+                                                    ? Colors.blue
+                                                    : Colors.white.withOpacity(
+                                                      0.5,
+                                                    ),
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  );
-                                }).toList(),
+                                  ),
+                                // NOTES BUTTON (Visible only when not drawing/resizing)
+                                if (!isPageLocked)
+                                  Positioned(
+                                    bottom: 24,
+                                    right: 12,
+                                    child: ElevatedButton.icon(
+                                      onPressed: _activateSelectionMode,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        foregroundColor: Colors.black,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      icon: const Icon(
+                                        Icons.assignment_outlined,
+                                        size: 18,
+                                      ),
+                                      label: const Text(
+                                        "Notes",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                // INSTRUCTION OVERLAY (for initial drawing)
+                                if (_isDrawMode && _startPos == null)
+                                  Positioned(
+                                    top: 20,
+                                    left: 0,
+                                    right: 0,
+                                    child: Center(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black87,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          "Drag on image to select area",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                // INSTRUCTION OVERLAY (for resizing)
+                                if (_isResizing &&
+                                    _finalSelectionRect != null &&
+                                    _activeHandle == DragHandle.none)
+                                  Positioned(
+                                    top: 20,
+                                    left: 0,
+                                    right: 0,
+                                    child: Center(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black87,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          "Adjust area or tap checkmark to confirm",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                               ],
                             );
                           },
                         );
                       },
                     ),
-                    // PAGE DOTS
-                    if (widget.imagePaths.length > 1)
-                      Positioned(
-                        bottom: 12,
-                        left: 0,
-                        right: 0,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(
-                            widget.imagePaths.length,
-                            (index) => Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color:
-                                    _currentImageIndex == index
-                                        ? Colors.blue
-                                        : Colors.white.withOpacity(0.5),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    // NOTES BUTTON
-                    Positioned(
-                      bottom: 24,
-                      right: 12,
-                      child: ElevatedButton.icon(
-                        onPressed: _activateSelectionMode,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        icon: const Icon(Icons.assignment_outlined, size: 18),
-                        label: const Text(
-                          "Notes",
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                    // INSTRUCTION OVERLAY
-                    if (_isDrawMode && _startPos == null)
-                      Positioned(
-                        top: 20,
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black87,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              "Drag on image to select area",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -727,25 +1105,106 @@ class _ImageSavePageState extends State<ImageSavePage> {
   }
 }
 
-// --- OVERLAY PAINTER ---
+// -----------------------------------------------------------------------------
+// --- NEW HELPER CLASSES FOR CUSTOM HALF-PAGE MODAL OVERLAY ---
+// -----------------------------------------------------------------------------
+
+class NoteModalOverlay extends StatelessWidget {
+  final Widget modalContent;
+  final Size screenSize;
+
+  const NoteModalOverlay({
+    Key? key,
+    required this.modalContent,
+    required this.screenSize,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    // The target initial height of the bottom sheet (half the screen height is no longer the minimum)
+    final mq = MediaQuery.of(context);
+    final keyboardHeight = mq.viewInsets.bottom;
+    final systemBottomPadding = mq.padding.bottom;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      // FIX 1: Use AnimatedPadding for smooth keyboard elevation.
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(
+          bottom: keyboardHeight, // Moves modal up to avoid keyboard
+        ),
+        child: ConstrainedBox(
+          // FIX 2: Remove fixed minHeight to let the modal shrink to fit its content,
+          // addressing the "gets up too high" issue.
+          constraints: BoxConstraints(maxHeight: screenSize.height),
+          child: Material(
+            // Using Material to provide the background, border radius, and shadow.
+            color: Colors.white,
+            elevation:
+                10, // Replicating the box shadow of the old container for visual style.
+            shadowColor: Colors.black26,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            clipBehavior: Clip.antiAlias,
+            child: SingleChildScrollView(
+              // Allows scrolling if content + keyboard height exceed screen height
+              child: Padding(
+                // Add system bottom padding to respect the safe area/gesture bar
+                padding: EdgeInsets.only(bottom: systemBottomPadding),
+                child: modalContent,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// [NoteModalPainter class removed as requested to remove the dimming shadow]
+
+// --- EXTENSION TO NORMALIZE RECT ---
+extension on Rect {
+  Rect normalize() {
+    return Rect.fromLTRB(
+      left < right ? left : right,
+      top < bottom ? top : bottom,
+      left > right ? left : right,
+      top > bottom ? top : bottom,
+    );
+  }
+}
+
+// --- OVERLAY PAINTER (KEPT FOR MAIN IMAGE SELECTION HIGHLIGHT) ---
 class SelectionOverlayPainter extends CustomPainter {
   final Rect rect;
+  final bool isResizing;
+  final DragHandle activeHandle;
 
-  SelectionOverlayPainter({required this.rect});
+  SelectionOverlayPainter({
+    required this.rect,
+    required this.isResizing,
+    this.activeHandle = DragHandle.none,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Path backgroundPath =
-        Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-    final Path holePath = Path()..addRect(rect);
-    final Path overlayPath = Path.combine(
-      ui.PathOperation.difference,
-      backgroundPath,
-      holePath,
-    );
+    // 1. DIM BACKGROUND (Black overlay with hole for the selected area)
+    if (isResizing) {
+      final Path backgroundPath =
+          Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+      final Path holePath = Path()..addRect(rect);
+      final Path overlayPath = Path.combine(
+        ui.PathOperation.difference,
+        backgroundPath,
+        holePath,
+      );
 
-    canvas.drawPath(overlayPath, Paint()..color = Colors.black54);
+      canvas.drawPath(overlayPath, Paint()..color = Colors.black54);
+    }
 
+    // 2. DRAW DASHED BORDER
     final Paint borderPaint =
         Paint()
           ..color = const Color(0xFF448AFF)
@@ -767,22 +1226,57 @@ class SelectionOverlayPainter extends CustomPainter {
       }
     }
 
-    final Paint dotPaint =
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.fill;
+    // 3. DRAW CENTER DOT (Only needed in drawing mode, the app bar button replaces the functionality in resizing mode)
+    if (!isResizing) {
+      final Paint dotPaint =
+          Paint()
+            ..color = Colors.white
+            ..style = PaintingStyle.fill;
 
-    canvas.drawCircle(
-      rect.center,
-      8,
-      Paint()
-        ..color = Colors.black26
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-    );
-    canvas.drawCircle(rect.center, 6, dotPaint);
+      canvas.drawCircle(
+        rect.center,
+        8,
+        Paint()
+          ..color = Colors.black26
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+      );
+      canvas.drawCircle(rect.center, 6, dotPaint);
+    }
+
+    // 4. DRAW RESIZE HANDLES (Only in resizing mode)
+    if (isResizing) {
+      final List<Offset> corners = [
+        rect.topLeft,
+        rect.topRight,
+        rect.bottomLeft,
+        rect.bottomRight,
+      ];
+
+      final Paint handleShadow =
+          Paint()
+            ..color = Colors.black.withOpacity(0.3)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+
+      final Paint handleFill = Paint()..color = Colors.white;
+      final Paint handleBorder =
+          Paint()
+            ..color = const Color(0xFF448AFF)
+            ..strokeWidth = 2
+            ..style = PaintingStyle.stroke;
+
+      const double handleRadius = 8;
+
+      for (final corner in corners) {
+        canvas.drawCircle(corner, handleRadius, handleShadow);
+        canvas.drawCircle(corner, handleRadius, handleFill);
+        canvas.drawCircle(corner, handleRadius, handleBorder);
+      }
+    }
   }
 
   @override
   bool shouldRepaint(covariant SelectionOverlayPainter oldDelegate) =>
-      rect != oldDelegate.rect;
+      rect != oldDelegate.rect ||
+      isResizing != oldDelegate.isResizing ||
+      activeHandle != oldDelegate.activeHandle;
 }

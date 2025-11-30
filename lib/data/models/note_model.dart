@@ -18,7 +18,7 @@ class NoteModel {
     this.normX = 0.5,
     this.normY = 0.5,
     this.normWidth = 0.0,
-    this.normHeight = 0.0
+    this.normHeight = 0.0,
   });
 
   Map<String, dynamic> toMap() {

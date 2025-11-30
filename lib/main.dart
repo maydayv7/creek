@@ -4,9 +4,11 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:adobe/services/theme_service.dart';
 import 'package:adobe/ui/pages/share_handler_page.dart';
 import 'package:adobe/ui/pages/home_page.dart';
+import 'package:adobe/services/analysis_queue_manager.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AnalysisQueueManager().processQueue();
   runApp(const MyApp());
 }
 
@@ -42,13 +44,15 @@ class _MyAppState extends State<MyApp> {
       _intentStreamSubscription = ReceiveSharingIntent.instance
           .getMediaStream()
           .listen((List<SharedMediaFile> value) {
-        if (value.isNotEmpty) {
-          _handleShare(value.first.path);
-        }
-      }, onError: (err) => debugPrint("Share error: $err"));
+            if (value.isNotEmpty) {
+              _handleShare(value.first.path);
+            }
+          }, onError: (err) => debugPrint("Share error: $err"));
 
       // 3. Cold Start
-      ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile> value) {
+      ReceiveSharingIntent.instance.getInitialMedia().then((
+        List<SharedMediaFile> value,
+      ) {
         if (value.isNotEmpty) {
           _handleShare(value.first.path);
           ReceiveSharingIntent.instance.reset();
@@ -68,9 +72,7 @@ class _MyAppState extends State<MyApp> {
     if (context == null) return;
 
     _navigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (_) => ShareHandlerPage(sharedText: content),
-      ),
+      MaterialPageRoute(builder: (_) => ShareHandlerPage(sharedText: content)),
     );
   }
 
@@ -90,7 +92,10 @@ class _MyAppState extends State<MyApp> {
     if (!_isReady) {
       return const MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: Scaffold(backgroundColor: Colors.white, body: Center(child: CircularProgressIndicator())),
+        home: Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(child: CircularProgressIndicator()),
+        ),
       );
     }
 

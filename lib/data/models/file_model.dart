@@ -41,10 +41,12 @@ class FileModel {
       filePath: map['file_path'],
       name: map['name'] ?? 'Untitled',
       description: map['description'],
-      tags: map['tags'] != null ? List<String>.from(jsonDecode(map['tags'])) : [],
-      lastUpdated: map['last_updated'] != null 
-          ? DateTime.parse(map['last_updated']) 
-          : DateTime.parse(map['created_at']),
+      tags:
+          map['tags'] != null ? List<String>.from(jsonDecode(map['tags'])) : [],
+      lastUpdated:
+          map['last_updated'] != null
+              ? DateTime.parse(map['last_updated'])
+              : DateTime.parse(map['created_at']),
       createdAt: DateTime.parse(map['created_at']),
     );
   }

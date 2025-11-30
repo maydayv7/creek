@@ -11,15 +11,16 @@ class ProjectBoardPageAlternate extends StatefulWidget {
   const ProjectBoardPageAlternate({super.key, required this.projectId});
 
   @override
-  State<ProjectBoardPageAlternate> createState() => ProjectBoardPageAlternateState();
+  State<ProjectBoardPageAlternate> createState() =>
+      ProjectBoardPageAlternateState();
 }
 
 class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
   final _imageRepo = ImageRepo();
-  
+
   List<ImageModel> _allImages = [];
   List<ImageModel> _filteredImages = [];
-  
+
   List<String> _allTags = [];
   Set<String> _selectedTags = {};
   bool _isLoading = true;
@@ -46,7 +47,7 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     final images = await _imageRepo.getImages(widget.projectId);
-    
+
     final Set<String> tags = {};
     for (var img in images) {
       tags.addAll(img.tags);
@@ -68,9 +69,10 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
       setState(() => _filteredImages = _allImages);
     } else {
       setState(() {
-        _filteredImages = _allImages.where((img) {
-          return img.tags.toSet().intersection(_selectedTags).isNotEmpty;
-        }).toList();
+        _filteredImages =
+            _allImages.where((img) {
+              return img.tags.toSet().intersection(_selectedTags).isNotEmpty;
+            }).toList();
       });
     }
   }
@@ -103,49 +105,53 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                       IconButton(
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.pop(context),
-                      )
+                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
                   if (_allTags.isEmpty)
                     Text("No tags available.", style: Variables.bodyStyle),
-                  
+
                   Expanded(
                     child: SingleChildScrollView(
                       child: Wrap(
                         spacing: 10,
                         runSpacing: 10,
-                        children: _allTags.map((tag) {
-                          final isSelected = _selectedTags.contains(tag);
-                          return FilterChip(
-                            label: Text(tag.toUpperCase()),
-                            selected: isSelected,
-                            onSelected: (selected) {
-                              setModalState(() {
-                                if (selected) {
-                                  _selectedTags.add(tag);
-                                } else {
-                                  _selectedTags.remove(tag);
-                                }
-                              });
-                              // Update main state
-                              this.setState(() {
-                                _applyFilter();
-                              });
-                            },
-                            labelStyle: Variables.captionStyle.copyWith(
-                              color: isSelected ? Colors.white : Variables.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            backgroundColor: Variables.surfaceSubtle,
-                            selectedColor: Variables.textPrimary,
-                            checkmarkColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: BorderSide.none,
-                            ),
-                          );
-                        }).toList(),
+                        children:
+                            _allTags.map((tag) {
+                              final isSelected = _selectedTags.contains(tag);
+                              return FilterChip(
+                                label: Text(tag.toUpperCase()),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  setModalState(() {
+                                    if (selected) {
+                                      _selectedTags.add(tag);
+                                    } else {
+                                      _selectedTags.remove(tag);
+                                    }
+                                  });
+                                  // Update main state
+                                  this.setState(() {
+                                    _applyFilter();
+                                  });
+                                },
+                                labelStyle: Variables.captionStyle.copyWith(
+                                  color:
+                                      isSelected
+                                          ? Colors.white
+                                          : Variables.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                backgroundColor: Variables.surfaceSubtle,
+                                selectedColor: Variables.textPrimary,
+                                checkmarkColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  side: BorderSide.none,
+                                ),
+                              );
+                            }).toList(),
                       ),
                     ),
                   ),
@@ -161,7 +167,10 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                             });
                             Navigator.pop(context);
                           },
-                          child: const Text("Clear All", style: TextStyle(color: Colors.red)),
+                          child: const Text(
+                            "Clear All",
+                            style: TextStyle(color: Colors.red),
+                          ),
                         ),
                       ),
                       Expanded(
@@ -170,7 +179,9 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Variables.textPrimary,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                           child: const Text("Done"),
                         ),
@@ -180,7 +191,7 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                 ],
               ),
             );
-          }
+          },
         );
       },
     );
@@ -220,44 +231,82 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
               const Spacer(),
               if (_selectedTags.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Variables.textPrimary,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     "${_selectedTags.length} Active",
-                    style: Variables.captionStyle.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: Variables.captionStyle.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                )
+                ),
             ],
           ),
         ),
-        
+
         // Masonry Grid
         Expanded(
-          child: _filteredImages.isEmpty 
-            ? Center(
-                child: Text(
-                  "No images found",
-                  style: Variables.bodyStyle.copyWith(color: Variables.textSecondary),
-                ),
-              )
-            : SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 80), // Bottom padding for FAB
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(children: leftColumn.map((e) => Padding(padding: const EdgeInsets.only(bottom: 12), child: e)).toList()),
+          child:
+              _filteredImages.isEmpty
+                  ? Center(
+                    child: Text(
+                      "No images found",
+                      style: Variables.bodyStyle.copyWith(
+                        color: Variables.textSecondary,
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(children: rightColumn.map((e) => Padding(padding: const EdgeInsets.only(bottom: 12), child: e)).toList()),
+                  )
+                  : SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      80,
+                    ), // Bottom padding for FAB
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children:
+                                leftColumn
+                                    .map(
+                                      (e) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
+                                        child: e,
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            children:
+                                rightColumn
+                                    .map(
+                                      (e) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
+                                        child: e,
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
         ),
       ],
     );
@@ -269,16 +318,17 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ImageDetailsPage(
-              imagePath: image.filePath,
-              imageId: image.id,
-              projectId: widget.projectId,
-            ),
+            builder:
+                (_) => ImageDetailsPage(
+                  imagePath: image.filePath,
+                  imageId: image.id,
+                  projectId: widget.projectId,
+                ),
           ),
         );
       },
       child: Container(
-        height: (index % 3 == 0) ? 240 : 180, 
+        height: (index % 3 == 0) ? 240 : 180,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: Variables.surfaceSubtle,
@@ -291,43 +341,59 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
               File(image.filePath),
               fit: BoxFit.cover,
               width: double.infinity,
-              errorBuilder: (_,__,___) => const Center(
-                child: Icon(Icons.broken_image, color: Variables.textDisabled),
-              ),
+              errorBuilder:
+                  (_, __, ___) => const Center(
+                    child: Icon(
+                      Icons.broken_image,
+                      color: Variables.textDisabled,
+                    ),
+                  ),
             ),
             if (image.tags.isNotEmpty)
               Positioned(
-                bottom: 0, left: 0, right: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                      colors: [
+                        Colors.black.withOpacity(0.8),
+                        Colors.transparent,
+                      ],
                     ),
                   ),
                   child: Wrap(
-                    spacing: 4, runSpacing: 4,
-                    children: image.tags.take(3).map((tag) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.white.withOpacity(0.1)),
-                        ),
-                        child: Text(
-                          tag.toUpperCase(), 
-                          style: const TextStyle(
-                            color: Colors.white, 
-                            fontSize: 9, 
-                            fontFamily: 'GeneralSans', 
-                            fontWeight: FontWeight.w600
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                    spacing: 4,
+                    runSpacing: 4,
+                    children:
+                        image.tags.take(3).map((tag) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.1),
+                              ),
+                            ),
+                            child: Text(
+                              tag.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontFamily: 'GeneralSans',
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        }).toList(),
                   ),
                 ),
               ),

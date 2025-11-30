@@ -8,6 +8,7 @@ class ImageModel {
   final List<String> tags;
   final String? analysisData;
   final DateTime createdAt;
+  final String status; // NEW: 'pending', 'analyzing', 'completed', 'failed'
 
   ImageModel({
     required this.id,
@@ -17,6 +18,7 @@ class ImageModel {
     this.tags = const [],
     this.analysisData,
     required this.createdAt,
+    this.status = 'pending',
   });
 
   Map<String, dynamic> toMap() {
@@ -28,6 +30,7 @@ class ImageModel {
       'tags': jsonEncode(tags),
       'analysis_data': analysisData,
       'created_at': createdAt.toIso8601String(),
+      'status': status,
     };
   }
 
@@ -37,9 +40,11 @@ class ImageModel {
       projectId: map['project_id'],
       filePath: map['file_path'],
       name: map['name'] ?? 'Untitled',
-      tags: map['tags'] != null ? List<String>.from(jsonDecode(map['tags'])) : [],
+      tags:
+          map['tags'] != null ? List<String>.from(jsonDecode(map['tags'])) : [],
       analysisData: map['analysis_data'],
       createdAt: DateTime.parse(map['created_at']),
+      status: map['status'] ?? 'pending',
     );
   }
 }

@@ -13,7 +13,10 @@ class FontIdentifierService {
 
   static const int IMG_SIZE = 64;
 
-  Future<void> initialize({required String modelPath, required String jsonPath}) async {
+  Future<void> initialize({
+    required String modelPath,
+    required String jsonPath,
+  }) async {
     if (_session != null) return;
 
     try {
@@ -37,27 +40,35 @@ class FontIdentifierService {
     }
   }
 
-  Future<Map<String, dynamic>> analyze(String imagePath, {
-    String? modelPath, 
-    String? jsonPath
+  Future<Map<String, dynamic>> analyze(
+    String imagePath, {
+    String? modelPath,
+    String? jsonPath,
   }) async {
-    if (modelPath == null || jsonPath == null) return {'success': false, 'scores': {}, 'error': 'Paths missing'};
+    if (modelPath == null || jsonPath == null)
+      return {'success': false, 'scores': {}, 'error': 'Paths missing'};
     await initialize(modelPath: modelPath, jsonPath: jsonPath);
-    if (_session == null || _fontDb == null) return {'success': false, 'scores': {}, 'error': 'Init failed'};
+    if (_session == null || _fontDb == null)
+      return {'success': false, 'scores': {}, 'error': 'Init failed'};
 
     try {
       // 1. OCR Detection (Native Platform Call)
       final inputImage = InputImage.fromFilePath(imagePath);
       final recognizedText = await _textRecognizer.processImage(inputImage);
-      
+
       if (recognizedText.blocks.isEmpty) {
-        return {'success': true, 'scores': {'No Text Detected': 1.0}, 'error': null};
+        return {
+          'success': true,
+          'scores': {'No Text Detected': 1.0},
+          'error': null,
+        };
       }
 
       // 2. Load Image for Processing
       final bytes = await File(imagePath).readAsBytes();
       final fullImage = img.decodeImage(bytes);
-      if (fullImage == null) return {'success': false, 'scores': {}, 'error': 'Image decode failed'};
+      if (fullImage == null)
+        return {'success': false, 'scores': {}, 'error': 'Image decode failed'};
 
       // Store counts to find dominant font
       Map<String, double> fontCounts = {};
@@ -66,10 +77,9 @@ class FontIdentifierService {
       // 3. Iterate Text Blocks
       for (TextBlock block in recognizedText.blocks) {
         for (TextLine line in block.lines) {
-          
           // Crop
           final rect = line.boundingBox;
-          
+
           // Safety check for bounds
           int x = max(0, rect.left.toInt());
           int y = max(0, rect.top.toInt());
@@ -88,7 +98,7 @@ class FontIdentifierService {
           // Aggregate Scores
           final fontName = match.key;
           final conf = match.value;
-          
+
           if (fontCounts.containsKey(fontName)) {
             fontCounts[fontName] = fontCounts[fontName]! + conf;
           } else {
@@ -102,18 +112,15 @@ class FontIdentifierService {
       fontCounts.updateAll((key, value) => (value / totalBlocks) * 100);
 
       // Sort
-      var sorted = fontCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      var sorted =
+          fontCounts.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
       Map<String, dynamic> finalScores = {};
-      for(var entry in sorted) {
+      for (var entry in sorted) {
         finalScores[entry.key] = entry.value;
       }
 
-      return {
-        'success': true,
-        'scores': finalScores,
-        'error': null,
-      };
-
+      return {'success': true, 'scores': finalScores, 'error': null};
     } catch (e) {
       debugPrint("Font Analysis Failed: $e");
       return {'success': false, 'scores': {}, 'error': e.toString()};
@@ -125,11 +132,11 @@ class FontIdentifierService {
     // Resize to 64x64
     final resized = img.copyResize(crop, width: IMG_SIZE, height: IMG_SIZE);
     final pixels = Float32List(IMG_SIZE * IMG_SIZE);
-    
+
     // 1. Calculate Mean Brightness (Adaptive Threshold)
     double totalLum = 0;
     for (final pixel in resized) {
-      totalLum += pixel.r * 0.299 + pixel.g * 0.587 + pixel.b * 0.114; 
+      totalLum += pixel.r * 0.299 + pixel.g * 0.587 + pixel.b * 0.114;
     }
     double mean = totalLum / (IMG_SIZE * IMG_SIZE);
 
@@ -154,36 +161,43 @@ class FontIdentifierService {
 
     try {
       // Input 1: Image [1, 64, 64, 1]
-      imgTensor = OrtValueTensor.createTensorWithDataList(
-        imageFloats, [1, 64, 64, 1]
-      );
+      imgTensor = OrtValueTensor.createTensorWithDataList(imageFloats, [
+        1,
+        64,
+        64,
+        1,
+      ]);
 
       // Input 2: Dummy Char [1, 26, 1] (Required by FANNet architecture)
-      final dummyFloats = Float32List(26 * 1); 
-      charTensor = OrtValueTensor.createTensorWithDataList(
-        dummyFloats, [1, 26, 1]
-      );
+      final dummyFloats = Float32List(26 * 1);
+      charTensor = OrtValueTensor.createTensorWithDataList(dummyFloats, [
+        1,
+        26,
+        1,
+      ]);
 
       runOptions = OrtRunOptions();
-      
+
       // Run
       outputs = _session!.run(runOptions, {
         'image_input': imgTensor,
-        'char_input': charTensor
+        'char_input': charTensor,
       });
 
       // Output Flattening
-      final rawOutput = outputs[0]?.value; 
+      final rawOutput = outputs[0]?.value;
       final List<double> flatOutput = [];
-      
-      void flatten(dynamic d) {
-        if (d is num) flatOutput.add(d.toDouble());
-        else if (d is List) for(var i in d) flatten(i);
-      }
-      flatten(rawOutput);
-      
-      return flatOutput;
 
+      void flatten(dynamic d) {
+        if (d is num)
+          flatOutput.add(d.toDouble());
+        else if (d is List)
+          for (var i in d) flatten(i);
+      }
+
+      flatten(rawOutput);
+
+      return flatOutput;
     } finally {
       imgTensor?.release();
       charTensor?.release();
@@ -203,7 +217,7 @@ class FontIdentifierService {
         sum += diff * diff;
       }
       double dist = sqrt(sum);
-      
+
       if (dist < minDist) {
         minDist = dist;
         bestFont = fontName;

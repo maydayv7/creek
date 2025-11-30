@@ -10,16 +10,20 @@ class InstagramDownloadService {
   Future<List<String>?> downloadInstagramImage(String url) async {
     try {
       final dir = await getApplicationDocumentsDirectory();
-      
+
       // Create directories
       final instagramDir = Directory('${dir.path}/instagram_downloads');
-      if (!await instagramDir.exists()) await instagramDir.create(recursive: true);
+      if (!await instagramDir.exists())
+        await instagramDir.create(recursive: true);
 
       final imagesDir = Directory('${dir.path}/images');
       if (!await imagesDir.exists()) await imagesDir.create(recursive: true);
 
       // Call Python Service
-      final jsonResult = await _pythonService.downloadInstagramImage(url, instagramDir.path);
+      final jsonResult = await _pythonService.downloadInstagramImage(
+        url,
+        instagramDir.path,
+      );
 
       if (jsonResult != null && jsonResult['success'] == true) {
         final List<dynamic> paths = jsonResult['file_paths'];

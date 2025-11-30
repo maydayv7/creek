@@ -36,9 +36,9 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _errorMessage = 'Error picking image: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
       }
     }
   }
@@ -82,32 +82,45 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt_outlined, color: Colors.black),
-                title: const Text("Take Photo", style: TextStyle(fontFamily: 'GeneralSans')),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _pickImage(ImageSource.camera);
-                },
+      builder:
+          (ctx) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(
+                      Icons.camera_alt_outlined,
+                      color: Colors.black,
+                    ),
+                    title: const Text(
+                      "Take Photo",
+                      style: TextStyle(fontFamily: 'GeneralSans'),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _pickImage(ImageSource.camera);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.image_outlined,
+                      color: Colors.black,
+                    ),
+                    title: const Text(
+                      "Choose from Gallery",
+                      style: TextStyle(fontFamily: 'GeneralSans'),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _pickImage(ImageSource.gallery);
+                    },
+                  ),
+                ],
               ),
-              ListTile(
-                leading: const Icon(Icons.image_outlined, color: Colors.black),
-                title: const Text("Choose from Gallery", style: TextStyle(fontFamily: 'GeneralSans')),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _pickImage(ImageSource.gallery);
-                },
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -172,8 +185,11 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                         Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.bug_report_outlined,
-                                size: 48, color: Colors.grey[400]),
+                            Icon(
+                              Icons.bug_report_outlined,
+                              size: 48,
+                              color: Colors.grey[400],
+                            ),
                             const SizedBox(height: 12),
                             Text(
                               "Select image to test full suite",
@@ -188,7 +204,9 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                         Container(
                           color: Colors.black26,
                           child: const Center(
-                            child: CircularProgressIndicator(color: Colors.white),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                     ],
@@ -210,7 +228,10 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                 ),
                 child: Text(
                   _errorMessage!,
-                  style: const TextStyle(color: Colors.red, fontFamily: 'GeneralSans'),
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontFamily: 'GeneralSans',
+                  ),
                 ),
               ),
 

@@ -7,7 +7,12 @@ import '../data/models/file_model.dart';
 class FileService {
   final _repo = FileRepo();
 
-  Future<String> saveFile(File file, int projectId, {String? description, String? name}) async {
+  Future<String> saveFile(
+    File file,
+    int projectId, {
+    String? description,
+    String? name,
+  }) async {
     final dir = await getApplicationDocumentsDirectory();
     final folder = Directory("${dir.path}/files");
     if (!await folder.exists()) await folder.create(recursive: true);
@@ -15,7 +20,7 @@ class FileService {
     final id = const Uuid().v4();
     String ext = file.path.split('.').last;
     final newPath = "${folder.path}/$id.$ext";
-    
+
     await file.copy(newPath);
 
     final projectFile = FileModel(
@@ -36,8 +41,18 @@ class FileService {
     await _repo.touchFile(id);
   }
 
-  Future<void> updateFileDetails(String id, {String? name, String? description, List<String>? tags}) async {
-    await _repo.updateDetails(id, name: name, description: description, tags: tags);
+  Future<void> updateFileDetails(
+    String id, {
+    String? name,
+    String? description,
+    List<String>? tags,
+  }) async {
+    await _repo.updateDetails(
+      id,
+      name: name,
+      description: description,
+      tags: tags,
+    );
   }
 
   Future<void> deleteFile(String id) async {

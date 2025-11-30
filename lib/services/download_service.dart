@@ -61,7 +61,7 @@ class DownloadService {
 
         // 1️1. GOOGLE PHOTOS / GOOGLEUSERCONTENT.COM
         RegExp googlePhotosRegex = RegExp(
-          r'https:\/\/lh3\.googleusercontent\.com\/[a-zA-Z0-9\-\._=]+'
+          r'https:\/\/lh3\.googleusercontent\.com\/[a-zA-Z0-9\-\._=]+',
         );
 
         var matchPhotos = googlePhotosRegex.firstMatch(response.body);
@@ -142,7 +142,7 @@ class DownloadService {
       await file.writeAsBytes(response.bodyBytes);
 
       debugPrint("Saved Successfully! → $filePath");
-      return filePath; 
+      return filePath;
     } catch (e) {
       debugPrint("Error: $e");
       return null;

@@ -27,6 +27,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
   Map<String, dynamic>? _stylesheetMap;
   String? _rawJsonString;
 
+  // Cache for font name lookups
+  final Map<String, String> _fontNameCache = {};
+
   @override
   void initState() {
     super.initState();
@@ -42,24 +45,45 @@ class _StylesheetPageState extends State<StylesheetPage> {
       (match) => '${match[1]}"${match[2]?.trim()}"${match[3]}'
     );
     cleaned = cleaned.replaceAllMapped(
-      RegExp(r'(:\s*)([a-zA-Z_][a-zA-Z0-9_\-\.]*)(\s*[,}])'),
+      RegExp(r'(:\s*)([a-zA-Z0-9_\-\.\/\s]+)(?=\s*[,}])'),
       (match) {
-        String val = match[2]!;
+        String val = match[2]!.trim();
         if (val == 'true' || val == 'false' || val == 'null' || double.tryParse(val) != null) {
           return match[0]!;
         }
-        return '${match[1]}"$val"${match[3]}';
+        return '${match[1]}"$val"';
       }
     );
     return cleaned;
+  }
+
+  String _resolveGoogleFontName(String dirtyName) {
+    if (_fontNameCache.containsKey(dirtyName)) {
+      return _fontNameCache[dirtyName]!;
+    }
+
+    String cleanInput = dirtyName.toLowerCase()
+        .replaceAll(RegExp(r'[-_]regular$'), '')
+        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    final allFonts = GoogleFonts.asMap().keys;
+    
+    for (String officialName in allFonts) {
+      String cleanOfficial = officialName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      if (cleanOfficial == cleanInput) {
+        _fontNameCache[dirtyName] = officialName;
+        return officialName;
+      }
+    }
+    return dirtyName; 
   }
 
   Future<void> _loadSavedStylesheet() async {
     final project = await ProjectRepo().getProjectById(_currentProjectId);
     if (project?.globalStylesheet != null && project!.globalStylesheet!.isNotEmpty) {
       String raw = project.globalStylesheet!;
-      
       dynamic parsed;
+      
       try {
         parsed = jsonDecode(raw);
       } catch (e) {
@@ -85,9 +109,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
             _stylesheetMap = null;
           }
         });
-        
-        // --- LOG TYPOGRAPHY ---
-        _logTypography();
       }
     }
   }
@@ -130,9 +151,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
           }
           _rawJsonString = jsonString;
         });
-        
-        // --- LOG TYPOGRAPHY ---
-        _logTypography();
       }
     } catch (e) {
       debugPrint("Gen Error: $e");
@@ -150,14 +168,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
       }
     }
     return null;
-  }
-
-  // --- DEBUG HELPER ---
-  void _logTypography() {
-    final typography = _getData(['Typography', 'fonts', 'font_family', 'type', 'font']);
-    debugPrint("\n\n========== TYPOGRAPHY SECTION ==========");
-    debugPrint(typography?.toString() ?? "Typography key not found in JSON.");
-    debugPrint("========================================\n");
   }
 
   @override
@@ -204,9 +214,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
     final colors = _getData(['Colour Palette', 'Color Palette', 'colors']);
     final emotions = _getData(['Emotions', 'emotions']);
     final era = _getData(['Era/Cultural Reference', 'era']);
-    final typography = _getData(['Typography', 'fonts']) ?? "General Sans"; 
+    final typography = _getData(['Typography', 'fonts']);
 
-    final foundAny = (style != null || lighting != null || colors != null || emotions != null || era != null);
+    final foundAny = (style != null || lighting != null || colors != null || emotions != null || era != null || typography != null);
 
     return RefreshIndicator(
       onRefresh: _generateStylesheet,
@@ -234,18 +244,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
             const SizedBox(height: 32),
 
             if (foundAny) ...[
-              // 1. Typography
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSectionHeader("Typography"),
-                    _buildTypographyCard(typography is String ? typography : "General Sans"),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
+              // 1. Typography (Now a Slider)
+              if (typography != null) 
+                _buildTypographySection(typography),
 
               // 2. Color Palette
               if (colors != null) ...[
@@ -262,7 +263,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
                 const SizedBox(height: 32),
               ],
 
-              // 3. Sliders
+              // 3. Slider Sections
               if (style != null) _buildSliderSection("Style & Aesthetic", style),
               if (emotions != null) _buildSliderSection("Mood & Emotions", emotions),
               if (lighting != null) _buildSliderSection("Lighting", lighting),
@@ -319,65 +320,109 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
-  Widget _buildTypographyCard(String fontName) {
-    TextStyle sampleStyle;
-    if (fontName.toLowerCase().contains("general") && fontName.toLowerCase().contains("sans")) {
-      sampleStyle = const TextStyle(fontFamily: 'GeneralSans');
-    } else {
-      try {
-        sampleStyle = GoogleFonts.getFont(fontName);
-      } catch (_) {
-        sampleStyle = const TextStyle(fontFamily: 'GeneralSans');
+  // --- TYPOGRAPHY SECTION (UPDATED TO SLIDER) ---
+  Widget _buildTypographySection(dynamic data) {
+    List<String> fontNames = [];
+
+    if (data is List) {
+      for (var item in data) {
+        if (item is Map && item.containsKey('label')) {
+          fontNames.add(item['label'].toString().trim());
+        } else if (item is String) {
+          fontNames.add(item.trim());
+        }
       }
+    } else if (data is Map && data.containsKey('label')) {
+      fontNames.add(data['label'].toString().trim());
+    } else if (data is String) {
+      fontNames.add(data.trim());
+    }
+
+    if (fontNames.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _buildSectionHeader("Typography"),
+        ),
+        SizedBox(
+          height: 150, // Height for the cards
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            itemCount: fontNames.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) => _buildTypographyCard(fontNames[index]),
+          ),
+        ),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildTypographyCard(String rawFontName) {
+    final String correctFontName = _resolveGoogleFontName(rawFontName);
+    TextStyle sampleStyle;
+    
+    try {
+      sampleStyle = GoogleFonts.getFont(correctFontName);
+    } catch (_) {
+      sampleStyle = const TextStyle(fontFamily: 'GeneralSans');
     }
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      width: 160, // Fixed Width for Horizontal List
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Variables.borderSubtle),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "Aa",
-            style: sampleStyle.copyWith(fontSize: 64, height: 1, fontWeight: FontWeight.w400, color: Colors.black),
-          ),
-          const SizedBox(width: 24),
+          // 1. Big "Aa" Preview
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  fontName,
-                  style: const TextStyle(
-                    fontFamily: 'GeneralSans',
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  "Primary Typeface",
-                  style: TextStyle(
-                    fontFamily: 'GeneralSans',
-                    fontSize: 14,
-                    color: Variables.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n1234567890",
-                  style: sampleStyle.copyWith(
-                    fontSize: 14,
-                    color: Variables.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-              ],
+            child: Text(
+              "Aa",
+              style: sampleStyle.copyWith(
+                fontSize: 56, 
+                height: 1, 
+                fontWeight: FontWeight.w400, 
+                color: Colors.black
+              ),
+            ),
+          ),
+          // 2. Font Name
+          Text(
+            correctFontName,
+            style: const TextStyle(
+              fontFamily: 'GeneralSans',
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          // 3. Label
+          const Text(
+            "Primary Typeface",
+            style: TextStyle(
+              fontFamily: 'GeneralSans',
+              fontSize: 11,
+              color: Variables.textSecondary,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

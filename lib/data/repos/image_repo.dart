@@ -26,7 +26,48 @@ class ImageRepo {
     return null;
   }
 
-  /// NEW METHOD: Fetches tags for the specific image
+  Future<ImageModel?> getByFilePath(String path) async {
+    final db = await AppDatabase.db;
+    final res = await db.query(
+      'images',
+      where: 'file_path = ?',
+      whereArgs: [path],
+      limit: 1,
+    );
+    if (res.isNotEmpty) return ImageModel.fromMap(res.first);
+    return null;
+  }
+
+  Future<void> updateProject(String id, int projectId) async {
+    final db = await AppDatabase.db;
+    await db.update(
+      'images',
+      {'project_id': projectId},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<ImageModel>> getPendingImages() async {
+    final db = await AppDatabase.db;
+    final res = await db.query(
+      'images',
+      where: 'status = ? OR status = ?',
+      whereArgs: ['pending', 'analyzing'],
+    );
+    return res.map((e) => ImageModel.fromMap(e)).toList();
+  }
+
+  Future<void> updateStatus(String id, String status) async {
+    final db = await AppDatabase.db;
+    await db.update(
+      'images',
+      {'status': status},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<List<String>> getTagsForImage(dynamic id) async {
     final db = await AppDatabase.db;
     final res = await db.query(
@@ -77,7 +118,7 @@ class ImageRepo {
     await db.delete('images', where: 'id = ?', whereArgs: [id]);
   }
 
-  /// Helper for Project Deletion Service
+  // Helper for Project Deletion Service
   Future<List<String>> getAllFilePathsForProjectIds(
     List<int> projectIds,
   ) async {
