@@ -5,6 +5,7 @@ import '../../data/repos/project_repo.dart';
 import '../../services/project_service.dart';
 import 'project_board_page.dart';
 import 'stylesheet_page.dart';
+import 'project_file_page.dart';
 
 class ProjectDetailPage extends StatefulWidget {
   final int projectId;
@@ -152,6 +153,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => StylesheetPage(projectId: projectId)),
+    ).then((_) => _loadData());
+  }
+
+  void _navigateToFiles(int projectId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProjectFilePage(projectId: projectId)),
     ).then((_) => _loadData());
   }
 
@@ -386,7 +394,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             theme: theme,
             isDark: isDark,
             isSmall: isSmall,
-            onTap: () => _showPlaceholder("Files"),
+            onTap: () => _navigateToFiles(targetId),
           ),
         ),
       ],
