@@ -407,7 +407,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
     });
   }
 
-  // --- ADD NOTE MODAL (MODIFIED FOR HALF PAGE OVERLAY) ---
+  //ADD NOTE MODAL
   void _showNoteModal() {
     _commentController.clear();
     // Ensure we have a valid selection to proceed
@@ -415,95 +415,153 @@ class _ImageSavePageState extends State<ImageSavePage> {
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // Crucial for custom height/overlay
-      backgroundColor:
-          Colors.transparent, // Crucial to allow the custom overlay to show
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
         final mediaQuery = MediaQuery.of(context);
 
-        // The actual content of the note modal (the form)
-        // [MODIFIED] Removed the redundant outer SingleChildScrollView.
-        // Scrolling is handled in NoteModalOverlay.
-        final modalContent = Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.only(top: 20, left: 20, right: 20),
-              child: Text(
-                "Add Note",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Category Dropdown
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                decoration: InputDecoration(
-                  labelText: "Category",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+        // 1. Wrap the content variable in StatefulBuilder
+        final modalContent = StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 20,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                  child: Column(
+                    children: [
+                      // --- ROW 1: Header ---
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Colors.grey,
+                            child: Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+
+                          const Text(
+                            "User",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
+                          ),
+
+                          const Spacer(),
+
+                          //  Dropdown ---
+                          Container(
+                            height: 40,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE0E5FF),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value:
+                                    _categories.contains(_selectedCategory)
+                                        ? _selectedCategory
+                                        : null,
+                                hint: const Text("Type"),
+                                isDense: true,
+                                icon: const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  size: 20,
+                                  color: Colors.black54,
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                                focusColor: Colors.transparent,
+                                dropdownColor: Colors.white,
+                                items:
+                                    _categories
+                                        .map(
+                                          (c) => DropdownMenuItem(
+                                            value: c,
+                                            child: Text(c),
+                                          ),
+                                        )
+                                        .toList(),
+
+                                onChanged: (v) {
+                                  setModalState(() {
+                                    _selectedCategory = v!;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // --- ROW 2: Input & Send ---
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _commentController,
+                              autofocus: true,
+                              maxLines: 1,
+                              style: const TextStyle(fontSize: 14),
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: const Color(0xFFF3F4F6),
+                                hintText: "Enter details...",
+                                hintStyle: TextStyle(color: Colors.grey[600]),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 12),
+
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 2),
+                            child: IconButton(
+                              icon: const Icon(Icons.send_outlined),
+                              color: Colors.black87,
+                              iconSize: 28,
+                              onPressed: () {
+                                _addTempNote();
+                                Navigator.pop(context);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                items:
-                    _categories
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                        .toList(),
-                onChanged: (v) => setState(() => _selectedCategory = v!),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Note Text
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: TextField(
-                controller: _commentController,
-                autofocus: true,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: "Enter details...",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Save Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: () {
-                    _addTempNote();
-                    Navigator.pop(context);
-                  },
-                  child: const Text(
-                    "Save Note",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
+                const SizedBox(height: 10),
+              ],
+            );
+          },
         );
 
-        // Wrap the content with the custom overlay
+        // Return your custom overlay wrapper with the stateful content inside
         return NoteModalOverlay(
           modalContent: modalContent,
           screenSize: mediaQuery.size,
@@ -904,7 +962,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                           ),
                                         ),
                                         child: const Text(
-                                          "Adjust area or tap Checkmark to confirm",
+                                          "Adjust area or tap checkmark to confirm",
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 12,
