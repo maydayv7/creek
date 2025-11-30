@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:undo/undo.dart';
 import './canvas_toolbar/magic_draw_overlay.dart';
+import '../../data/repos/project_repo.dart';
+import '../../services/stylesheet_service.dart';
 
 // --- MODELS ---
 class DrawingPoint {
@@ -54,6 +56,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   String? selectedId;
   Offset? _dragStartPosition;
   late Size _canvasSize;
+  List<Color> _brandColors = [];
 
   // --- NEW MAGIC DRAW STATE ---
   bool _isMagicDrawActive = false;
@@ -73,6 +76,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     super.initState();
     _canvasSize = Size(widget.width, widget.height);
 
+    _fetchBrandColors();
+
     if (widget.initialImage != null) {
       elements.add({
         'id': 'bg_${DateTime.now().millisecondsSinceEpoch}',
@@ -82,6 +87,25 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         'size': Size(widget.width, widget.height),
         'rotation': 0.0,
       });
+    }
+  }
+
+  Future<void> _fetchBrandColors() async {
+    try {
+      final int? pId = int.tryParse(widget.projectId);
+      if (pId == null) return;
+
+      final project = await ProjectRepo().getProjectById(pId);
+      if (project != null && project.globalStylesheet != null) {
+        final styleData = StylesheetService().parse(project.globalStylesheet);
+        if (mounted && styleData.colors.isNotEmpty) {
+          setState(() {
+            _brandColors = styleData.colors;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading brand colors: $e");
     }
   }
 
@@ -173,7 +197,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
             selectedColor: _selectedColor,
             strokeWidth: _strokeWidth,
             isEraser: _isEraser,
-            onClose: _saveAndCloseMagicDraw, // This saves the drawing!
+            brandColors: _brandColors, // PASS FETCHED COLORS HERE
+            onClose: _saveAndCloseMagicDraw,
             onColorChanged: (c) => setState(() => _selectedColor = c),
             onWidthChanged: (w) => setState(() => _strokeWidth = w),
             onEraserToggle: (e) => setState(() => _isEraser = e),

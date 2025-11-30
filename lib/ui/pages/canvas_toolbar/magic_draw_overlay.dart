@@ -11,6 +11,7 @@ class MagicDrawTools extends StatefulWidget {
   final Function(Color) onColorChanged;
   final Function(double) onWidthChanged;
   final Function(bool) onEraserToggle;
+  final List<Color> brandColors;
 
   const MagicDrawTools({
     super.key,
@@ -22,7 +23,9 @@ class MagicDrawTools extends StatefulWidget {
     required this.onColorChanged,
     required this.onWidthChanged,
     required this.onEraserToggle,
+    required this.brandColors,
   });
+  
 
   @override
   State<MagicDrawTools> createState() => _MagicDrawToolsState();
@@ -31,13 +34,22 @@ class MagicDrawTools extends StatefulWidget {
 class _MagicDrawToolsState extends State<MagicDrawTools> {
   bool _showStrokeSlider = false;
 
+  // 1. Initialize recent colors here so they persist
+  final List<Color> _recentColors = [
+    Colors.blue,
+    Colors.purple,
+    const Color(0xFFD81B60),
+    Colors.pinkAccent,
+    Colors.amber,
+  ];
+
   @override
   Widget build(BuildContext context) {
     if (!widget.isActive) return const SizedBox.shrink();
 
     return Stack(
       children: [
-        // 1. Close Button (Top Left - Safe Area)
+        // 1. Close Button
         Positioned(
           top: 0,
           left: 16,
@@ -57,8 +69,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
           ),
         ),
 
-        // 2. Floating Tools UI (Bottom)
-        // MOVED UP: Changed bottom from 100 to 140
+        // 2. Floating Tools UI
         Positioned(
           bottom: 140,
           left: 16,
@@ -274,7 +285,10 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
       builder: (context) {
         return _AdvancedColorPickerSheet(
           initialColor: widget.selectedColor,
+          // 2. Pass the persistent list to the sheet
+          recentColors: _recentColors,
           onColorChanged: widget.onColorChanged,
+          brandColors: widget.brandColors,
         );
       },
     );
@@ -309,10 +323,15 @@ class _TaperedSliderPainter extends CustomPainter {
 class _AdvancedColorPickerSheet extends StatefulWidget {
   final Color initialColor;
   final ValueChanged<Color> onColorChanged;
+  // 3. Accept the list as a parameter
+  final List<Color> recentColors;
+  final List<Color> brandColors;
 
   const _AdvancedColorPickerSheet({
     required this.initialColor,
     required this.onColorChanged,
+    required this.recentColors,
+    required this.brandColors,
   });
 
   @override
@@ -325,38 +344,53 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
   late TabController _tabController;
   late Color _currentColor;
 
-  // Dummy Brand Palette (Simulating StyleSheet Fetch)
-  final List<Color> _brandPalette = [
-    Colors.blue,
-    const Color(0xFFCCFF00), // Neon Lime
-    Colors.purpleAccent,
-    const Color(0xFFF0F0F0), // Off White
-    Colors.black,
-  ];
+  final TextEditingController _rController = TextEditingController();
+  final TextEditingController _gController = TextEditingController();
+  final TextEditingController _bController = TextEditingController();
 
-  final List<Color> _recentColors = [
-    Colors.blue,
-    Colors.purple,
-    const Color(0xFFD81B60),
-    Colors.pinkAccent,
-    Colors.amber,
-  ];
+  late List<Color> _brandPalette;
 
   @override
   void initState() {
     super.initState();
     _currentColor = widget.initialColor;
     _tabController = TabController(length: 3, vsync: this);
+    _brandPalette = widget.brandColors; // <-- load actual brand colors
+    _updateControllers();
+  }
+
+
+  void _updateControllers() {
+    _rController.text = _currentColor.red.toString();
+    _gController.text = _currentColor.green.toString();
+    _bController.text = _currentColor.blue.toString();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _rController.dispose();
+    _gController.dispose();
+    _bController.dispose();
     super.dispose();
   }
 
   void _updateColor(Color color) {
-    setState(() => _currentColor = color);
+    setState(() {
+      _currentColor = color;
+
+      // 4. Update the recent colors list logic
+      // Remove if exists to avoid duplicates
+      widget.recentColors.removeWhere((c) => c.value == color.value);
+      // Insert at front
+      widget.recentColors.insert(0, color);
+      // Limit to 5 items
+      if (widget.recentColors.length > 5) {
+        widget.recentColors.removeLast();
+      }
+
+      _updateControllers();
+    });
     widget.onColorChanged(color);
   }
 
@@ -366,14 +400,15 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            // --- HEADER ---
-            const SizedBox(height: 8),
-            Container(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // --- HEADER HANDLE ---
+          const SizedBox(height: 12),
+          Center(
+            child: Container(
               width: 40,
               height: 4,
               decoration: BoxDecoration(
@@ -381,161 +416,241 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 16),
 
-            // --- TABS ---
-            TabBar(
-              controller: _tabController,
-              labelColor: Colors.black,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: Colors.black,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-              tabs: const [
-                Tab(text: 'Grid'),
-                Tab(text: 'Spectrum'),
-                Tab(text: 'Sliders'),
+          // --- TABS ---
+          TabBar(
+            controller: _tabController,
+            labelColor: Colors.black,
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: Colors.black,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+            tabs: const [
+              Tab(text: 'Grid'),
+              Tab(text: 'Spectrum'),
+              Tab(text: 'Sliders'),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // --- HEX / HEADER ROW ---
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        "Hex",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: _currentColor,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      "#${_currentColor.value.toRadixString(16).toUpperCase().substring(2)}",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.colorize, size: 20, color: Colors.black54),
               ],
             ),
+          ),
 
-            const SizedBox(height: 16),
+          const SizedBox(height: 16),
+          const Divider(height: 1),
 
-            // --- HEX Preview ---
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      children: const [
-                        Text("Hex", style: TextStyle(fontSize: 12)),
-                        Icon(Icons.arrow_drop_down, size: 16),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: _currentColor,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        "#${_currentColor.value.toRadixString(16).toUpperCase().substring(2)}",
-                        style: const TextStyle(fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.edit, size: 18, color: Colors.grey),
-                ],
-              ),
+          // --- MAIN CONTENT AREA ---
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildGridTab(),
+                _buildSpectrumTab(),
+                _buildSlidersTab(),
+              ],
             ),
+          ),
 
-            const SizedBox(height: 16),
-
-            // --- TAB VIEWS ---
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                physics:
-                    const NeverScrollableScrollPhysics(), // Prevent swipe conflict
-                children: [
-                  _buildGridTab(),
-                  _buildSpectrumTab(),
-                  _buildSlidersTab(),
-                ],
-              ),
-            ),
-
-            // --- SHARED FOOTER (Recently Used, Brand, Gradients) ---
-            _buildSharedFooter(),
-          ],
-        ),
+          // --- FOOTER ---
+          _buildSharedFooter(),
+        ],
       ),
     );
   }
 
+  // --- HELPER: Generate colors to match the image style ---
+  List<Color> _generateColorGrid() {
+    List<Color> colors = [];
+
+    // 1. Top Row: Grayscale (White -> Black)
+    for (int i = 0; i < 9; i++) {
+      double lightness = 1.0 - (i / 8); // 1.0 to 0.0
+      colors.add(HSLColor.fromAHSL(1.0, 0.0, 0.0, lightness).toColor());
+    }
+
+    // 2. Main Grid: Hues (Columns) x Shades (Rows)
+    final int hueSteps = 9; // Columns
+    final int shadeSteps = 7; // Rows excluding grayscale
+
+    for (int shade = 0; shade < shadeSteps; shade++) {
+      for (int hueStep = 0; hueStep < hueSteps; hueStep++) {
+        double hue = (hueStep / hueSteps) * 360;
+        double saturation = 0.5 + (shade / shadeSteps) * 0.5;
+        double lightness = 0.8 - (shade / shadeSteps) * 0.5;
+
+        colors.add(
+          HSLColor.fromAHSL(1.0, hue, saturation, lightness).toColor(),
+        );
+      }
+    }
+    return colors;
+  }
+
   // --- TAB 1: GRID ---
   Widget _buildGridTab() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: GridView.builder(
-                physics: const BouncingScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 10,
-                  crossAxisSpacing: 2,
-                  mainAxisSpacing: 2,
-                ),
-                itemCount: 100,
-                itemBuilder: (context, index) {
-                  // Generate a varied color grid
-                  final double hue = (index % 10) * 36.0;
-                  final double saturation = ((index ~/ 10) + 1) / 10.0;
-                  final color =
-                      HSVColor.fromAHSV(1.0, hue, saturation, 0.9).toColor();
+    final gridColors = _generateColorGrid();
 
-                  return GestureDetector(
-                    onTap: () => _updateColor(color),
-                    child: Container(color: color),
-                  );
-                },
+    return Column(
+      children: [
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: GridView.builder(
+              physics: const BouncingScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 9,
+                crossAxisSpacing: 0,
+                mainAxisSpacing: 0,
+                childAspectRatio: 1.0,
               ),
+              itemCount: gridColors.length,
+              itemBuilder: (context, index) {
+                final color = gridColors[index];
+                final isSelected = _currentColor.value == color.value;
+
+                return GestureDetector(
+                  onTap: () => _updateColor(color),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: color,
+                          border: Border.all(
+                            color: Colors.black.withOpacity(0.05),
+                            width: 0.5,
+                          ),
+                        ),
+                      ),
+                      if (isSelected)
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
-          const SizedBox(height: 10),
-          _buildHueSlider(),
-          _buildOpacitySlider(),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   // --- TAB 2: SPECTRUM ---
   Widget _buildSpectrumTab() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          Expanded(
-            child: ColorPicker(
-              pickerColor: _currentColor,
-              onColorChanged: _updateColor,
-              enableAlpha: false,
-              displayThumbColor: true,
-              paletteType: PaletteType.hsvWithHue,
-              labelTypes: const [], // Hide default text inputs
-              pickerAreaHeightPercent: 0.8,
-              pickerAreaBorderRadius: BorderRadius.circular(12),
-              // We hide standard sliders to use our custom ones to match design
+      padding: const EdgeInsets.all(20),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxHeight < 150) {
+            return const Center(child: Text("Rotate device"));
+          }
+          return SizedBox(
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: ColorPicker(
+                pickerColor: _currentColor,
+                onColorChanged: _updateColor,
+                enableAlpha: false,
+                labelTypes: const [],
+                displayThumbColor: true,
+                paletteType: PaletteType.hsvWithHue,
+                pickerAreaHeightPercent: 0.8,
+                hexInputBar: false,
+              ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -543,250 +658,186 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
   // --- TAB 3: SLIDERS ---
   Widget _buildSlidersTab() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          _buildRGBSlider("R", Colors.red, _currentColor.red, (v) {
-            _updateColor(_currentColor.withRed(v.toInt()));
-          }),
-          _buildRGBSlider("G", Colors.green, _currentColor.green, (v) {
-            _updateColor(_currentColor.withGreen(v.toInt()));
-          }),
-          _buildRGBSlider("B", Colors.blue, _currentColor.blue, (v) {
-            _updateColor(_currentColor.withBlue(v.toInt()));
-          }),
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildSingleRGBSlider("Red", Colors.red, _currentColor.red, (v) {
+              _updateColor(_currentColor.withRed(v.toInt()));
+            }),
+            const SizedBox(height: 24),
+            _buildSingleRGBSlider("Green", Colors.green, _currentColor.green, (
+              v,
+            ) {
+              _updateColor(_currentColor.withGreen(v.toInt()));
+            }),
+            const SizedBox(height: 24),
+            _buildSingleRGBSlider("Blue", Colors.blue, _currentColor.blue, (v) {
+              _updateColor(_currentColor.withBlue(v.toInt()));
+            }),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildRGBSlider(
+  Widget _buildSingleRGBSlider(
     String label,
     Color activeColor,
     int value,
     ValueChanged<double> onChanged,
   ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: SizedBox(
-              height: 36,
-              child: SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 36,
-                  activeTrackColor: activeColor,
-                  inactiveTrackColor: activeColor.withOpacity(0.2),
-                  thumbColor:
-                      Colors.transparent, // Hide knob, make it look like a bar
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 0,
-                  ),
-                  overlayShape: SliderComponentShape.noOverlay,
-                  trackShape: const RectangularSliderTrackShape(),
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 30,
+            child: SliderTheme(
+              data: SliderThemeData(
+                trackHeight: 6,
+                activeTrackColor: activeColor,
+                inactiveTrackColor: activeColor.withOpacity(0.15),
+                thumbColor: Colors.white,
+                thumbShape: const RoundSliderThumbShape(
+                  enabledThumbRadius: 14,
+                  elevation: 4,
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Slider(
-                    value: value.toDouble(),
-                    min: 0,
-                    max: 255,
-                    onChanged: onChanged,
-                  ),
-                ),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 24),
+                trackShape: const RoundedRectSliderTrackShape(),
+              ),
+              child: Slider(
+                value: value.toDouble(),
+                min: 0,
+                max: 255,
+                onChanged: onChanged,
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Container(
-            width: 50,
-            padding: const EdgeInsets.all(8),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              "$value",
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+        ),
+        const SizedBox(width: 12),
+        Container(
+          width: 50,
+          height: 36,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
           ),
-        ],
-      ),
+          alignment: Alignment.center,
+          child: Text(
+            value.toString(),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+        ),
+      ],
     );
   }
 
-  // --- SHARED COMPONENTS ---
-
-  Widget _buildHueSlider() {
-    return SizedBox(
-      height: 15,
-      child: SliderTheme(
-        data: SliderThemeData(
-          trackHeight: 8,
-          trackShape: const RectangularSliderTrackShape(),
-          thumbShape: const RoundSliderThumbShape(
-            enabledThumbRadius: 10,
-            elevation: 2,
-          ),
-          thumbColor: Colors.white,
-          overlayShape: SliderComponentShape.noOverlay,
-        ),
-        child: ColorPicker(
-          pickerColor: _currentColor,
-          onColorChanged: _updateColor,
-          enableAlpha: false,
-          displayThumbColor: true,
-          paletteType: PaletteType.hsv,
-          labelTypes: const [],
-          pickerAreaHeightPercent: 0.0, // Only sliders
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOpacitySlider() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8.0),
-      child: SizedBox(
-        height: 15,
-        child: SliderTheme(
-          data: SliderThemeData(
-            trackHeight: 8,
-            thumbShape: const RoundSliderThumbShape(
-              enabledThumbRadius: 10,
-              elevation: 2,
-            ),
-            thumbColor: Colors.white,
-            overlayShape: SliderComponentShape.noOverlay,
-          ),
-          child: Slider(
-            value: 1.0,
-            onChanged: (v) {},
-            activeColor: Colors.blue,
-            inactiveColor: Colors.grey[300],
-          ),
-        ),
-      ),
-    );
-  }
-
+  // --- FOOTER ---
   Widget _buildSharedFooter() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Recently used",
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: _recentColors.map((c) => _buildColorCircle(c)).toList(),
-          ),
-          const SizedBox(height: 16),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Brand Palette",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Colors.grey.shade100)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Recently used",
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey,
               ),
-              Text(
-                "Edit",
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.blue[700],
-                  fontWeight: FontWeight.bold,
+            ),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children:
+                    // 5. Use the widget.recentColors list here
+                    widget.recentColors
+                        .map((c) => _buildColorCircle(c))
+                        .toList(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "Brand Palette",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.grey.shade300),
+                Text(
+                  "Edit",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.blue[700],
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                child: Icon(Icons.block, size: 16, color: Colors.red[300]),
+              ],
+            ),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildAddButton(),
+                  const SizedBox(width: 12),
+                  ..._brandPalette.map((c) => _buildColorCircle(c)).toList(),
+                ],
               ),
-              ..._brandPalette.map((c) => _buildColorCircle(c)).toList(),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.add, size: 18, color: Colors.black54),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          const Text(
-            "Gradients",
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _buildGradientCircle(Colors.black, Colors.white),
-              _buildGradientCircle(Colors.grey, Colors.black),
-              _buildGradientCircle(Colors.white, Colors.grey),
-              _buildGradientCircle(Colors.black, Colors.grey),
-              const SizedBox(width: 8),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.tune, size: 16, color: Colors.black54),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildColorCircle(Color color) {
-    return Container(
-      width: 32,
-      height: 32,
-      margin: const EdgeInsets.only(right: 12),
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+    return GestureDetector(
+      onTap: () => _updateColor(color),
+      child: Container(
+        width: 36,
+        height: 36,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.grey.shade200, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildGradientCircle(Color c1, Color c2) {
+  Widget _buildAddButton() {
     return Container(
-      width: 32,
-      height: 32,
-      margin: const EdgeInsets.only(right: 12),
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
+        color: Colors.grey[100],
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [c1, c2],
-        ),
+        border: Border.all(color: Colors.grey.shade300),
       ),
+      child: const Icon(Icons.add, size: 20, color: Colors.black54),
     );
   }
 }

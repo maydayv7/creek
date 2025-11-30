@@ -59,11 +59,11 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
   }
 
   Future<void> _handleFinish() async {
-    // 1. Basic Validation - only Project Name is required
+    // 1. Basic Validation
     if (_projectNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Project name is required.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Project name is required.')),
+      );
       return;
     }
 
@@ -72,31 +72,19 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
     });
 
     try {
-      // 2. Prepare the data
-      final brandData = {
-        'description': _descriptionController.text.trim(),
-        'problem': _problemController.text.trim(),
-        'goal': _goalController.text.trim(),
-        'keywords': _keywords,
-        'competitors': _competitorBrands.map((b) => b['name']).toList(),
-        'appear': _whereWillAppearController.text.trim(),
-      };
+      // 2. Prepare data
+      final String title = _projectNameController.text.trim();
+      final String description = _descriptionController.text.trim();
 
-      // 3. Call the Service
-      debugPrint('BrandData: $brandData');
-      await _projectService.createProject(
-        _projectNameController.text.trim().isEmpty
-            ? 'Untitled Project'
-            : _projectNameController.text.trim(),
-        description:
-            _descriptionController.text.trim().isEmpty
-                ? null
-                : _descriptionController.text.trim(),
+      // 3. Call the Service and capture the NEW ID
+      final int newId = await _projectService.createProject(
+        title,
+        description: description.isEmpty ? null : description,
       );
 
-      // 4. Success Handling
+      // 4. Success Handling - Return the ID and Title map
       if (mounted) {
-        Navigator.pop(context, true);
+        Navigator.pop(context, {'id': newId, 'title': title});
       }
     } catch (e) {
       // 5. Error Handling
