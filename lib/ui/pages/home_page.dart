@@ -222,35 +222,46 @@ class _HomePageState extends State<HomePage> {
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.grey[800] : Colors.grey[200],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: TextField(
-                              decoration: InputDecoration(
-                                hintText: 'Search',
-                                hintStyle: TextStyle(
-                                  fontSize: 12,
-                                  color: theme.colorScheme.onSurface.withOpacity(0.5),
-                                  fontFamily: 'GeneralSans',
-                                ),
-                                prefixIcon: Icon(
-                                  Icons.search,
-                                  size: 18,
-                                  color: theme.colorScheme.onSurface.withOpacity(0.5),
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                              ),
-                              style: TextStyle(
+                          child: TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Search',
+                              hintStyle: TextStyle(
                                 fontSize: 12,
+                                color: theme.colorScheme.onSurface.withOpacity(0.5),
                                 fontFamily: 'GeneralSans',
-                                color: theme.colorScheme.onSurface,
                               ),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                size: 18,
+                                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                              ),
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 50,
+                                minHeight: 18,
+                              ),
+                              filled: true,
+                              fillColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontFamily: 'GeneralSans',
+                              color: theme.colorScheme.onSurface,
                             ),
                           ),
                         ),
