@@ -4,8 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/file_model.dart';
 import '../../services/file_service.dart';
-import '../widgets/bottom_bar.dart'; // Import BottomBar
+import '../widgets/bottom_bar.dart';
 import 'create_file_page.dart';
+import 'canvas_board_page.dart'; // [IMPORTANT] Import this to open the canvas
 
 class ProjectFilePage extends StatefulWidget {
   final int projectId;
@@ -41,9 +42,47 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
       }
     } catch (e) {
       debugPrint('Error loading files: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- ACTIONS ---
+
+  void _navigateToCreateFile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => CreateFilePage(
+              // Pass the current projectId so the file is saved to THIS project
+              projectId: widget.projectId,
+            ),
+      ),
+    ).then((_) => _loadData());
+  }
+
+  void _openFile(FileModel file) {
+    // Check if it's a Canvas file (JSON)
+    if (file.filePath.toLowerCase().endsWith('.json')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => CanvasBoardPage(
+                projectId: widget.projectId,
+                // Use default dimensions for viewing; the canvas content defines the actual size
+                width: 1080,
+                height: 1920,
+                existingFile: file, // [KEY FIX] Loads the saved canvas
+              ),
+        ),
+      ).then((_) => _loadData());
+    } else {
+      // It's a regular image
+      // You can add navigation to an Image Viewer page here if you have one
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Image preview coming soon")),
+      );
     }
   }
 
@@ -179,17 +218,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     }
   }
 
-  void _navigateToCreateFile() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        // Passing no file implies a "Blank Canvas"
-        // Pass projectId so CreateFilePage knows we are in a specific project context
-        builder: (_) => CreateFilePage(projectId: widget.projectId),
-      ),
-    ).then((_) => _loadData());
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -208,7 +236,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
           ),
         ],
       ),
-      // Added BottomBar here
       bottomNavigationBar: BottomBar(
         currentTab: BottomBarItem.files,
         projectId: widget.projectId,
@@ -235,8 +262,8 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                           Text(
                             "${_files.length} items",
                             style: TextStyle(
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: 0.6,
+                              color: theme.colorScheme.onSurface.withOpacity(
+                                0.6,
                               ),
                               fontFamily: 'GeneralSans',
                             ),
@@ -301,125 +328,132 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
 
   Widget _buildFileCard(FileModel file, ThemeData theme, bool isDark) {
     final dateStr = DateFormat.yMMMd().format(file.lastUpdated);
+    final isCanvas = file.filePath.toLowerCase().endsWith('.json');
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return InkWell(
+      onTap: () => _openFile(file), // [KEY FIX] Make the card clickable
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[850] : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
           ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icon based on type
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: (isCanvas
+                            ? Colors.orange
+                            : theme.colorScheme.primary)
+                        .withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    isCanvas ? Icons.brush : Icons.insert_drive_file,
+                    color: isCanvas ? Colors.orange : theme.colorScheme.primary,
+                  ),
                 ),
-                child: Icon(
-                  Icons.insert_drive_file,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      file.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'GeneralSans',
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Updated $dateStr",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.5,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        file.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'GeneralSans',
                         ),
-                        fontFamily: 'GeneralSans',
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                onSelected: (value) {
-                  if (value == 'delete') {
-                    _deleteFile(file.id);
-                  } else if (value == 'open') {
-                    _fileService.openFile(file.id);
-                  }
-                },
-                itemBuilder:
-                    (context) => [
-                      const PopupMenuItem(value: 'open', child: Text("Open")),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text(
-                          "Delete",
-                          style: TextStyle(color: Colors.red),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Updated $dateStr",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          fontFamily: 'GeneralSans',
                         ),
                       ),
                     ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    if (value == 'delete') {
+                      _deleteFile(file.id);
+                    } else if (value == 'open') {
+                      _openFile(file);
+                    }
+                  },
+                  itemBuilder:
+                      (context) => [
+                        const PopupMenuItem(value: 'open', child: Text("Open")),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text(
+                            "Delete",
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                ),
+              ],
+            ),
+            if (file.description != null && file.description!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                file.description!,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  fontFamily: 'GeneralSans',
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
-          ),
-          if (file.description != null && file.description!.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              file.description!,
-              style: TextStyle(
-                fontSize: 13,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                fontFamily: 'GeneralSans',
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-          if (file.tags.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children:
-                  file.tags
-                      .map(
-                        (tag) => Chip(
-                          label: Text(
-                            tag,
-                            style: const TextStyle(fontSize: 10),
+            if (file.tags.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children:
+                    file.tags
+                        .map(
+                          (tag) => Chip(
+                            label: Text(
+                              tag,
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
                           ),
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      )
-                      .toList(),
-            ),
+                        )
+                        .toList(),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

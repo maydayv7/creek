@@ -1,7 +1,11 @@
 import 'dart:io';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:undo/undo.dart';
@@ -10,11 +14,24 @@ import './canvas_toolbar/text_tools_overlay.dart';
 import '../../data/repos/project_repo.dart';
 import '../../services/stylesheet_service.dart';
 
-// --- MODELS ---
+import '../../services/file_service.dart';
+import '../../data/models/file_model.dart';
+
+// --- MODELS WITH JSON SUPPORT ---
+
 class DrawingPoint {
   final Offset offset;
   final Paint paint;
   const DrawingPoint({required this.offset, required this.paint});
+
+  Map<String, dynamic> toMap() => {'dx': offset.dx, 'dy': offset.dy};
+
+  factory DrawingPoint.fromMap(Map<String, dynamic> map) {
+    return DrawingPoint(
+      offset: Offset(map['dx'] ?? 0, map['dy'] ?? 0),
+      paint: Paint(),
+    );
+  }
 }
 
 class DrawingPath {
@@ -22,12 +39,32 @@ class DrawingPath {
   final Color color;
   final double strokeWidth;
   final bool isEraser;
+
   DrawingPath({
     required this.points,
     required this.color,
     required this.strokeWidth,
     required this.isEraser,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'points': points.map((p) => p.toMap()).toList(),
+      'color': color.value,
+      'strokeWidth': strokeWidth,
+      'isEraser': isEraser,
+    };
+  }
+
+  factory DrawingPath.fromMap(Map<String, dynamic> map) {
+    return DrawingPath(
+      points:
+          (map['points'] as List).map((p) => DrawingPoint.fromMap(p)).toList(),
+      color: Color(map['color']),
+      strokeWidth: (map['strokeWidth'] as num).toDouble(),
+      isEraser: map['isEraser'] ?? false,
+    );
+  }
 }
 
 // Helper to snapshot the entire canvas state for undo/redo
@@ -38,16 +75,19 @@ class CanvasState {
 }
 
 class CanvasBoardPage extends StatefulWidget {
-  final String projectId;
+  final int projectId;
   final double width;
   final double height;
   final File? initialImage;
+  final FileModel? existingFile;
+
   const CanvasBoardPage({
     super.key,
     required this.projectId,
     required this.width,
     required this.height,
     this.initialImage,
+    this.existingFile,
   });
 
   @override
@@ -55,12 +95,15 @@ class CanvasBoardPage extends StatefulWidget {
 }
 
 class _CanvasBoardPageState extends State<CanvasBoardPage> {
-  // --- STATE ---
+  // --- SERVICES ---
+  final FileService _fileService = FileService();
   final ChangeStack _changeStack = ChangeStack();
   final ImagePicker _picker = ImagePicker();
 
+  // --- STATE ---
+  bool _hasUnsavedChanges = false;
   List<Map<String, dynamic>> elements = [];
-  List<DrawingPath> _paths = [];
+  List<DrawingPath> _paths = []; // Keeps drawing strokes live
 
   // Snapshots for undo grouping
   CanvasState? _gestureStartSnapshot;
@@ -94,10 +137,11 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   void initState() {
     super.initState();
     _canvasSize = Size(widget.width, widget.height);
-
     _fetchBrandColors();
 
-    if (widget.initialImage != null) {
+    if (widget.existingFile != null) {
+      _loadCanvasFromFile();
+    } else if (widget.initialImage != null) {
       elements.add({
         'id': 'bg_${DateTime.now().millisecondsSinceEpoch}',
         'type': 'file_image',
@@ -106,6 +150,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         'size': Size(widget.width, widget.height),
         'rotation': 0.0,
       });
+      _hasUnsavedChanges = true;
     }
   }
 
@@ -119,7 +164,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 
   Future<void> _fetchBrandColors() async {
     try {
-      final int? pId = int.tryParse(widget.projectId);
+      final int? pId = widget.projectId;
       if (pId == null) return;
 
       final project = await ProjectRepo().getProjectById(pId);
@@ -138,9 +183,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 
   // --- UNDO/REDO ---
 
-  // Robust undo function: call this AFTER a change is made, passing the OLD state
   void _recordChange(CanvasState oldState) {
-    // Capture NEW state
     final newState = CanvasState(
       _deepCopyElements(elements),
       List.from(_paths),
@@ -154,6 +197,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
           setState(() {
             elements = _deepCopyElements(newState.elements);
             _paths = List.from(newState.paths);
+            _hasUnsavedChanges = true;
           });
         },
         (val) {
@@ -161,10 +205,12 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
           setState(() {
             elements = _deepCopyElements(val.elements);
             _paths = List.from(val.paths);
+            _hasUnsavedChanges = true;
           });
         },
       ),
     );
+    setState(() => _hasUnsavedChanges = true);
   }
 
   CanvasState _getCurrentState() {
@@ -187,7 +233,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   void _addTextElement() {
     final oldState = _getCurrentState();
     final id = 'text_${DateTime.now().millisecondsSinceEpoch}';
-
     final double defaultFontSize = (_canvasSize.width / 25).clamp(24.0, 96.0);
     final initialPos = Offset(
       _canvasSize.width / 2 - 150,
@@ -297,6 +342,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       elements[index]['position'] = newPos;
       elements[index]['size'] = newSize;
       elements[index]['rotation'] = newRotation;
+      _hasUnsavedChanges = true;
     });
   }
 
@@ -307,7 +353,204 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     }
   }
 
-  // --- BUILD ---
+  // ===========================================================================
+  //  SAVE & LOAD LOGIC
+  // ===========================================================================
+
+  void _handleBackNavigation() {
+    // If in magic draw mode, just close tool first
+    if (_isMagicDrawActive) {
+      _saveAndCloseMagicDraw();
+      return;
+    }
+
+    if (!_hasUnsavedChanges && widget.existingFile != null) {
+      Navigator.pop(context);
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("Save Changes?"),
+            content: const Text(
+              "Do you want to save your canvas before leaving?",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Leave page
+                },
+                child: const Text(
+                  "Discard",
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(context); // Close dialog
+                  await _saveCanvas(); // Save
+                  if (mounted) Navigator.pop(context); // Leave page
+                },
+                child: const Text("Save"),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<String?> _showNameDialog() async {
+    TextEditingController nameController = TextEditingController(
+      text: "Untitled Canvas",
+    );
+    return showDialog<String>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text("Save Canvas"),
+            content: TextField(
+              controller: nameController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: "Canvas Name",
+                hintText: "Enter a name for your file",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Cancel"),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, nameController.text.trim()),
+                child: const Text("Save"),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _saveCanvas() async {
+    try {
+      String fileName = "Canvas ${DateTime.now().toString().split(' ')[0]}";
+
+      // 1. IF NEW FILE: Ask user for name
+      if (widget.existingFile == null) {
+        final userFileName = await _showNameDialog();
+        if (userFileName == null || userFileName.isEmpty) return; // Cancelled
+        fileName = userFileName;
+      }
+
+      // 2. Serialize Elements AND Paths (Drawing) to JSON
+      final jsonList = _elementsToJson(elements);
+      final pathsJson = _paths.map((p) => p.toMap()).toList();
+      final saveData = {'elements': jsonList, 'paths': pathsJson};
+      final jsonString = jsonEncode(saveData);
+
+      final directory = await getTemporaryDirectory();
+      final tempFile = File(
+        '${directory.path}/canvas_temp_${DateTime.now().millisecondsSinceEpoch}.json',
+      );
+      await tempFile.writeAsString(jsonString);
+
+      if (widget.existingFile != null) {
+        // Overwrite existing file
+        final existingFile = File(widget.existingFile!.filePath);
+        await existingFile.writeAsString(jsonString);
+        await _fileService.openFile(widget.existingFile!.id);
+      } else {
+        // Save as new file
+        await _fileService.saveFile(
+          tempFile,
+          widget.projectId,
+          name: fileName,
+          description: "Editable Canvas Board",
+        );
+      }
+
+      if (await tempFile.exists()) await tempFile.delete();
+
+      setState(() => _hasUnsavedChanges = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Canvas Saved Successfully")),
+        );
+      }
+    } catch (e) {
+      debugPrint("Save Error: $e");
+    }
+  }
+
+  Future<void> _loadCanvasFromFile() async {
+    try {
+      final file = File(widget.existingFile!.filePath);
+      if (await file.exists()) {
+        final jsonString = await file.readAsString();
+        final dynamic decoded = jsonDecode(jsonString);
+
+        setState(() {
+          if (decoded is List) {
+            // Legacy support (older files with just elements)
+            elements = _jsonToElements(decoded);
+            _paths = [];
+          } else {
+            // New support (Elements + Paths)
+            elements = _jsonToElements(decoded['elements']);
+            _paths =
+                (decoded['paths'] as List)
+                    .map((p) => DrawingPath.fromMap(p))
+                    .toList();
+          }
+          _hasUnsavedChanges = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading canvas: $e");
+    }
+  }
+
+  List<Map<String, dynamic>> _elementsToJson(
+    List<Map<String, dynamic>> elements,
+  ) {
+    return elements.map((e) {
+      final copy = Map<String, dynamic>.from(e);
+      if (e['position'] is Offset) {
+        copy['position'] = {
+          'dx': (e['position'] as Offset).dx,
+          'dy': (e['position'] as Offset).dy,
+        };
+      }
+      if (e['size'] is Size) {
+        copy['size'] = {
+          'width': (e['size'] as Size).width,
+          'height': (e['size'] as Size).height,
+        };
+      }
+      return copy;
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _jsonToElements(List<dynamic> jsonList) {
+    return jsonList.map((item) {
+      final e = Map<String, dynamic>.from(item);
+      if (e['position'] is Map) {
+        e['position'] = Offset(e['position']['dx'], e['position']['dy']);
+      }
+      if (e['size'] is Map) {
+        e['size'] = Size(e['size']['width'], e['size']['height']);
+      }
+      e['rotation'] = (e['rotation'] as num).toDouble();
+      return e;
+    }).toList();
+  }
+
+  // ===========================================================================
+  //  UI BUILDER
+  // ===========================================================================
 
   @override
   Widget build(BuildContext context) {
@@ -320,242 +563,248 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         selectedEl != null && selectedEl['type'] == 'text';
     final bool showTextOverlay = _isTextToolsActive || isTextSelected;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFE0E0E0),
-      appBar: _buildAppBar(),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (!_hasInitializedView) {
-            _hasInitializedView = true;
-            final double scaleX =
-                (constraints.maxWidth - 40) / _canvasSize.width;
-            final double scaleY =
-                (constraints.maxHeight - 40) / _canvasSize.height;
-            final double initialScale = math
-                .min(scaleX, scaleY)
-                .clamp(0.01, 1.0);
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        _handleBackNavigation();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFE0E0E0),
+        appBar: _buildAppBar(),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            if (!_hasInitializedView) {
+              _hasInitializedView = true;
+              final double scaleX =
+                  (constraints.maxWidth - 40) / _canvasSize.width;
+              final double scaleY =
+                  (constraints.maxHeight - 40) / _canvasSize.height;
+              final double initialScale = math
+                  .min(scaleX, scaleY)
+                  .clamp(0.01, 1.0);
 
-            final double transX =
-                (constraints.maxWidth - (_canvasSize.width * initialScale)) / 2;
-            final double transY =
-                (constraints.maxHeight - (_canvasSize.height * initialScale)) /
-                2;
+              final double transX =
+                  (constraints.maxWidth - (_canvasSize.width * initialScale)) /
+                  2;
+              final double transY =
+                  (constraints.maxHeight -
+                      (_canvasSize.height * initialScale)) /
+                  2;
 
-            _transformationController.value =
-                Matrix4.identity()
-                  ..translate(transX, transY)
-                  ..scale(initialScale);
-          }
+              _transformationController.value =
+                  Matrix4.identity()
+                    ..translate(transX, transY)
+                    ..scale(initialScale);
+            }
 
-          return Stack(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  if (!_isMagicDrawActive) {
-                    _exitEditMode();
-                    setState(() => selectedId = null);
-                  }
-                },
-                behavior: HitTestBehavior.translucent,
-                child: InteractiveViewer(
-                  transformationController: _transformationController,
-                  constrained: false,
-                  boundaryMargin: const EdgeInsets.all(double.infinity),
-                  minScale: 0.01,
-                  maxScale: 10.0,
-                  scaleEnabled: !_isMagicDrawActive,
-                  panEnabled: !_isMagicDrawActive,
-                  child: SizedBox(
-                    width: _canvasSize.width,
-                    height: _canvasSize.height,
-                    child: Stack(
-                      children: [
-                        // Background
-                        Container(
-                          width: double.infinity,
-                          height: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
-                                blurRadius: 40,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
+            return Stack(
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    if (!_isMagicDrawActive) {
+                      _exitEditMode();
+                      setState(() => selectedId = null);
+                    }
+                  },
+                  behavior: HitTestBehavior.translucent,
+                  child: InteractiveViewer(
+                    transformationController: _transformationController,
+                    constrained: false,
+                    boundaryMargin: const EdgeInsets.all(double.infinity),
+                    minScale: 0.01,
+                    maxScale: 10.0,
+                    scaleEnabled: !_isMagicDrawActive,
+                    panEnabled: !_isMagicDrawActive,
+                    child: SizedBox(
+                      width: _canvasSize.width,
+                      height: _canvasSize.height,
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            height: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.15),
+                                  blurRadius: 40,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-
-                        // Elements
-                        ...elements.map((e) {
-                          final bool isSelected = selectedId == e['id'];
-                          return _ManipulatingBox(
-                            key: ValueKey(e['id']),
-                            id: e['id'],
-                            position: e['position'],
-                            size: e['size'],
-                            rotation: e['rotation'],
-                            type: e['type'],
-                            content: e['content'],
-                            styleData: e,
-                            isSelected: isSelected && !_isMagicDrawActive,
-                            isEditing:
-                                isSelected &&
-                                _isEditingText &&
-                                e['type'] == 'text',
-                            viewScale:
-                                _transformationController.value
-                                    .getMaxScaleOnAxis(),
-                            onTap: () {
-                              if (!_isMagicDrawActive) {
-                                if (_isEditingText && selectedId != e['id']) {
-                                  _exitEditMode();
+                          ...elements.map((e) {
+                            final bool isSelected = selectedId == e['id'];
+                            return _ManipulatingBox(
+                              key: ValueKey(e['id']),
+                              id: e['id'],
+                              position: e['position'],
+                              size: e['size'],
+                              rotation: e['rotation'],
+                              type: e['type'],
+                              content: e['content'],
+                              styleData: e,
+                              isSelected: isSelected && !_isMagicDrawActive,
+                              isEditing:
+                                  isSelected &&
+                                  _isEditingText &&
+                                  e['type'] == 'text',
+                              viewScale:
+                                  _transformationController.value
+                                      .getMaxScaleOnAxis(),
+                              onTap: () {
+                                if (!_isMagicDrawActive) {
+                                  if (_isEditingText && selectedId != e['id'])
+                                    _exitEditMode();
+                                  setState(() {
+                                    selectedId = e['id'];
+                                    if (e['type'] == 'text')
+                                      _isTextToolsActive = true;
+                                  });
+                                  setState(() {
+                                    // Bring to front
+                                    elements.remove(e);
+                                    elements.add(e);
+                                  });
                                 }
-                                setState(() {
-                                  selectedId = e['id'];
-                                  if (e['type'] == 'text') {
-                                    _isTextToolsActive = true;
+                              },
+                              onDoubleTap: () {
+                                if (e['type'] == 'text') _enterEditMode(e);
+                              },
+                              onDragStart: _handleGestureStart,
+                              onUpdate:
+                                  (newPos, newSize, newRot) =>
+                                      _handleElementUpdate(
+                                        e['id'],
+                                        newPos,
+                                        newSize,
+                                        newRot,
+                                      ),
+                              onDragEnd: (newPos, newSize, newRot) {
+                                _handleElementUpdate(
+                                  e['id'],
+                                  newPos,
+                                  newSize,
+                                  newRot,
+                                );
+                                _handleGestureEnd();
+                              },
+                              textController:
+                                  isSelected ? _textEditingController : null,
+                              focusNode: isSelected ? _textFocusNode : null,
+                              transformationController:
+                                  _transformationController,
+                            );
+                          }),
+                          // Drawing Layer - Always Visible (ignoring touches when not active)
+                          IgnorePointer(
+                            ignoring: !_isMagicDrawActive,
+                            child: RepaintBoundary(
+                              key: _drawingKey,
+                              child: GestureDetector(
+                                onPanStart: (_) {
+                                  _gestureStartSnapshot = _getCurrentState();
+                                },
+                                onPanUpdate: _onPanUpdate,
+                                onPanEnd: (details) {
+                                  _onPanEnd(details);
+                                  if (_gestureStartSnapshot != null) {
+                                    _recordChange(_gestureStartSnapshot!);
+                                    _gestureStartSnapshot = null;
                                   }
-                                });
-                                setState(() {
-                                  elements.remove(e);
-                                  elements.add(e);
-                                });
-                              }
-                            },
-                            onDoubleTap: () {
-                              if (e['type'] == 'text') _enterEditMode(e);
-                            },
-                            onDragStart: _handleGestureStart,
-                            onUpdate: (newPos, newSize, newRot) {
-                              _handleElementUpdate(
-                                e['id'],
-                                newPos,
-                                newSize,
-                                newRot,
-                              );
-                            },
-                            onDragEnd: (newPos, newSize, newRot) {
-                              _handleElementUpdate(
-                                e['id'],
-                                newPos,
-                                newSize,
-                                newRot,
-                              );
-                              _handleGestureEnd();
-                            },
-                            textController:
-                                isSelected ? _textEditingController : null,
-                            focusNode: isSelected ? _textFocusNode : null,
-                            transformationController: _transformationController,
-                          );
-                        }),
-
-                        // Drawing Layer
-                        IgnorePointer(
-                          ignoring: !_isMagicDrawActive,
-                          child: RepaintBoundary(
-                            key: _drawingKey,
-                            child: GestureDetector(
-                              onPanStart: (details) {
-                                _gestureStartSnapshot = _getCurrentState();
-                              },
-                              onPanUpdate: _onPanUpdate,
-                              onPanEnd: (details) {
-                                _onPanEnd(details);
-                                if (_gestureStartSnapshot != null) {
-                                  _recordChange(_gestureStartSnapshot!);
-                                  _gestureStartSnapshot = null;
-                                }
-                              },
-                              child: CustomPaint(
-                                size: Size.infinite,
-                                painter: CanvasPainter(
-                                  paths: _paths,
-                                  currentPoints: _currentPoints,
-                                  currentColor:
-                                      _isEraser
-                                          ? Colors.transparent
-                                          : _selectedColor,
-                                  currentWidth: _strokeWidth,
-                                  isEraser: _isEraser,
+                                },
+                                child: CustomPaint(
+                                  size: Size.infinite,
+                                  painter: CanvasPainter(
+                                    paths: _paths,
+                                    currentPoints: _currentPoints,
+                                    currentColor:
+                                        _isEraser
+                                            ? Colors.transparent
+                                            : _selectedColor,
+                                    currentWidth: _strokeWidth,
+                                    isEraser: _isEraser,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              MagicDrawTools(
-                isActive: _isMagicDrawActive,
-                selectedColor: _selectedColor,
-                strokeWidth: _strokeWidth,
-                isEraser: _isEraser,
-                brandColors: _brandColors,
-                onClose: _saveAndCloseMagicDraw,
-                onColorChanged: (c) => setState(() => _selectedColor = c),
-                onWidthChanged: (w) => setState(() => _strokeWidth = w),
-                onEraserToggle: (e) => setState(() => _isEraser = e),
-              ),
-
-              TextToolsOverlay(
-                isActive: showTextOverlay && !_isMagicDrawActive,
-                isTextSelected: isTextSelected,
-                currentColor: Color(
-                  selectedEl?['style_color'] ?? Colors.black.value,
+                MagicDrawTools(
+                  isActive: _isMagicDrawActive,
+                  selectedColor: _selectedColor,
+                  strokeWidth: _strokeWidth,
+                  isEraser: _isEraser,
+                  brandColors: _brandColors,
+                  onClose: _saveAndCloseMagicDraw,
+                  onColorChanged: (c) => setState(() => _selectedColor = c),
+                  onWidthChanged: (w) => setState(() => _strokeWidth = w),
+                  onEraserToggle: (e) => setState(() => _isEraser = e),
                 ),
-                currentFontSize:
-                    (selectedEl?['style_fontSize'] ?? 24.0) as double,
-                onClose: () {
-                  _exitEditMode();
-                  setState(() {
-                    _isTextToolsActive = false;
-                    selectedId = null;
-                  });
-                },
-                onAddText: _addTextElement,
-                onDelete: _deleteSelectedElement,
-                onColorChanged:
-                    (c) => _updateSelectedTextProperty('style_color', c.value),
-                onFontSizeChanged:
-                    (s) => _updateSelectedTextProperty('style_fontSize', s),
-              ),
 
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: CanvasBottomBar(
-                  activeItem:
-                      _isMagicDrawActive
-                          ? "Magic Draw"
-                          : (_isTextToolsActive ? "Text" : null),
-                  onMagicDraw:
-                      () => setState(() {
-                        _isMagicDrawActive = !_isMagicDrawActive;
-                        _isTextToolsActive = false;
-                        _exitEditMode();
-                      }),
-                  onMedia: _pickImageFromGallery,
-                  onStylesheet: () => _showComingSoon('Stylesheet'),
-                  onTools: () => _showComingSoon('Tools'),
-                  onText: _toggleTextTools,
-                  onSelect: () => _showComingSoon('Select'),
-                  onPlugins: () => _showComingSoon('Plugins'),
+                TextToolsOverlay(
+                  isActive: showTextOverlay && !_isMagicDrawActive,
+                  isTextSelected: isTextSelected,
+                  currentColor: Color(
+                    selectedEl?['style_color'] ?? Colors.black.value,
+                  ),
+                  currentFontSize:
+                      (selectedEl?['style_fontSize'] ?? 24.0) as double,
+                  onClose: () {
+                    _exitEditMode();
+                    setState(() {
+                      _isTextToolsActive = false;
+                      selectedId = null;
+                    });
+                  },
+                  onAddText: _addTextElement,
+                  onDelete: _deleteSelectedElement,
+                  onColorChanged:
+                      (c) =>
+                          _updateSelectedTextProperty('style_color', c.value),
+                  onFontSizeChanged:
+                      (s) => _updateSelectedTextProperty('style_fontSize', s),
                 ),
-              ),
-            ],
-          );
-        },
+
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: CanvasBottomBar(
+                    activeItem:
+                        _isMagicDrawActive
+                            ? "Magic Draw"
+                            : (_isTextToolsActive ? "Text" : null),
+                    onMagicDraw:
+                        () => setState(() {
+                          _isMagicDrawActive = !_isMagicDrawActive;
+                          _isTextToolsActive = false;
+                          _exitEditMode();
+                        }),
+                    onMedia: _pickImageFromGallery,
+                    onStylesheet: () => _showComingSoon('Stylesheet'),
+                    onTools: () => _showComingSoon('Tools'),
+                    onText: _toggleTextTools,
+                    onSelect: () => _showComingSoon('Select'),
+                    onPlugins: () => _showComingSoon('Plugins'),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  // --- BOILERPLATE HELPERS ---
+  // --- DRAWING HELPERS ---
 
   void _onPanUpdate(DragUpdateDetails details) {
     setState(() {
@@ -577,10 +826,12 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
           ),
         );
         _currentPoints = [];
+        _hasUnsavedChanges = true;
       }
     });
   }
 
+  // Just toggles state; drawing data stays in _paths and is saved via _saveCanvas
   Future<void> _saveAndCloseMagicDraw() async {
     setState(() => _isMagicDrawActive = false);
   }
@@ -595,13 +846,16 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
               icon: SvgPicture.asset(
                 'assets/icons/arrow-left-s-line.svg',
                 width: 22,
-                colorFilter: ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                colorFilter: const ColorFilter.mode(
+                  Colors.black,
+                  BlendMode.srcIn,
+                ),
               ),
               onPressed: () {
                 if (_isMagicDrawActive) {
                   _saveAndCloseMagicDraw();
                 } else {
-                  Navigator.of(context).maybePop();
+                  _handleBackNavigation();
                 }
               },
             ),
@@ -643,12 +897,18 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         SafeArea(
           child: Row(
             children: [
+              if (selectedId != null)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: _deleteSelectedElement,
+                  tooltip: "Delete Selected",
+                ),
               IconButton(
                 icon: SvgPicture.asset(
                   'assets/icons/file-image-line.svg',
                   width: 22,
                 ),
-                onPressed: _pickImageFromGallery,
+                onPressed: _saveCanvas,
               ),
               IconButton(
                 icon: SvgPicture.asset(
@@ -687,6 +947,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
             'rotation': 0.0,
           });
         }
+        _hasUnsavedChanges = true;
       });
       _recordChange(oldState);
     }
@@ -736,10 +997,7 @@ class _ManipulatingBox extends StatefulWidget {
   final bool isSelected;
   final bool isEditing;
   final double viewScale;
-
-  // Passed controller for real-time zoom updates
   final TransformationController transformationController;
-
   final VoidCallback onTap;
   final VoidCallback onDoubleTap;
   final VoidCallback onDragStart;
@@ -749,7 +1007,7 @@ class _ManipulatingBox extends StatefulWidget {
   final FocusNode? focusNode;
 
   const _ManipulatingBox({
-    super.key,
+    Key? key,
     required this.id,
     required this.position,
     required this.size,
@@ -768,7 +1026,7 @@ class _ManipulatingBox extends StatefulWidget {
     required this.onDragEnd,
     this.textController,
     this.focusNode,
-  });
+  }) : super(key: key);
 
   @override
   State<_ManipulatingBox> createState() => _ManipulatingBoxState();
@@ -827,7 +1085,7 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                   onPanUpdate: (details) {
                     if (widget.isSelected && !widget.isEditing) {
                       // FIX: Do not divide by currentZoom
-                      final delta = details.delta; 
+                      final delta = details.delta;
                       final globalDelta = _rotateVector(delta, _rot);
                       setState(() => _pos += globalDelta);
                       widget.onUpdate(_pos, _size, _rot);
@@ -844,12 +1102,12 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                                 color: Colors.blue,
                                 width: 2.0 * handleScale,
                               )
-                              : widget.type == 'text'
-                              ? Border.all(
-                                color: Colors.grey.withOpacity(0.3),
-                                width: 1.0 * handleScale,
-                              )
-                              : null,
+                              : (widget.type == 'text'
+                                  ? Border.all(
+                                    color: Colors.grey.withOpacity(0.3),
+                                    width: 1.0 * handleScale,
+                                  )
+                                  : null),
                     ),
                     child:
                         widget.type == 'file_image'
@@ -860,7 +1118,6 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                             : _buildText(),
                   ),
                 ),
-
                 if (widget.isSelected && !widget.isEditing) ...[
                   Positioned(
                     right: -visualSize / 2,
@@ -885,7 +1142,6 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                       },
                     ),
                   ),
-
                   Positioned(
                     right: -visualSize / 2,
                     top: -visualSize / 2,
@@ -981,7 +1237,9 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
             color: color,
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white, width: 2),
-            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.26), blurRadius: 4),
+            ],
           ),
           child: Icon(icon, size: visualSize * 0.6, color: Colors.white),
         ),
@@ -1013,6 +1271,7 @@ class CanvasPainter extends CustomPainter {
     required this.currentWidth,
     required this.isEraser,
   });
+
   @override
   void paint(Canvas canvas, Size size) {
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
@@ -1025,12 +1284,12 @@ class CanvasPainter extends CustomPainter {
             ..strokeCap = StrokeCap.round
             ..strokeJoin = StrokeJoin.round
             ..style = PaintingStyle.stroke;
+
       if (path.points.length > 1) {
         final Path p = Path();
         p.moveTo(path.points.first.offset.dx, path.points.first.offset.dy);
-        for (int i = 1; i < path.points.length; i++) {
+        for (int i = 1; i < path.points.length; i++)
           p.lineTo(path.points[i].offset.dx, path.points[i].offset.dy);
-        }
         canvas.drawPath(p, paint);
       } else if (path.points.isNotEmpty) {
         canvas.drawPoints(ui.PointMode.points, [
@@ -1049,9 +1308,8 @@ class CanvasPainter extends CustomPainter {
             ..style = PaintingStyle.stroke;
       final Path p = Path();
       p.moveTo(currentPoints.first.offset.dx, currentPoints.first.offset.dy);
-      for (int i = 1; i < currentPoints.length; i++) {
+      for (int i = 1; i < currentPoints.length; i++)
         p.lineTo(currentPoints[i].offset.dx, currentPoints[i].offset.dy);
-      }
       canvas.drawPath(p, paint);
     }
     canvas.restore();
@@ -1081,6 +1339,7 @@ class CanvasBottomBar extends StatelessWidget {
     required this.onSelect,
     required this.onPlugins,
   });
+
   @override
   Widget build(BuildContext context) {
     return Container(

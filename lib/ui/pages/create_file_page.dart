@@ -13,9 +13,8 @@ import '../../data/models/project_model.dart';
 
 class CreateFilePage extends StatefulWidget {
   final File? file; // Made optional for blank canvas creation
-  final int? projectId; // Optional: If null, user can select a project
-
-  const CreateFilePage({super.key, this.file, this.projectId});
+  final int projectId;
+  const CreateFilePage({super.key, this.file, this.projectId = 0});
 
   @override
   State<CreateFilePage> createState() => _CreateFilePageState();
@@ -451,8 +450,8 @@ class _CreateFilePageState extends State<CreateFilePage> {
       MaterialPageRoute(
         builder:
             (context) => CanvasBoardPage(
-              // Use the selected project ID
-              projectId: _selectedProjectId.toString(),
+              projectId: widget.projectId,
+              // Pass the dimensions from the preset
               width: width.toDouble(),
               height: height.toDouble(),
               initialImage: widget.file,
