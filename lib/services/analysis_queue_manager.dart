@@ -8,6 +8,7 @@ import '../data/models/note_model.dart';
 import '../data/repos/image_repo.dart';
 import '../data/repos/note_repo.dart';
 import 'analyze/image_analyzer.dart';
+import 'package:path/path.dart' as p;
 
 class AnalysisQueueManager {
   static final AnalysisQueueManager _instance =
@@ -113,7 +114,10 @@ class AnalysisQueueManager {
       }
 
       final appDir = await getApplicationDocumentsDirectory();
-      final cropDir = Directory('${appDir.path}/crops');
+      
+      final cropDirPath = p.join(appDir.path, 'crops'); 
+      final cropDir = Directory(cropDirPath);
+      
       if (!await cropDir.exists()) {
         await cropDir.create(recursive: true);
       }
@@ -134,10 +138,9 @@ class AnalysisQueueManager {
     img.Image parentImage,
     Directory cropDir,
   ) async {
-    await _noteRepo.updateNote(note.id!, status: 'analyzing');
     try {
       // 1. Define Permanent Path
-      final String cropPath = '${cropDir.path}/note_crop_${note.id}.jpg';
+      final String cropPath = p.join(cropDir.path, 'note_crop_${note.id}.jpg');
       final File cropFile = File(cropPath);
 
       // 2. Generate Crop (if it doesn't already exist)
@@ -147,11 +150,11 @@ class AnalysisQueueManager {
         int w = (note.normWidth * parentImage.width).round();
         int h = (note.normHeight * parentImage.height).round();
 
-        // Center -> Top-Left
+        // Center -> Top-Left conversion
         int left = x - (w ~/ 2);
         int top = y - (h ~/ 2);
 
-        // Clamping logic
+        // Clamping logic (Safety check)
         if (left < 0) left = 0;
         if (top < 0) top = 0;
         if (left + w > parentImage.width) w = parentImage.width - left;
@@ -173,21 +176,30 @@ class AnalysisQueueManager {
         await cropFile.writeAsBytes(img.encodeJpg(croppedImg));
       }
 
+      await _noteRepo.updateNote(
+        note.id!, 
+        status: 'analyzing',
+        cropFilePath: cropPath
+      );
+
       // 3. Analysis
       debugPrint("[Queue]: Analyzing Note ${note.id} tag: ${note.category}");
+      
+      // Now when this calls generateAsset internally, the DB lookup will succeed
       final result = await ImageAnalyzerService.analyzeSelected(cropPath, [
         note.category,
       ]);
 
-      // 4. Update DB
+      // 4. Update DB with Results
       if (result['success'] == true && result['data'] != null) {
         final resultsMap = result['data']['results'] ?? {};
         final jsonString = jsonEncode(resultsMap);
+        
         await _noteRepo.updateNote(
           note.id!,
           analysisData: jsonString,
           status: 'completed',
-          cropFilePath: cropPath,
+          // cropFilePath is already saved, no need to save again
         );
       } else {
         await _noteRepo.updateNote(note.id!, status: 'failed');

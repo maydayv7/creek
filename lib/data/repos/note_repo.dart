@@ -85,7 +85,7 @@ class NoteRepo {
     final db = await AppDatabase.db;
     final maps = await db.query(
       'notes',
-      where: 'cropFilePath = ?',
+      where: 'crop_file_path = ?',
       whereArgs: [path],
     );
 
