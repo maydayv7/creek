@@ -27,6 +27,10 @@ dependencies:
   flutter_svg: ^2.2.3
   google_fonts: ^6.1.0
   flutter_colorpicker: ^1.1.0
+  undo: ^1.0.1
+  flutter_box_transform: ^0.4.7
+  dotted_border: ^2.0.0
+  share_plus: ^12.0.1
 
 dev_dependencies:
   flutter_test:

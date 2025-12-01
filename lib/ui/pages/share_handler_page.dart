@@ -4,11 +4,17 @@ import 'package:adobe/services/download_service.dart';
 import 'package:adobe/services/instagram_download_service.dart';
 import 'package:adobe/services/image_service.dart';
 import 'package:adobe/ui/pages/share_to_moodboard_page.dart';
+import 'package:adobe/ui/pages/share_to_file_page.dart';
 
 class ShareHandlerPage extends StatefulWidget {
   final String sharedText;
+  final String destination;
 
-  const ShareHandlerPage({super.key, required this.sharedText});
+  const ShareHandlerPage({
+    super.key,
+    required this.sharedText,
+    required this.destination,
+  });
 
   @override
   State<ShareHandlerPage> createState() => _ShareHandlerPageState();
@@ -66,32 +72,49 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
         }
       }
 
-      // SUCCESS: Persist and Navigate
+      // SUCCESS: Route based on Destination
       if (tempFiles.isNotEmpty) {
-        List<File> permanentFiles = [];
+        if (!mounted) return;
 
-        // PERSIST IMMEDIATELY
-        // Save to App Docs and DB (into Inbox) and status 'completed' (waiting for tags)
-        for (var file in tempFiles) {
-          final id = await _imageService.saveImage(
-            file,
-            0, // Project 0 = Inbox
-            tags: [],
-          );
-
-          final savedImage = await _imageService.getImage(id);
-          if (savedImage != null) {
-            permanentFiles.add(File(savedImage.filePath));
-          }
-        }
-
-        if (mounted) {
+        // CHECK DESTINATION
+        if (widget.destination == 'files') {
+          // --- ROUTE TO FILES ---
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => ShareToMoodboardPage(imageFiles: permanentFiles),
+              builder:
+                  (_) => ShareToFilePage(
+                    // FIX: Use 'sharedImage' instead of 'file' to match ShareToFilePage constructor
+                    sharedImage: tempFiles.first,
+                  ),
             ),
           );
+        } else {
+          // --- ROUTE TO MOODBOARDS (Default) ---
+          List<File> permanentFiles = [];
+
+          for (var file in tempFiles) {
+            final id = await _imageService.saveImage(
+              file,
+              0, // Project 0 = Inbox
+              tags: [],
+            );
+
+            final savedImage = await _imageService.getImage(id);
+            if (savedImage != null) {
+              permanentFiles.add(File(savedImage.filePath));
+            }
+          }
+
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (_) => ShareToMoodboardPage(imageFiles: permanentFiles),
+              ),
+            );
+          }
         }
       } else {
         throw Exception("Could not retrieve any media files.");

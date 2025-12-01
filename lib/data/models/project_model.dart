@@ -8,6 +8,7 @@ class ProjectModel {
   final String? globalStylesheet; // Stored as JSON string
   final DateTime lastAccessedAt;
   final DateTime createdAt;
+  final List<String> assetsPath;
 
   ProjectModel({
     this.id,
@@ -17,6 +18,7 @@ class ProjectModel {
     this.globalStylesheet,
     required this.lastAccessedAt,
     required this.createdAt,
+    this.assetsPath = const [],
   });
 
   bool get isEvent => parentId != null;
@@ -40,6 +42,7 @@ class ProjectModel {
       'global_stylesheet': globalStylesheet,
       'last_accessed_at': lastAccessedAt.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
+      'assets_path': jsonEncode(assetsPath),
     };
   }
 
@@ -52,6 +55,10 @@ class ProjectModel {
       globalStylesheet: map['global_stylesheet'],
       lastAccessedAt: DateTime.parse(map['last_accessed_at']),
       createdAt: DateTime.parse(map['created_at']),
+      assetsPath:
+          map['assets_path'] != null
+              ? List<String>.from(jsonDecode(map['assets_path']))
+              : [],
     );
   }
 }

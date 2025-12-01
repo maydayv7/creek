@@ -70,6 +70,18 @@ class FileRepo {
     return res.map((e) => e['file_path'] as String).toList();
   }
 
+  Future<FileModel?> getByFilePath(String path) async {
+    final db = await AppDatabase.db;
+    final res = await db.query(
+      'files',
+      where: 'file_path = ?',
+      whereArgs: [path],
+      limit: 1,
+    );
+    if (res.isNotEmpty) return FileModel.fromMap(res.first);
+    return null;
+  }
+
   Future<List<FileModel>> getRecentFiles({int limit = 10}) async {
     final db = await AppDatabase.db;
     final res = await db.query(

@@ -1,5 +1,6 @@
 import '../data/repos/note_repo.dart';
 import '../data/models/note_model.dart';
+import 'analysis_queue_manager.dart';
 
 class NoteService {
   final _repo = NoteRepo();
@@ -23,10 +24,11 @@ class NoteService {
       normWidth: normWidth,
       normHeight: normHeight,
     );
+
     await _repo.addNote(note);
+    AnalysisQueueManager().processQueue();
   }
 
-  // UPDATE THIS TO MATCH REPO
   Future<void> updateNote(
     int noteId, {
     String? content,
@@ -36,6 +38,7 @@ class NoteService {
     double? normWidth,
     double? normHeight,
   }) async {
+    // TODO: If category or crop area changes, need to re-analyze
     await _repo.updateNote(
       noteId,
       content: content,
@@ -51,7 +54,6 @@ class NoteService {
     await _repo.deleteNote(noteId);
   }
 
-  // Add this method to fetch notes for a specific image
   Future<List<NoteModel>> getNotesForImage(String imageId) async {
     return await _repo.getNotesForImage(imageId);
   }

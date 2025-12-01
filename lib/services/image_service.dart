@@ -70,7 +70,7 @@ class ImageService {
     );
     await _repo.addImage(image);
 
-    // 4. Trigger Analysis Queue (Always)
+    // 4. Trigger Analysis Queue
     AnalysisQueueManager().processQueue();
 
     return id;
@@ -98,6 +98,10 @@ class ImageService {
     // 2. Mark as pending and trigger queue
     await _repo.updateStatus(imageId, 'pending');
     AnalysisQueueManager().processQueue();
+  }
+
+  Future<void> renameImage(String id, String newName) async {
+    await _repo.updateName(id, newName);
   }
 
   Future<void> updateAnalysis(String id, Map<String, dynamic> analysis) async {

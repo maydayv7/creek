@@ -13,8 +13,9 @@ class InstagramDownloadService {
 
       // Create directories
       final instagramDir = Directory('${dir.path}/instagram_downloads');
-      if (!await instagramDir.exists())
+      if (!await instagramDir.exists()) {
         await instagramDir.create(recursive: true);
+      }
 
       final imagesDir = Directory('${dir.path}/images');
       if (!await imagesDir.exists()) await imagesDir.create(recursive: true);

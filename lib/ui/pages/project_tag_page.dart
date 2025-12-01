@@ -10,6 +10,7 @@ import '../../data/repos/project_repo.dart';
 import '../../data/repos/note_repo.dart';
 import 'image_save_page.dart';
 import 'image_details_page.dart';
+import '../widgets/image_context_menu.dart';
 
 class ProjectTagPage extends StatefulWidget {
   final int projectId;
@@ -201,50 +202,54 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
   }
 
   Widget _buildStaggeredImageItem(ImageModel image, {required int index}) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (_) => ImageDetailsPage(
-                  imagePath: image.filePath,
-                  imageId: image.id,
-                  projectId: widget.projectId,
-                ),
+    return ImageContextMenu(
+      image: image,
+      onImageDeleted: () => _loadData(),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (_) => ImageDetailsPage(
+                    imagePath: image.filePath,
+                    imageId: image.id,
+                    projectId: widget.projectId,
+                  ),
+            ),
+          ).then((_) => _loadData());
+        },
+        child: Container(
+          // Simulate staggered heights similar to Alternate Page
+          height: (index % 3 == 0) ? 240 : 180,
+          decoration: BoxDecoration(
+            color: Variables.surfaceSubtle,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Variables.borderSubtle),
           ),
-        ).then((_) => _loadData());
-      },
-      child: Container(
-        // Simulate staggered heights similar to Alternate Page
-        height: (index % 3 == 0) ? 240 : 180,
-        decoration: BoxDecoration(
-          color: Variables.surfaceSubtle,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Variables.borderSubtle),
-        ),
-        // Explicitly clip content to border radius
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.file(
-                File(image.filePath),
-                fit: BoxFit.cover,
-                width: double.infinity,
-                errorBuilder:
-                    (_, __, ___) => Container(
-                      color: Variables.surfaceSubtle,
-                      child: const Center(
-                        child: Icon(
-                          Icons.broken_image,
-                          color: Variables.textDisabled,
+          // Explicitly clip content to border radius
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.file(
+                  File(image.filePath),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  errorBuilder:
+                      (_, __, ___) => Container(
+                        color: Variables.surfaceSubtle,
+                        child: const Center(
+                          child: Icon(
+                            Icons.broken_image,
+                            color: Variables.textDisabled,
+                          ),
                         ),
                       ),
-                    ),
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

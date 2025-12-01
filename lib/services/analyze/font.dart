@@ -45,11 +45,13 @@ class FontIdentifierService {
     String? modelPath,
     String? jsonPath,
   }) async {
-    if (modelPath == null || jsonPath == null)
+    if (modelPath == null || jsonPath == null) {
       return {'success': false, 'scores': {}, 'error': 'Paths missing'};
+    }
     await initialize(modelPath: modelPath, jsonPath: jsonPath);
-    if (_session == null || _fontDb == null)
+    if (_session == null || _fontDb == null) {
       return {'success': false, 'scores': {}, 'error': 'Init failed'};
+    }
 
     try {
       // 1. OCR Detection (Native Platform Call)
@@ -67,8 +69,9 @@ class FontIdentifierService {
       // 2. Load Image for Processing
       final bytes = await File(imagePath).readAsBytes();
       final fullImage = img.decodeImage(bytes);
-      if (fullImage == null)
+      if (fullImage == null) {
         return {'success': false, 'scores': {}, 'error': 'Image decode failed'};
+      }
 
       // Store counts to find dominant font
       Map<String, double> fontCounts = {};
@@ -189,10 +192,13 @@ class FontIdentifierService {
       final List<double> flatOutput = [];
 
       void flatten(dynamic d) {
-        if (d is num)
+        if (d is num) {
           flatOutput.add(d.toDouble());
-        else if (d is List)
-          for (var i in d) flatten(i);
+        } else if (d is List) {
+          for (var i in d) {
+            flatten(i);
+          }
+        }
       }
 
       flatten(rawOutput);

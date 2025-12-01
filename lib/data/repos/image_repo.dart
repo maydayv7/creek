@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:flutter/widgets.dart';
+
 import '../database.dart';
 import '../models/image_model.dart';
 
@@ -48,6 +50,16 @@ class ImageRepo {
     );
   }
 
+  Future<void> updateName(String id, String newName) async {
+    final db = await AppDatabase.db;
+    await db.update(
+      'images',
+      {'name': newName},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<List<ImageModel>> getPendingImages() async {
     final db = await AppDatabase.db;
     final res = await db.query(
@@ -86,7 +98,7 @@ class ImageRepo {
         final List<dynamic> decoded = jsonDecode(tagsJson);
         return decoded.map((e) => e.toString()).toList();
       } catch (e) {
-        print("Error decoding tags: $e");
+        debugPrint("Error decoding tags: $e");
         return [];
       }
     }

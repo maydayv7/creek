@@ -32,13 +32,13 @@ class ImageSavePage extends StatefulWidget {
   final String? parentProjectName;
 
   const ImageSavePage({
-    Key? key,
+    super.key,
     required this.imagePaths,
     required this.projectId,
     required this.projectName,
     this.isFromShare = true,
     this.parentProjectName,
-  }) : super(key: key);
+  });
 
   @override
   State<ImageSavePage> createState() => _ImageSavePageState();
@@ -315,8 +315,9 @@ class _ImageSavePageState extends State<ImageSavePage> {
   void _onResizeUpdate(DragUpdateDetails details) {
     if (!_isResizing ||
         _finalSelectionRect == null ||
-        _activeHandle == DragHandle.none)
+        _activeHandle == DragHandle.none) {
       return;
+    }
 
     final pos = _getLocalPosition(details.globalPosition);
     if (pos == null) return;
@@ -835,8 +836,8 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                           shape: BoxShape.circle,
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withOpacity(
-                                                0.3,
+                                              color: Colors.black.withValues(
+                                                alpha: 0.3,
                                               ),
                                               blurRadius: 4,
                                               offset: const Offset(0, 1),
@@ -849,7 +850,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                         ),
                                       ),
                                     );
-                                  }).toList(),
+                                  }),
                                 // PAGE DOTS
                                 if (widget.imagePaths.length > 1 &&
                                     !isPageLocked)
@@ -873,8 +874,8 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                             color:
                                                 _currentImageIndex == index
                                                     ? Colors.blue
-                                                    : Colors.white.withOpacity(
-                                                      0.5,
+                                                    : Colors.white.withValues(
+                                                      alpha: 0.5,
                                                     ),
                                           ),
                                         ),
@@ -993,7 +994,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, -5),
                 ),
@@ -1114,10 +1115,10 @@ class NoteModalOverlay extends StatelessWidget {
   final Size screenSize;
 
   const NoteModalOverlay({
-    Key? key,
+    super.key,
     required this.modalContent,
     required this.screenSize,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1254,7 +1255,7 @@ class SelectionOverlayPainter extends CustomPainter {
 
       final Paint handleShadow =
           Paint()
-            ..color = Colors.black.withOpacity(0.3)
+            ..color = Colors.black.withValues(alpha: 0.3)
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
 
       final Paint handleFill = Paint()..color = Colors.white;

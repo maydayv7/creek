@@ -1,8 +1,10 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:adobe/ui/styles/variables.dart';
 import 'package:adobe/ui/pages/project_board_page.dart';
 import 'package:adobe/ui/pages/stylesheet_page.dart';
+import 'package:adobe/ui/pages/project_file_page.dart';
 
 enum BottomBarItem { moodboard, stylesheet, files }
 
@@ -28,11 +30,8 @@ class BottomBar extends StatelessWidget {
         nextPage = StylesheetPage(projectId: projectId);
         break;
       case BottomBarItem.files:
-        // TODO
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Files page not implemented yet")),
-        );
-        return;
+        nextPage = ProjectFilePage(projectId: projectId);
+        break;
     }
 
     Navigator.pushReplacement(
@@ -47,42 +46,48 @@ class BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // System Safe Area Padding
+    final double safeBottom = MediaQuery.of(context).padding.bottom;
+    final double effectiveBottomPadding = max(safeBottom, 24.0);
+
     return Container(
-      height: 90,
       decoration: const BoxDecoration(
         color: Variables.background,
         border: Border(
           top: BorderSide(color: Variables.borderSubtle, width: 1),
         ),
       ),
-      padding: const EdgeInsets.only(bottom: 24, top: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildNavItem(
-              context,
-              BottomBarItem.moodboard,
-              "Moodboard",
-              "assets/icons/moodboard_icon.svg",
+      padding: EdgeInsets.only(bottom: effectiveBottomPadding, top: 12),
+      child: SizedBox(
+        height: 54,
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildNavItem(
+                context,
+                BottomBarItem.moodboard,
+                "Moodboard",
+                "assets/icons/moodboard_icon.svg",
+              ),
             ),
-          ),
-          Expanded(
-            child: _buildNavItem(
-              context,
-              BottomBarItem.stylesheet,
-              "Stylesheet",
-              "assets/icons/stylesheet_icon.svg",
+            Expanded(
+              child: _buildNavItem(
+                context,
+                BottomBarItem.stylesheet,
+                "Stylesheet",
+                "assets/icons/stylesheet_icon.svg",
+              ),
             ),
-          ),
-          Expanded(
-            child: _buildNavItem(
-              context,
-              BottomBarItem.files,
-              "Files",
-              "assets/icons/files_icon.svg",
+            Expanded(
+              child: _buildNavItem(
+                context,
+                BottomBarItem.files,
+                "Files",
+                "assets/icons/files_icon.svg",
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

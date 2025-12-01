@@ -46,11 +46,13 @@ class EmbeddingAnalyzerService {
     String? jsonPath,
   }) async {
     // Safety check
-    if (modelPath == null || jsonPath == null)
+    if (modelPath == null || jsonPath == null) {
       return {'success': false, 'scores': {}, 'error': 'Paths missing'};
+    }
     await initialize(modelPath: modelPath, jsonPath: jsonPath);
-    if (_session == null || _centroids == null)
+    if (_session == null || _centroids == null) {
       return {'success': false, 'scores': {}, 'error': 'Init failed'};
+    }
 
     OrtValueTensor? inputOrt;
     OrtRunOptions? runOptions;
@@ -58,8 +60,9 @@ class EmbeddingAnalyzerService {
 
     try {
       final float32Input = await ClipImageProcessor.preprocess(imagePath);
-      if (float32Input == null)
+      if (float32Input == null) {
         return {'success': false, 'scores': {}, 'error': 'Image decode failed'};
+      }
 
       // Create Tensor
       // Note: ensure ClipImageProcessor returns a flat List<double>

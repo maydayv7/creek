@@ -8,6 +8,9 @@ class NoteModel {
   final double normY;
   final double normWidth;
   final double normHeight;
+  final String? analysisData;
+  final String? cropFilePath;
+  final String status;
 
   NoteModel({
     this.id,
@@ -19,6 +22,9 @@ class NoteModel {
     this.normY = 0.5,
     this.normWidth = 0.0,
     this.normHeight = 0.0,
+    this.analysisData,
+    this.cropFilePath,
+    this.status = 'pending',
   });
 
   Map<String, dynamic> toMap() {
@@ -32,6 +38,9 @@ class NoteModel {
       'norm_y': normY,
       'norm_width': normWidth,
       'norm_height': normHeight,
+      'analysis_data': analysisData,
+      'crop_file_path': cropFilePath,
+      'status': status,
     };
   }
 
@@ -46,6 +55,9 @@ class NoteModel {
       normY: map['norm_y'] ?? 0.5,
       normWidth: map['norm_width'] ?? 0.0,
       normHeight: map['norm_height'] ?? 0.0,
+      analysisData: map['analysis_data'],
+      cropFilePath: map['crop_file_path'],
+      status: map['status'] ?? 'pending',
     );
   }
 }

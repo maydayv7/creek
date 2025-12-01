@@ -37,6 +37,10 @@ class FileService {
     return id;
   }
 
+  Future<List<FileModel>> getFiles(int projectId) async {
+    return await _repo.getFiles(projectId);
+  }
+
   Future<void> openFile(String id) async {
     await _repo.touchFile(id);
   }

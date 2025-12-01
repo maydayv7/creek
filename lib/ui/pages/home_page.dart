@@ -7,9 +7,7 @@ import 'package:adobe/data/repos/image_repo.dart';
 import 'package:adobe/data/repos/file_repo.dart';
 import 'package:adobe/services/project_service.dart';
 import 'package:image/image.dart' as img;
-import 'package:intl/intl.dart';
 import 'project_detail_page.dart';
-import 'image_analysis_page.dart';
 import 'define_brand_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -28,7 +26,7 @@ class _HomePageState extends State<HomePage> {
   List<ProjectModel> _allProjects = [];
   List<FileModel> _recentFiles = [];
   Map<int, ProjectModel> _projectMap = {};
-  Map<int, List<String>> _projectPreviews = {};
+  final Map<int, List<String>> _projectPreviews = {};
   Map<String, String> _fileDimensions = {};
   bool _isLoading = true;
   final String _userName = "Alex"; 
@@ -211,29 +209,46 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
 
-                    // Search Bar
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isDark ? Colors.grey[800] : Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                      // Search Bar
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: TextField(
                             decoration: InputDecoration(
                               hintText: 'Search',
                               hintStyle: TextStyle(
                                 fontSize: 12,
-                                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.5,
+                                ),
                                 fontFamily: 'GeneralSans',
                               ),
                               prefixIcon: Icon(
                                 Icons.search,
                                 size: 18,
-                                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.5,
+                                ),
                               ),
-                              border: InputBorder.none,
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 50,
+                                minHeight: 18,
+                              ),
+                              filled: true,
+                              fillColor:
+                                  isDark ? Colors.grey[800] : Colors.grey[200],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 12,
@@ -247,51 +262,69 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
-                    ),
 
                     const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-                    // Content Sections
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Recent Files Section
-                            if (_recentFiles.isNotEmpty) ...[
-                              _buildSectionHeader(
-                                'Recent Files',
-                                theme,
-                                onTap: () {},
-                              ),
-                              const SizedBox(height: 12),
-                              ...(_recentFiles.take(2).map((file) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildRecentFileCard(file, theme, isDark),
-                              )).toList()),
-                              const SizedBox(height: 24),
-                            ],
+                      // Content Sections
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Recent Files Section
+                              if (_recentFiles.isNotEmpty) ...[
+                                _buildSectionHeader(
+                                  'Recent Files',
+                                  theme,
+                                  onTap: () {
+                                    // Navigate to recent files page
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                ...(_recentFiles
+                                    .take(2)
+                                    .map(
+                                      (file) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
+                                        child: _buildRecentFileCard(
+                                          file,
+                                          theme,
+                                          isDark,
+                                        ),
+                                      ),
+                                    )
+                                    .toList()),
+                                const SizedBox(height: 24),
+                              ],
 
-                            // Projects Section
-                            _buildSectionHeader(
-                              'Projects',
-                              theme,
-                              onTap: () {},
-                            ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              height: 100,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: _allProjects.length,
-                                itemBuilder: (context, index) {
-                                  final project = _allProjects[index];
-                                  return _buildProjectCard(project, theme, isDark);
+                              // Projects Section
+                              _buildSectionHeader(
+                                'Projects',
+                                theme,
+                                onTap: () {
+                                  // Navigate to all projects
                                 },
                               ),
-                            ),
-                            const SizedBox(height: 24),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                height: 100,
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: _allProjects.length,
+                                  itemBuilder: (context, index) {
+                                    final project = _allProjects[index];
+                                    return _buildProjectCard(
+                                      project,
+                                      theme,
+                                      isDark,
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 24),
 
                             // Explore Templates Section
                             _buildSectionHeader(
@@ -322,7 +355,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSectionHeader(String title, ThemeData theme, {VoidCallback? onTap}) {
+  Widget _buildSectionHeader(
+    String title,
+    ThemeData theme, {
+    VoidCallback? onTap,
+  }) {
     return Row(
       children: [
         Text(
@@ -341,7 +378,7 @@ class _HomePageState extends State<HomePage> {
             child: Icon(
               Icons.chevron_right,
               size: 24,
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
       ],
@@ -375,14 +412,17 @@ class _HomePageState extends State<HomePage> {
                 child: Image.file(
                   File(file.filePath),
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: isDark ? Colors.grey[800] : Colors.grey[200],
-                    child: Icon(
-                      Icons.broken_image,
-                      size: 24,
-                      color: theme.colorScheme.onSurface.withOpacity(0.3),
-                    ),
-                  ),
+                  errorBuilder:
+                      (context, error, stackTrace) => Container(
+                        color: isDark ? Colors.grey[800] : Colors.grey[200],
+                        child: Icon(
+                          Icons.broken_image,
+                          size: 24,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.3,
+                          ),
+                        ),
+                      ),
                 ),
               ),
             ),
@@ -407,7 +447,8 @@ class _HomePageState extends State<HomePage> {
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500,
                                     fontFamily: 'Inter',
-                                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.6),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -431,7 +472,9 @@ class _HomePageState extends State<HomePage> {
                         Icon(
                           Icons.more_vert,
                           size: 16,
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ],
                     ),
@@ -441,7 +484,9 @@ class _HomePageState extends State<HomePage> {
                       style: TextStyle(
                         fontSize: 10,
                         fontFamily: 'GeneralSans',
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -450,7 +495,9 @@ class _HomePageState extends State<HomePage> {
                       style: TextStyle(
                         fontSize: 10,
                         fontFamily: 'GeneralSans',
-                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.4,
+                        ),
                       ),
                     ),
                   ],
@@ -488,29 +535,38 @@ class _HomePageState extends State<HomePage> {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(8),
                 ),
-                child: previewImages.isEmpty
-                    ? Container(
-                        color: isDark ? Colors.grey[800] : Colors.grey[200],
-                        child: Center(
-                          child: Icon(
-                            Icons.folder_outlined,
-                            size: 32,
-                            color: theme.colorScheme.onSurface.withOpacity(0.3),
-                          ),
-                        ),
-                      )
-                    : Image.file(
-                        File(previewImages.first),
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        errorBuilder: (context, error, stackTrace) => Container(
+                child:
+                    previewImages.isEmpty
+                        ? Container(
                           color: isDark ? Colors.grey[800] : Colors.grey[200],
-                          child: Icon(
-                            Icons.broken_image,
-                            color: theme.colorScheme.onSurface.withOpacity(0.3),
+                          child: Center(
+                            child: Icon(
+                              Icons.folder_outlined,
+                              size: 32,
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.3,
+                              ),
+                            ),
                           ),
+                        )
+                        : Image.file(
+                          File(previewImages.first),
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          errorBuilder:
+                              (context, error, stackTrace) => Container(
+                                color:
+                                    isDark
+                                        ? Colors.grey[800]
+                                        : Colors.grey[200],
+                                child: Icon(
+                                  Icons.broken_image,
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                ),
+                              ),
                         ),
-                      ),
               ),
             ),
             Padding(
@@ -534,7 +590,7 @@ class _HomePageState extends State<HomePage> {
                   Icon(
                     Icons.more_vert,
                     size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ],
               ),
@@ -577,7 +633,7 @@ class _HomePageState extends State<HomePage> {
                     child: Icon(
                       Icons.image_outlined,
                       size: 32,
-                      color: theme.colorScheme.onSurface.withOpacity(0.3),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
                     ),
                   ),
                 ),
@@ -600,7 +656,7 @@ class _HomePageState extends State<HomePage> {
                   style: TextStyle(
                     fontSize: 12,
                     fontFamily: 'GeneralSans',
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     height: 1.2,
                   ),
                   maxLines: 1,

@@ -1,15 +1,9 @@
-import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
-import 'models/project_model.dart';
-import 'models/image_model.dart';
-import 'models/file_model.dart';
-import 'models/note_model.dart';
-
 class AppDatabase {
   static Database? _db;
-  static const String _dbName = 'database_v5.db';
+  static const String _dbName = 'database_v6.db';
 
   static Future<Database> get db async {
     if (_db != null) return _db!;
@@ -36,6 +30,7 @@ class AppDatabase {
             parent_id INTEGER, 
             global_stylesheet TEXT,
             last_accessed_at TEXT,
+            assets_path TEXT DEFAULT '[]',
             created_at TEXT,
             FOREIGN KEY (parent_id) REFERENCES projects (id) ON DELETE CASCADE
           )
@@ -92,6 +87,9 @@ class AppDatabase {
             norm_y REAL DEFAULT 0.5,
             norm_width REAL DEFAULT 0.0,
             norm_height REAL DEFAULT 0.0,
+            analysis_data TEXT,
+            crop_file_path TEXT,
+            status TEXT DEFAULT 'pending',
             FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE
           )
         ''');
