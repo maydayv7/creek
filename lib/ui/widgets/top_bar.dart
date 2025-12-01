@@ -15,6 +15,8 @@ class TopBar extends StatefulWidget implements PreferredSizeWidget {
   final VoidCallback? onAIPressed;
   final bool? isAlternateView; // For toggle state
   final VoidCallback? onLayoutToggle; // For toggle callback
+  final bool hideDropdown;
+
 
   const TopBar({
     super.key,
@@ -28,6 +30,7 @@ class TopBar extends StatefulWidget implements PreferredSizeWidget {
     this.onAIPressed,
     this.isAlternateView,
     this.onLayoutToggle,
+    this.hideDropdown = false,
   });
 
   @override
@@ -177,7 +180,7 @@ class _TopBarState extends State<TopBar> {
               ),
             ),
             // Second Row: Global Dropdown and Action Buttons
-            Container(
+            if(!widget.hideDropdown) Container(
               height: 40.0, // py-[8px] = 16px + 24px content
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(

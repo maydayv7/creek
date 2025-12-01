@@ -10,6 +10,7 @@ import '../../data/repos/project_repo.dart';
 import '../widgets/bottom_bar.dart';
 import 'create_file_page.dart';
 import 'canvas_board_page.dart';
+import '../widgets/top_bar.dart';
 
 import 'package:image/image.dart' as img;
 
@@ -202,7 +203,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     await _loadEverything();
   }
 
-  
   Future<void> _deleteFile(FileModel file) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -244,7 +244,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     }
   }
 
-
   // ---------------------------------------
   // CREATE FILE
   // ---------------------------------------
@@ -257,13 +256,30 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     ).then((_) => _loadEverything());
   }
 
+  String _formatRelative(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inDays > 0) {
+      return "${diff.inDays} day${diff.inDays > 1 ? 's' : ''} ago";
+    }
+    if (diff.inHours > 0) {
+      return "${diff.inHours} hour${diff.inHours > 1 ? 's' : ''} ago";
+    }
+    if (diff.inMinutes > 0) {
+      return "${diff.inMinutes} min ago";
+    }
+    return "just now";
+  }
+
   // ---------------------------------------
   // FILE CARD (Same UI but thumbnail updated)
   // ---------------------------------------
   Widget _fileCard(FileModel file) {
-    final date = DateFormat.yMMMd().format(file.lastUpdated);
     final meta = _fileMetadata[file.id] ?? {};
     final preview = meta["preview"] ?? "";
+    final dimensions = meta["dimensions"] ?? "Unknown";
+
     final realPreview =
         preview.isNotEmpty && File(preview).existsSync()
             ? preview
@@ -273,96 +289,119 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
       onTap: () => _openFile(file),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFE4E4E7)),
         ),
+
+        // ❗ NO padding here — keeps left flush
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ---------------------------------------
-            // ✔ NEW THUMBNAIL SIZE (HomePage style)
-            // ---------------------------------------
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey[300],
+            // ---------- THUMBNAIL (FLUSH) ----------
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.file(
-                  File(realPreview),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.image),
+              child: Image.file(
+                File(realPreview),
+                width: 120,
+                height: 120,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (_, __, ___) => Container(
+                      width: 120,
+                      height: 120,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.broken_image),
+                    ),
+              ),
+            ),
+
+            // ---------- SPACING ----------
+            const SizedBox(width: 12),
+
+            // ---------- RIGHT SIDE TEXT ----------
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Breadcrumb
+                    Text(
+                      _breadcrumbFor(file),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                        fontFamily: 'GeneralSans',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Name
+                    Text(
+                      file.name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'GeneralSans',
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    // Dimensions
+                    Text(
+                      dimensions,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[700],
+                        fontFamily: 'GeneralSans',
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    // Updated time
+                    Text(
+                      "Last edited • ${_formatRelative(file.lastUpdated)}",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontFamily: 'GeneralSans',
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
 
-            const SizedBox(width: 12),
-
-            // ---------------------------------------
-            // TEXT INFO (unchanged UI)
-            // ---------------------------------------
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _breadcrumbFor(file),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[600],
-                      fontFamily: 'GeneralSans',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-
-                  const SizedBox(height: 2),
-
-                  Text(
-                    file.name,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'GeneralSans',
-                    ),
-                  ),
-
-                  const SizedBox(height: 2),
-
-                  Text(
-                    "Edited $date",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontFamily: 'GeneralSans',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(width: 8),
+            // ---------- MENU ----------
             PopupMenuButton<String>(
               onSelected: (value) => _handleFileMenuAction(file, value),
               itemBuilder:
-                  (context) => [
-                    const PopupMenuItem(value: "open", child: Text("Open")),
-                    const PopupMenuItem(value: "rename", child: Text("Rename")),
-                    const PopupMenuItem(value: "delete", child: Text("Delete")),
+                  (_) => const [
+                    PopupMenuItem(value: "open", child: Text("Open")),
+                    PopupMenuItem(value: "rename", child: Text("Rename")),
+                    PopupMenuItem(value: "delete", child: Text("Delete")),
                   ],
               icon: const Icon(Icons.more_vert, size: 20),
             ),
 
+            const SizedBox(width: 4), // slight right breathing space
           ],
         ),
       ),
     );
   }
+
+
+
 
   // ---------------------------------------
   // BREADCRUMB
@@ -402,17 +441,24 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F8),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF7F7F8),
-        elevation: 0,
-        title: const Text(
-          "Project Files",
-          style: TextStyle(
-            fontFamily: 'GeneralSans',
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF27272A),
-          ),
-        ),
+      appBar: TopBar(
+        currentProjectId: widget.projectId,
+        onBack: () => Navigator.pop(context),
+        titleOverride: "Project Files",
+        onProjectChanged: (project) {
+          // When user switches project from dropdown,
+          // refresh this page with the new projectId
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProjectFilePage(projectId: project.id!),
+            ),
+          );
+        },
+        hideDropdown: true,
+        onSettingsPressed: () {},
+        onLayoutToggle: () {},
+        isAlternateView: false,
       ),
 
       bottomNavigationBar: BottomBar(
@@ -578,13 +624,29 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
   // ---------------------------------------
   Widget _buildEventDropdown() {
     return Container(
+      height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(6),
+        color: const Color(0xFFE4E4E7), // subtle grey
+        borderRadius: BorderRadius.circular(8),
       ),
       child: DropdownButton<ProjectModel>(
         value: _selectedEvent,
+        isExpanded: false,
+        underline: const SizedBox(),
+        icon: const Icon(
+          Icons.keyboard_arrow_down_rounded,
+          size: 18,
+          color: Color(0xFF27272A),
+        ),
+        style: const TextStyle(
+          fontFamily: "GeneralSans",
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF27272A),
+        ),
+        dropdownColor: Colors.white,
+        borderRadius: BorderRadius.circular(8),
         items:
             _events
                 .map(
@@ -593,22 +655,23 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                     child: Text(
                       e.title,
                       style: const TextStyle(
-                        fontFamily: 'GeneralSans',
+                        fontFamily: "GeneralSans",
                         fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF27272A),
                       ),
                     ),
                   ),
                 )
                 .toList(),
-        onChanged: (e) {
-          if (e != null) _onSelectEvent(e);
+        onChanged: (value) {
+          if (value != null) _onSelectEvent(value);
         },
-        underline: const SizedBox(),
-        isExpanded: true,
       ),
     );
   }
-  
+
+
   // ---------------------------------------
   // FILTER
   // ---------------------------------------
