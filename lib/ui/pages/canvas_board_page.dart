@@ -9,10 +9,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:undo/undo.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:image/image.dart' as img;
 import './canvas_toolbar/magic_draw_overlay.dart';
 import './canvas_toolbar/text_tools_overlay.dart';
 import '../../data/repos/project_repo.dart';
 import '../../services/stylesheet_service.dart';
+import 'project_file_page.dart';
 
 import '../../services/file_service.dart';
 import '../../data/models/file_model.dart';
@@ -127,6 +130,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   double _strokeWidth = 10.0;
   bool _isEraser = false;
   final GlobalKey _drawingKey = GlobalKey();
+  final GlobalKey _canvasGlobalKey = GlobalKey();
 
   // --- VIEWPORT ---
   final TransformationController _transformationController =
@@ -320,6 +324,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       elements.removeWhere((e) => e['id'] == selectedId);
       selectedId = null;
       _isEditingText = false;
+      _isTextToolsActive = false;
     });
     _textFocusNode.unfocus();
     _recordChange(oldState);
@@ -350,6 +355,62 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     if (_gestureStartSnapshot != null) {
       _recordChange(_gestureStartSnapshot!);
       _gestureStartSnapshot = null;
+    }
+  }
+
+  Future<void> _exportProject() async {
+    try {
+      // 1. Show loading or feedback
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Generating image...")));
+
+      // 2. Capture the Full Canvas using the global key
+      final boundary =
+          _canvasGlobalKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) return;
+
+      // 3. Convert to Image (High pixel ratio for quality)
+      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      final ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+
+      if (byteData == null) return;
+
+      final Uint8List pngBytes = byteData.buffer.asUint8List();
+
+      // 4. Convert PNG to JPG using 'image' package
+      // We do this in a compute isolate ideally, but for simplicity here on main thread
+      final img.Image? decodedImage = img.decodePng(pngBytes);
+
+      if (decodedImage == null) {
+        throw Exception("Failed to decode image");
+      }
+
+      // Encode to JPG (Quality 90)
+      final Uint8List jpgBytes = img.encodeJpg(decodedImage, quality: 90);
+
+      // 5. Save to Temporary File
+      final directory = await getTemporaryDirectory();
+      final String fileName =
+          "export_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      final String filePath = '${directory.path}/$fileName';
+
+      final File imgFile = File(filePath);
+      await imgFile.writeAsBytes(jpgBytes);
+
+      // 6. Trigger System Share/Save Dialog
+      // This allows the user to "Save to Device", "Share to Instagram", etc.
+      await Share.shareXFiles([
+        XFile(filePath, mimeType: 'image/jpeg'),
+      ], text: 'Check out my design created with Adobe Clone!');
+    } catch (e) {
+      debugPrint("Export Error: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Export failed: $e")));
     }
   }
 
@@ -392,7 +453,11 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                 onPressed: () async {
                   Navigator.pop(context); // Close dialog
                   await _saveCanvas(); // Save
-                  if (mounted) Navigator.pop(context); // Leave page
+                  // Note: The redirect logic is handled in _saveCanvas for new files.
+                  // For existing files, we pop here.
+                  if (mounted && widget.existingFile != null) {
+                    Navigator.pop(context);
+                  }
                 },
                 child: const Text("Save"),
               ),
@@ -436,9 +501,10 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   Future<void> _saveCanvas() async {
     try {
       String fileName = "Canvas ${DateTime.now().toString().split(' ')[0]}";
+      bool isNewFile = widget.existingFile == null;
 
       // 1. IF NEW FILE: Ask user for name
-      if (widget.existingFile == null) {
+      if (isNewFile) {
         final userFileName = await _showNameDialog();
         if (userFileName == null || userFileName.isEmpty) return; // Cancelled
         fileName = userFileName;
@@ -447,7 +513,14 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       // 2. Serialize Elements AND Paths (Drawing) to JSON
       final jsonList = _elementsToJson(elements);
       final pathsJson = _paths.map((p) => p.toMap()).toList();
-      final saveData = {'elements': jsonList, 'paths': pathsJson};
+
+      // [FIX] SAVE CANVAS DIMENSIONS
+      final saveData = {
+        'elements': jsonList,
+        'paths': pathsJson,
+        'width': _canvasSize.width, // Saving Width
+        'height': _canvasSize.height, // Saving Height
+      };
       final jsonString = jsonEncode(saveData);
 
       final directory = await getTemporaryDirectory();
@@ -479,6 +552,14 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Canvas Saved Successfully")),
         );
+        if (isNewFile) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProjectFilePage(projectId: widget.projectId),
+            ),
+          );
+        }
       }
     } catch (e) {
       debugPrint("Save Error: $e");
@@ -493,17 +574,29 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         final dynamic decoded = jsonDecode(jsonString);
 
         setState(() {
-          if (decoded is List) {
-            // Legacy support (older files with just elements)
+          if (decoded is Map && decoded.containsKey('elements')) {
+            // New format with dimensions
+            elements = _jsonToElements(decoded['elements']);
+            if (decoded['paths'] != null) {
+              _paths =
+                  (decoded['paths'] as List)
+                      .map((p) => DrawingPath.fromMap(p))
+                      .toList();
+            } else {
+              _paths = [];
+            }
+            // [FIX] LOAD CANVAS DIMENSIONS & RESET VIEW INIT
+            if (decoded['width'] != null && decoded['height'] != null) {
+              _canvasSize = Size(
+                (decoded['width'] as num).toDouble(),
+                (decoded['height'] as num).toDouble(),
+              );
+              _hasInitializedView = false; // FORCE RE-CENTERING
+            }
+          } else if (decoded is List) {
+            // Legacy support
             elements = _jsonToElements(decoded);
             _paths = [];
-          } else {
-            // New support (Elements + Paths)
-            elements = _jsonToElements(decoded['elements']);
-            _paths =
-                (decoded['paths'] as List)
-                    .map((p) => DrawingPath.fromMap(p))
-                    .toList();
           }
           _hasUnsavedChanges = false;
         });
@@ -621,114 +714,131 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                       height: _canvasSize.height,
                       child: Stack(
                         children: [
-                          Container(
-                            width: double.infinity,
-                            height: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.15),
-                                  blurRadius: 40,
-                                  offset: const Offset(0, 10),
+                          // [NEW] WRAPPED IN REPAINT BOUNDARY FOR EXPORT
+                          RepaintBoundary(
+                            key: _canvasGlobalKey,
+                            child: Stack(
+                              children: [
+                                Container(
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.15),
+                                        blurRadius: 40,
+                                        offset: const Offset(0, 10),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          ...elements.map((e) {
-                            final bool isSelected = selectedId == e['id'];
-                            return _ManipulatingBox(
-                              key: ValueKey(e['id']),
-                              id: e['id'],
-                              position: e['position'],
-                              size: e['size'],
-                              rotation: e['rotation'],
-                              type: e['type'],
-                              content: e['content'],
-                              styleData: e,
-                              isSelected: isSelected && !_isMagicDrawActive,
-                              isEditing:
-                                  isSelected &&
-                                  _isEditingText &&
-                                  e['type'] == 'text',
-                              viewScale:
-                                  _transformationController.value
-                                      .getMaxScaleOnAxis(),
-                              onTap: () {
-                                if (!_isMagicDrawActive) {
-                                  if (_isEditingText && selectedId != e['id'])
-                                    _exitEditMode();
-                                  setState(() {
-                                    selectedId = e['id'];
-                                    if (e['type'] == 'text')
-                                      _isTextToolsActive = true;
-                                  });
-                                  setState(() {
-                                    // Bring to front
-                                    elements.remove(e);
-                                    elements.add(e);
-                                  });
-                                }
-                              },
-                              onDoubleTap: () {
-                                if (e['type'] == 'text') _enterEditMode(e);
-                              },
-                              onDragStart: _handleGestureStart,
-                              onUpdate:
-                                  (newPos, newSize, newRot) =>
+                                ...elements.map((e) {
+                                  final bool isSelected = selectedId == e['id'];
+                                  return _ManipulatingBox(
+                                    key: ValueKey(e['id']),
+                                    id: e['id'],
+                                    position: e['position'],
+                                    size: e['size'],
+                                    rotation: e['rotation'],
+                                    type: e['type'],
+                                    content: e['content'],
+                                    styleData: e,
+                                    isSelected:
+                                        isSelected && !_isMagicDrawActive,
+                                    isEditing:
+                                        isSelected &&
+                                        _isEditingText &&
+                                        e['type'] == 'text',
+                                    viewScale:
+                                        _transformationController.value
+                                            .getMaxScaleOnAxis(),
+                                    onTap: () {
+                                      if (!_isMagicDrawActive) {
+                                        if (_isEditingText &&
+                                            selectedId != e['id']) {
+                                          _exitEditMode();
+                                        }
+                                        setState(() {
+                                          selectedId = e['id'];
+                                          if (e['type'] == 'text') {
+                                            _isTextToolsActive = true;
+                                          }
+                                        });
+                                        setState(() {
+                                          // Bring to front
+                                          elements.remove(e);
+                                          elements.add(e);
+                                        });
+                                      }
+                                    },
+                                    onDoubleTap: () {
+                                      if (e['type'] == 'text')
+                                        _enterEditMode(e);
+                                    },
+                                    onDragStart: _handleGestureStart,
+                                    onUpdate:
+                                        (newPos, newSize, newRot) =>
+                                            _handleElementUpdate(
+                                              e['id'],
+                                              newPos,
+                                              newSize,
+                                              newRot,
+                                            ),
+                                    onDragEnd: (newPos, newSize, newRot) {
                                       _handleElementUpdate(
                                         e['id'],
                                         newPos,
                                         newSize,
                                         newRot,
+                                      );
+                                      _handleGestureEnd();
+                                    },
+                                    textController:
+                                        isSelected
+                                            ? _textEditingController
+                                            : null,
+                                    focusNode:
+                                        isSelected ? _textFocusNode : null,
+                                    transformationController:
+                                        _transformationController,
+                                  );
+                                }),
+                                // Drawing Layer inside Capture Zone
+                                IgnorePointer(
+                                  ignoring: !_isMagicDrawActive,
+                                  child: RepaintBoundary(
+                                    key: _drawingKey,
+                                    child: GestureDetector(
+                                      onPanStart: (_) {
+                                        _gestureStartSnapshot =
+                                            _getCurrentState();
+                                      },
+                                      onPanUpdate: _onPanUpdate,
+                                      onPanEnd: (details) {
+                                        _onPanEnd(details);
+                                        if (_gestureStartSnapshot != null) {
+                                          _recordChange(_gestureStartSnapshot!);
+                                          _gestureStartSnapshot = null;
+                                        }
+                                      },
+                                      child: CustomPaint(
+                                        size: Size.infinite,
+                                        painter: CanvasPainter(
+                                          paths: _paths,
+                                          currentPoints: _currentPoints,
+                                          currentColor:
+                                              _isEraser
+                                                  ? Colors.transparent
+                                                  : _selectedColor,
+                                          currentWidth: _strokeWidth,
+                                          isEraser: _isEraser,
+                                        ),
                                       ),
-                              onDragEnd: (newPos, newSize, newRot) {
-                                _handleElementUpdate(
-                                  e['id'],
-                                  newPos,
-                                  newSize,
-                                  newRot,
-                                );
-                                _handleGestureEnd();
-                              },
-                              textController:
-                                  isSelected ? _textEditingController : null,
-                              focusNode: isSelected ? _textFocusNode : null,
-                              transformationController:
-                                  _transformationController,
-                            );
-                          }),
-                          // Drawing Layer - Always Visible (ignoring touches when not active)
-                          IgnorePointer(
-                            ignoring: !_isMagicDrawActive,
-                            child: RepaintBoundary(
-                              key: _drawingKey,
-                              child: GestureDetector(
-                                onPanStart: (_) {
-                                  _gestureStartSnapshot = _getCurrentState();
-                                },
-                                onPanUpdate: _onPanUpdate,
-                                onPanEnd: (details) {
-                                  _onPanEnd(details);
-                                  if (_gestureStartSnapshot != null) {
-                                    _recordChange(_gestureStartSnapshot!);
-                                    _gestureStartSnapshot = null;
-                                  }
-                                },
-                                child: CustomPaint(
-                                  size: Size.infinite,
-                                  painter: CanvasPainter(
-                                    paths: _paths,
-                                    currentPoints: _currentPoints,
-                                    currentColor:
-                                        _isEraser
-                                            ? Colors.transparent
-                                            : _selectedColor,
-                                    currentWidth: _strokeWidth,
-                                    isEraser: _isEraser,
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
                           ),
                         ],
@@ -743,7 +853,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                   strokeWidth: _strokeWidth,
                   isEraser: _isEraser,
                   brandColors: _brandColors,
-                  onClose: _saveAndCloseMagicDraw,
+                  onClose:
+                      _saveAndCloseMagicDraw, // REMOVED as per previous request
                   onColorChanged: (c) => setState(() => _selectedColor = c),
                   onWidthChanged: (w) => setState(() => _strokeWidth = w),
                   onEraserToggle: (e) => setState(() => _isEraser = e),
@@ -765,7 +876,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                     });
                   },
                   onAddText: _addTextElement,
-                  onDelete: _deleteSelectedElement,
                   onColorChanged:
                       (c) =>
                           _updateSelectedTextProperty('style_color', c.value),
@@ -838,7 +948,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      leadingWidth: 140,
+      leadingWidth: 160,
       leading: SafeArea(
         child: Row(
           children: [
@@ -905,7 +1015,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                 ),
               IconButton(
                 icon: SvgPicture.asset(
-                  'assets/icons/file-image-line.svg',
+                  'assets/icons/save-3-line.svg',
                   width: 22,
                 ),
                 onPressed: _saveCanvas,
@@ -975,7 +1085,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   }
 
   void _openLayers() => _showComingSoon('Layers');
-  void _exportProject() => _showComingSoon('Export');
   void _openSettings() => _showComingSoon('Settings');
   void _showComingSoon([dynamic feature]) => ScaffoldMessenger.of(
     context,
@@ -983,7 +1092,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 }
 
 // =============================================================================
-//  MANIPULATING BOX WIDGET
+//  MANIPULATING BOX WIDGET
 // =============================================================================
 
 class _ManipulatingBox extends StatefulWidget {
@@ -1084,7 +1193,6 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                   onPanStart: (_) => widget.onDragStart(),
                   onPanUpdate: (details) {
                     if (widget.isSelected && !widget.isEditing) {
-                      // FIX: Do not divide by currentZoom
                       final delta = details.delta;
                       final globalDelta = _rotateVector(delta, _rot);
                       setState(() => _pos += globalDelta);
@@ -1128,15 +1236,17 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                       icon: Icons.zoom_out_map,
                       color: Colors.blue,
                       onDrag: (delta) {
-                        // FIX: Use delta directly, no un-rotation
                         setState(() {
+                          final localDelta = _rotateVector(delta, -_rot);
                           _size = Size(
-                            (_size.width + delta.dx).clamp(50.0, 10000.0),
-                            (_size.height + delta.dy).clamp(30.0, 10000.0),
+                            (_size.width + localDelta.dx).clamp(50.0, 10000.0),
+                            (_size.height + localDelta.dy).clamp(30.0, 10000.0),
                           );
-                          // Fix anchor point calculation
-                          final offset = Offset(delta.dx / 2, delta.dy / 2);
-                          _pos += _rotateVector(offset, _rot) - offset;
+                          final offset = Offset(
+                            localDelta.dx / 2,
+                            localDelta.dy / 2,
+                          );
+                          _pos += _rotateVector(offset, _rot);
                         });
                         widget.onUpdate(_pos, _size, _rot);
                       },
@@ -1355,7 +1465,7 @@ class CanvasBottomBar extends StatelessWidget {
         ],
       ),
       child: SafeArea(
-        top: false,
+        top: false, // We don't need top SafeArea as it's a bottom bar
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: SingleChildScrollView(
@@ -1439,7 +1549,7 @@ class _BottomBarItem extends StatelessWidget {
               iconPath,
               width: 24,
               colorFilter: ColorFilter.mode(
-                isActive ? Colors.blue : Colors.black87,
+                isActive ? const Color(0xFF27272A) : const Color(0xFF9F9FA9),
                 BlendMode.srcIn,
               ),
             ),
@@ -1449,7 +1559,10 @@ class _BottomBarItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: isActive ? Colors.blue : Colors.black87,
+                color:
+                    isActive
+                        ? const Color(0xFF27272A)
+                        : const Color(0xFF9F9FA9),
               ),
             ),
           ],
