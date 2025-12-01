@@ -276,20 +276,18 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                       onImageDeleted: () => _loadImagesForSelected(),
                       child: GestureDetector(
                         onTap: () {
-                          if (_currentProject?.id != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => ImageDetailsPage(
-                                      imagePath: image.filePath,
-                                      imageId: image.id,
-                                      projectId: _currentProject!.id!,
-                                    ),
-                              ),
-                            ).then((_) => _loadImagesForSelected());
-                          }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => ProjectTagPage(
+                                    projectId: _currentProject!.id!,
+                                    tag: category,
+                                  ),
+                            ),
+                          );
                         },
+
                         child: Container(
                           width: 120,
                           decoration: BoxDecoration(
