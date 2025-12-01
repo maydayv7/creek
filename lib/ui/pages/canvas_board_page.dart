@@ -18,6 +18,7 @@ import './canvas_toolbar/text_tools_overlay.dart';
 import '../../data/repos/project_repo.dart';
 import '../../services/stylesheet_service.dart';
 import 'project_file_page.dart';
+import 'package:path/path.dart' as p;
 
 import '../../services/file_service.dart';
 import '../../data/models/file_model.dart';
@@ -87,7 +88,7 @@ class CanvasBoardPage extends StatefulWidget {
   final double height;
   final File? initialImage;
   final FileModel? existingFile;
-  final File? injectedMedia; 
+  final File? injectedMedia;
 
   const CanvasBoardPage({
     super.key,
@@ -174,26 +175,9 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       });
       _hasUnsavedChanges = true;
     }
-
-    // Inject shared image EXACTLY like gallery images
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.injectedMedia != null && widget.existingFile != null) {
-        final oldState = _getCurrentState();
-        setState(() {
-          elements.add({
-            'id': 'shared_${DateTime.now().millisecondsSinceEpoch}',
-            'type': 'file_image',
-            'content': widget.injectedMedia!.path,
-            'position': const Offset(50, 50),
-            'size': const Size(150, 150), // EXACT match
-            'rotation': 0.0,
-          });
-          _hasUnsavedChanges = true;
-        });
-        _recordChange(oldState);
-      }
-    });
-
+    
+    // Note: injectedMedia handling is done inside _loadCanvasFromFile to ensure
+    // it happens after file content is loaded, avoiding race conditions.
   }
 
   @override
@@ -548,6 +532,360 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   }
 
   // ===========================================================================
+  //  SAVE & LOAD LOGIC
+  // ===========================================================================
+
+  void _handleBackNavigation() {
+    // If in magic draw mode, just close tool first
+    if (_isMagicDrawActive) {
+      _saveAndCloseMagicDraw();
+      return;
+    }
+
+    if (!_hasUnsavedChanges && widget.existingFile != null) {
+      Navigator.pop(context);
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("Save Changes?"),
+            content: const Text(
+              "Do you want to save your canvas before leaving?",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Leave page
+                },
+                child: const Text(
+                  "Discard",
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(context); // Close dialog
+                  await _saveCanvas(); // Save
+                  // Note: The redirect logic is handled in _saveCanvas for new files.
+                  // For existing files, we pop here.
+                  if (mounted && widget.existingFile != null) {
+                    Navigator.pop(context);
+                  }
+                },
+                child: const Text("Save"),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<String?> _showNameDialog() async {
+    TextEditingController nameController = TextEditingController(
+      text: "Untitled Canvas",
+    );
+    return showDialog<String>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text("Save Canvas"),
+            content: TextField(
+              controller: nameController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: "Canvas Name",
+                hintText: "Enter a name for your file",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Cancel"),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, nameController.text.trim()),
+                child: const Text("Save"),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // Helper to generate preview image
+  Future<String?> _generatePreviewImage() async {
+    try {
+      final boundary =
+          _canvasGlobalKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+
+      // Capture image with lower pixel ratio for preview thumbnail
+      final ui.Image image = await boundary.toImage(pixelRatio: 1.0);
+      final ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+
+      if (byteData == null) return null;
+      final Uint8List pngBytes = byteData.buffer.asUint8List();
+
+      final directory = await getApplicationDocumentsDirectory();
+      final previewDir = Directory('${directory.path}/previews');
+      if (!await previewDir.exists()) {
+        await previewDir.create(recursive: true);
+      }
+
+      final String fileName =
+          "preview_${DateTime.now().millisecondsSinceEpoch}.png";
+      final String filePath = '${previewDir.path}/$fileName';
+
+      final File imgFile = File(filePath);
+      await imgFile.writeAsBytes(pngBytes);
+      return filePath;
+    } catch (e) {
+      debugPrint("Error generating preview: $e");
+      return null;
+    }
+  }
+
+  Future<void> _saveCanvas() async {
+    try {
+      String fileName = "Canvas ${DateTime.now().toString().split(' ')[0]}";
+      bool isNewFile = widget.existingFile == null;
+
+      // 1. IF NEW FILE: Ask user for name
+      if (isNewFile) {
+        final userFileName = await _showNameDialog();
+        if (userFileName == null || userFileName.isEmpty) return; // Cancelled
+        fileName = userFileName;
+      }
+
+      // 2. Generate Preview
+      final String? previewPath = await _generatePreviewImage();
+
+      // 3. Serialize Elements AND Paths (Drawing) to JSON
+      final jsonList = _elementsToJson(elements);
+      final pathsJson = _paths.map((p) => p.toMap()).toList();
+
+      final saveData = {
+        'elements': jsonList,
+        'paths': pathsJson,
+        'width': _canvasSize.width, // Saving Width
+        'height': _canvasSize.height, // Saving Height
+        'preview_path': previewPath, // Saving Preview Path
+      };
+      final jsonString = jsonEncode(saveData);
+
+      final directory = await getTemporaryDirectory();
+      final tempFile = File(
+        '${directory.path}/canvas_temp_${DateTime.now().millisecondsSinceEpoch}.json',
+      );
+      await tempFile.writeAsString(jsonString);
+
+      if (widget.existingFile != null) {
+        // Overwrite existing file
+        final existingFile = File(widget.existingFile!.filePath);
+        await existingFile.writeAsString(jsonString);
+        await _fileService.openFile(widget.existingFile!.id);
+      } else {
+        // Save as new file
+        await _fileService.saveFile(
+          tempFile,
+          widget.projectId,
+          name: fileName,
+          description: "Editable Canvas Board",
+        );
+      }
+
+      if (await tempFile.exists()) await tempFile.delete();
+
+      setState(() => _hasUnsavedChanges = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Canvas Saved Successfully")),
+        );
+        if (isNewFile) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProjectFilePage(projectId: widget.projectId),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("Save Error: $e");
+    }
+  }
+
+  Future<void> _loadCanvasFromFile() async {
+    try {
+      final file = File(widget.existingFile!.filePath);
+      if (await file.exists()) {
+        final jsonString = await file.readAsString();
+        final dynamic decoded = jsonDecode(jsonString);
+
+        setState(() {
+          if (decoded is Map && decoded.containsKey('elements')) {
+            // New format with dimensions
+            elements = _jsonToElements(decoded['elements']);
+            if (decoded['paths'] != null) {
+              _paths =
+                  (decoded['paths'] as List)
+                      .map((p) => DrawingPath.fromMap(p))
+                      .toList();
+            } else {
+              _paths = [];
+            }
+            // [FIX] LOAD CANVAS DIMENSIONS & RESET VIEW INIT
+            if (decoded['width'] != null && decoded['height'] != null) {
+              _canvasSize = Size(
+                (decoded['width'] as num).toDouble(),
+                (decoded['height'] as num).toDouble(),
+              );
+              _hasInitializedView = false; // FORCE RE-CENTERING
+            }
+          } else if (decoded is List) {
+            // Legacy support
+            elements = _jsonToElements(decoded);
+            _paths = [];
+            _hasInitializedView = false;
+          }
+          _hasUnsavedChanges = false;
+        });
+        
+        // Handle Injected Media (e.g. from Share)
+         if (widget.injectedMedia != null) {
+          final oldState = _getCurrentState();
+          setState(() {
+            elements.add({
+              'id': 'shared_${DateTime.now().millisecondsSinceEpoch}',
+              'type': 'file_image',
+              'content': widget.injectedMedia!.path,
+              'position': const Offset(50, 50),
+              'size': const Size(150, 150),
+              'rotation': 0.0,
+            });
+          });
+          _recordChange(oldState);
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading canvas: $e");
+    }
+  }
+
+  List<Map<String, dynamic>> _deepCopyElements(
+    List<Map<String, dynamic>> source,
+  ) {
+    return source.map((e) {
+      final copy = Map<String, dynamic>.from(e);
+      if (e['position'] is Offset) {
+        copy['position'] = Offset(
+          (e['position'] as Offset).dx,
+          (e['position'] as Offset).dy,
+        );
+      }
+      if (e['size'] is Size) {
+        copy['size'] = Size(
+          (e['size'] as Size).width,
+          (e['size'] as Size).height,
+        );
+      }
+      return copy;
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _elementsToJson(
+    List<Map<String, dynamic>> elements,
+  ) {
+    return elements.map((e) {
+      final copy = Map<String, dynamic>.from(e);
+      if (e['position'] is Offset) {
+        copy['position'] = {
+          'dx': (e['position'] as Offset).dx,
+          'dy': (e['position'] as Offset).dy,
+        };
+      }
+      if (e['size'] is Size) {
+        copy['size'] = {
+          'width': (e['size'] as Size).width,
+          'height': (e['size'] as Size).height,
+        };
+      }
+      return copy;
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _jsonToElements(List<dynamic> jsonList) {
+    return jsonList.map((item) {
+      final e = Map<String, dynamic>.from(item);
+      if (e['position'] is Map) {
+        e['position'] = Offset(e['position']['dx'], e['position']['dy']);
+      }
+      if (e['size'] is Map) {
+        e['size'] = Size(e['size']['width'], e['size']['height']);
+      }
+      e['rotation'] = (e['rotation'] as num).toDouble();
+      return e;
+    }).toList();
+  }
+
+  void _openLayers() => _showComingSoon('Layers');
+  void _openSettings() => _showComingSoon('Settings');
+  void _showComingSoon([dynamic feature]) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(const SnackBar(content: Text('Coming soon')));
+  
+  // [UPDATED] New Bottom Sheet for Assets
+  void _openStylesheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.9,
+            builder:
+                (_, controller) => _AssetPickerSheet(
+                  projectId: widget.projectId,
+                  scrollController: controller,
+                  onAddAssets: (List<String> paths) {
+                    _addAssetsToCanvas(paths);
+                    Navigator.pop(context);
+                  },
+                ),
+          ),
+    );
+  }
+
+  void _addAssetsToCanvas(List<String> paths) {
+    if (paths.isEmpty) return;
+    final oldState = _getCurrentState();
+    setState(() {
+      for (var path in paths) {
+        elements.add({
+          'id':
+              'asset_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(1000)}',
+          'type': 'file_image',
+          'content': path,
+          'position': const Offset(50, 50),
+          'size': const Size(150, 150),
+          'rotation': 0.0,
+        });
+      }
+      _hasUnsavedChanges = true;
+    });
+    _recordChange(oldState);
+  }
+
+  // ===========================================================================
   //  UI BUILDER
   // ===========================================================================
 
@@ -865,7 +1203,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                           _tempBaseImage = null; // Force recapture next time
                         }),
                     onMedia: _pickImageFromGallery,
-                    onStylesheet: () => _showComingSoon('Stylesheet'),
+                    onStylesheet: _openStylesheet,
                     onTools: () => _showComingSoon('Tools'),
                     onText: _toggleTextTools,
                     onSelect: () => _showComingSoon('Select'),
@@ -1213,309 +1551,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       _recordChange(oldState);
     }
   }
-
-  List<Map<String, dynamic>> _deepCopyElements(
-    List<Map<String, dynamic>> source,
-  ) {
-    return source.map((e) {
-      final copy = Map<String, dynamic>.from(e);
-      if (e['position'] is Offset) {
-        copy['position'] = Offset(
-          (e['position'] as Offset).dx,
-          (e['position'] as Offset).dy,
-        );
-      }
-      if (e['size'] is Size) {
-        copy['size'] = Size(
-          (e['size'] as Size).width,
-          (e['size'] as Size).height,
-        );
-      }
-      return copy;
-    }).toList();
-  }
-
-  List<Map<String, dynamic>> _elementsToJson(
-    List<Map<String, dynamic>> elements,
-  ) {
-    return elements.map((e) {
-      final copy = Map<String, dynamic>.from(e);
-      if (e['position'] is Offset) {
-        copy['position'] = {
-          'dx': (e['position'] as Offset).dx,
-          'dy': (e['position'] as Offset).dy,
-        };
-      }
-      if (e['size'] is Size) {
-        copy['size'] = {
-          'width': (e['size'] as Size).width,
-          'height': (e['size'] as Size).height,
-        };
-      }
-      return copy;
-    }).toList();
-  }
-
-  List<Map<String, dynamic>> _jsonToElements(List<dynamic> jsonList) {
-    return jsonList.map((item) {
-      final e = Map<String, dynamic>.from(item);
-      if (e['position'] is Map) {
-        e['position'] = Offset(e['position']['dx'], e['position']['dy']);
-      }
-      if (e['size'] is Map) {
-        e['size'] = Size(e['size']['width'], e['size']['height']);
-      }
-      e['rotation'] = (e['rotation'] as num).toDouble();
-      return e;
-    }).toList();
-  }
-
-  void _handleBackNavigation() {
-    // If in magic draw mode, just close tool first
-    if (_isMagicDrawActive) {
-      _saveAndCloseMagicDraw();
-      return;
-    }
-
-    if (!_hasUnsavedChanges && widget.existingFile != null) {
-      Navigator.pop(context);
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text("Save Changes?"),
-            content: const Text(
-              "Do you want to save your canvas before leaving?",
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context); // Close dialog
-                  Navigator.pop(context); // Leave page
-                },
-                child: const Text(
-                  "Discard",
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  Navigator.pop(context); // Close dialog
-                  await _saveCanvas(); // Save
-                  // Note: The redirect logic is handled in _saveCanvas for new files.
-                  // For existing files, we pop here.
-                  if (mounted && widget.existingFile != null) {
-                    Navigator.pop(context);
-                  }
-                },
-                child: const Text("Save"),
-              ),
-            ],
-          ),
-    );
-  }
-
-  Future<String?> _showNameDialog() async {
-    TextEditingController nameController = TextEditingController(
-      text: "Untitled Canvas",
-    );
-    return showDialog<String>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text("Save Canvas"),
-            content: TextField(
-              controller: nameController,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: "Canvas Name",
-                hintText: "Enter a name for your file",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("Cancel"),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, nameController.text.trim()),
-                child: const Text("Save"),
-              ),
-            ],
-          ),
-    );
-  }
-
-  // Helper to generate preview image
-  Future<String?> _generatePreviewImage() async {
-    try {
-      final boundary =
-          _canvasGlobalKey.currentContext?.findRenderObject()
-              as RenderRepaintBoundary?;
-      if (boundary == null) return null;
-
-      // Capture image with lower pixel ratio for preview thumbnail
-      final ui.Image image = await boundary.toImage(pixelRatio: 1.0);
-      final ByteData? byteData = await image.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
-
-      if (byteData == null) return null;
-      final Uint8List pngBytes = byteData.buffer.asUint8List();
-
-      final directory = await getApplicationDocumentsDirectory();
-      final previewDir = Directory('${directory.path}/previews');
-      if (!await previewDir.exists()) {
-        await previewDir.create(recursive: true);
-      }
-
-      final String fileName =
-          "preview_${DateTime.now().millisecondsSinceEpoch}.png";
-      final String filePath = '${previewDir.path}/$fileName';
-
-      final File imgFile = File(filePath);
-      await imgFile.writeAsBytes(pngBytes);
-      return filePath;
-    } catch (e) {
-      debugPrint("Error generating preview: $e");
-      return null;
-    }
-  }
-
-  Future<void> _saveCanvas() async {
-    try {
-      String fileName = "Canvas ${DateTime.now().toString().split(' ')[0]}";
-      bool isNewFile = widget.existingFile == null;
-
-      // 1. IF NEW FILE: Ask user for name
-      if (isNewFile) {
-        final userFileName = await _showNameDialog();
-        if (userFileName == null || userFileName.isEmpty) return; // Cancelled
-        fileName = userFileName;
-      }
-
-      // 2. Generate Preview
-      final String? previewPath = await _generatePreviewImage();
-
-      // 3. Serialize Elements AND Paths (Drawing) to JSON
-      final jsonList = _elementsToJson(elements);
-      final pathsJson = _paths.map((p) => p.toMap()).toList();
-
-      final saveData = {
-        'elements': jsonList,
-        'paths': pathsJson,
-        'width': _canvasSize.width, // Saving Width
-        'height': _canvasSize.height, // Saving Height
-        'preview_path': previewPath, // Saving Preview Path
-      };
-      final jsonString = jsonEncode(saveData);
-
-      final directory = await getTemporaryDirectory();
-      final tempFile = File(
-        '${directory.path}/canvas_temp_${DateTime.now().millisecondsSinceEpoch}.json',
-      );
-      await tempFile.writeAsString(jsonString);
-
-      if (widget.existingFile != null) {
-        // Overwrite existing file
-        final existingFile = File(widget.existingFile!.filePath);
-        await existingFile.writeAsString(jsonString);
-        await _fileService.openFile(widget.existingFile!.id);
-      } else {
-        // Save as new file
-        await _fileService.saveFile(
-          tempFile,
-          widget.projectId,
-          name: fileName,
-          description: "Editable Canvas Board",
-        );
-      }
-
-      if (await tempFile.exists()) await tempFile.delete();
-
-      setState(() => _hasUnsavedChanges = false);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Canvas Saved Successfully")),
-        );
-        if (isNewFile) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ProjectFilePage(projectId: widget.projectId),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint("Save Error: $e");
-    }
-  }
-
-  Future<void> _loadCanvasFromFile() async {
-    try {
-      final file = File(widget.existingFile!.filePath);
-      if (await file.exists()) {
-        final jsonString = await file.readAsString();
-        final dynamic decoded = jsonDecode(jsonString);
-
-        setState(() {
-          if (decoded is Map && decoded.containsKey('elements')) {
-            // New format with dimensions
-            elements = _jsonToElements(decoded['elements']);
-            if (decoded['paths'] != null) {
-              _paths =
-                  (decoded['paths'] as List)
-                      .map((p) => DrawingPath.fromMap(p))
-                      .toList();
-            } else {
-              _paths = [];
-            }
-            // [FIX] LOAD CANVAS DIMENSIONS & RESET VIEW INIT
-            if (decoded['width'] != null && decoded['height'] != null) {
-              _canvasSize = Size(
-                (decoded['width'] as num).toDouble(),
-                (decoded['height'] as num).toDouble(),
-              );
-              _hasInitializedView = false; // FORCE RE-CENTERING
-            }
-          } else if (decoded is List) {
-            // Legacy support
-            elements = _jsonToElements(decoded);
-            _paths = [];
-          }
-          _hasUnsavedChanges = false;
-        });
-         if (widget.injectedMedia != null) {
-          final oldState = _getCurrentState();
-          setState(() {
-            elements.add({
-              'id': 'shared_${DateTime.now().millisecondsSinceEpoch}',
-              'type': 'file_image',
-              'content': widget.injectedMedia!.path,
-              'position': const Offset(50, 50),
-              'size': const Size(150, 150),
-              'rotation': 0.0,
-            });
-          });
-          _recordChange(oldState);
-        }
-      }
-    } catch (e) {
-      debugPrint("Error loading canvas: $e");
-    }
-  }
-
-  void _openLayers() => _showComingSoon('Layers');
-  void _openSettings() => _showComingSoon('Settings');
-  void _showComingSoon([dynamic feature]) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(const SnackBar(content: Text('Coming soon')));
 }
 
 // =============================================================================
@@ -2007,6 +2042,271 @@ class _BottomBarItem extends StatelessWidget {
                         : const Color(0xFF9F9FA9),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AssetPickerSheet extends StatefulWidget {
+  final int projectId;
+  final ScrollController scrollController;
+  final Function(List<String>) onAddAssets; // Accepts List
+
+  const _AssetPickerSheet({
+    required this.projectId,
+    required this.scrollController,
+    required this.onAddAssets,
+  });
+
+  @override
+  State<_AssetPickerSheet> createState() => _AssetPickerSheetState();
+}
+
+class _AssetPickerSheetState extends State<_AssetPickerSheet> {
+  List<String> _assets = [];
+  bool _isLoading = true;
+  Set<String> _selectedPaths = {}; // Supports multi-select
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAssets();
+  }
+
+  Future<void> _loadAssets() async {
+    try {
+      final project = await ProjectRepo().getProjectById(widget.projectId);
+      if (mounted) {
+        setState(() {
+          _assets = project?.assetsPath ?? [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading assets: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<File?> _resolveFile(String path) async {
+    final file = File(path);
+    if (await file.exists()) return file;
+    try {
+      final filename = p.basename(path);
+      final dir = await getApplicationDocumentsDirectory();
+      final fixedPath = '${dir.path}/generated_images/$filename';
+      final fixedFile = File(fixedPath);
+      if (await fixedFile.exists()) return fixedFile;
+    } catch (e) {
+      debugPrint("Error resolving file: $e");
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Column(
+        children: [
+          // Handle
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Search Bar
+          Container(
+            height: 40,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                const Icon(Icons.search, color: Colors.grey),
+                const SizedBox(width: 8),
+                const Text(
+                  "Search Stylesheet",
+                  style: TextStyle(
+                    fontFamily: 'GeneralSans',
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Category Tabs
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              children: [
+                _buildFilterChip("Assets", true),
+                const SizedBox(width: 12),
+                _buildFilterChip("Backgrounds & Texture", false),
+              ],
+            ),
+          ),
+
+          // Grid
+          Expanded(
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _assets.isEmpty
+                    ? Center(
+                      child: Text(
+                        "No assets found in stylesheet",
+                        style: TextStyle(color: Colors.grey[500]),
+                      ),
+                    )
+                    : Stack(
+                      children: [
+                        GridView.builder(
+                          controller: widget.scrollController,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                                childAspectRatio: 1.0,
+                              ),
+                          itemCount: _assets.length,
+                          itemBuilder: (context, index) {
+                            final assetPath = _assets[index];
+                            final isSelected = _selectedPaths.contains(
+                              assetPath,
+                            );
+
+                            return FutureBuilder<File?>(
+                              future: _resolveFile(assetPath),
+                              builder: (context, snapshot) {
+                                final file = snapshot.data;
+                                return _buildAssetTile(
+                                  child:
+                                      file != null
+                                          ? Image.file(file, fit: BoxFit.cover)
+                                          : const Icon(
+                                            Icons.broken_image,
+                                            color: Colors.grey,
+                                          ),
+                                  isSelected: isSelected,
+                                  onTap: () {
+                                    if (file != null) {
+                                      setState(() {
+                                        if (isSelected) {
+                                          _selectedPaths.remove(assetPath);
+                                        } else {
+                                          _selectedPaths.add(assetPath);
+                                        }
+                                      });
+                                    }
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+          ),
+
+          // Bottom CTA
+          SafeArea(
+            top: false,
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(top: 16, bottom: 16),
+              child: ElevatedButton(
+                onPressed: () => widget.onAddAssets(_selectedPaths.toList()),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF27272A),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: const Text(
+                  "Add to File",
+                  style: TextStyle(
+                    fontFamily: 'GeneralSans',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, bool isSelected) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFFF4F4F5) : Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isSelected ? Colors.transparent : Colors.grey[300]!,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'GeneralSans',
+          fontSize: 14,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          color: isSelected ? Colors.black : Colors.grey[600],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssetTile({
+    required Widget child,
+    required VoidCallback onTap,
+    bool isSelected = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Colors.blue : Colors.grey[200]!,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            child,
+            if (isSelected)
+              Container(
+                color: Colors.blue.withOpacity(0.1),
+                child: const Center(
+                  child: Icon(Icons.check_circle, color: Colors.blue),
+                ),
+              ),
           ],
         ),
       ),
