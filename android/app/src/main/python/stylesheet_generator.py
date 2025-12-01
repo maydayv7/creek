@@ -18,7 +18,7 @@ PALETTE_SIZE = 5               # Number of colors in final palette
 def hex_to_rgb(hex_str: str) -> List[int]:
     """Converts '#FF5733' to [255, 87, 51] for math operations."""
     try:
-        hex_str = hex_str.lstrip('#')
+        hex_str = hex_str.strip().lstrip('#')
         if len(hex_str) != 6: return [0, 0, 0]
         return [int(hex_str[i:i+2], 16) for i in (0, 2, 4)]
     except:
@@ -274,7 +274,7 @@ class UnifiedStyleEngine:
         self.doc_counter = 0
 
         self.aliases = {
-            "Color Pallete": "Color Palette",
+            "Colour Palette": "Color Palette",
             "Texture": "Background/Texture", 
             "Era": "Era/Cultural Reference",
             "Font": "Typography",
@@ -311,15 +311,27 @@ class UnifiedStyleEngine:
                 # Map "Font" -> "Typography", etc.
                 std_category = self.aliases.get(category, category)
 
-                # Extract scores dictionary if nested
-                if isinstance(payload, dict) and "scores" in payload: 
-                    payload = payload["scores"]
+                # PATH A: COLOR PALETTE
+                # NOTE: We intentionally SKIP processing 'scores' (moods) here
+                if std_category == "Color Palette":
+                    if isinstance(payload, dict):
+                        # Extract "palette" list (Actual Hex Codes)
+                        if "palette" in payload and isinstance(payload["palette"], list):
+                            for hex_code in payload["palette"]:
+                                if isinstance(hex_code, str) and hex_code.startswith('#'):
+                                    self.color_pool.append(hex_to_rgb(hex_code))
+                    # Fallback: if payload is just a list of hex strings
+                    elif isinstance(payload, list):
+                        for item in payload:
+                            if isinstance(item, str) and item.startswith('#'):
+                                self.color_pool.append(hex_to_rgb(item))
 
-                # Normalize to list of tuples
-                vectors = self._normalize(payload)
+                # PATH B: TYPOGRAPHY
+                elif std_category == "Typography":
+                    if isinstance(payload, dict) and "scores" in payload: 
+                        payload = payload["scores"]
+                    vectors = self._normalize(payload)
 
-                # PATH A: TYPOGRAPHY
-                if std_category == "Typography":
                     for rank, (font_name, score) in enumerate(vectors):
                         # Skip "No Text Detected"
                         if "no text" in font_name.lower(): continue
@@ -332,16 +344,12 @@ class UnifiedStyleEngine:
                         if font_name not in self.font_members[cluster]:
                             self.font_members[cluster].append(font_name)
 
-                # PATH B: COLOR PALETTE
-                elif std_category == "Color Palette":
-                    for rank, (hex_code, score) in enumerate(vectors):
-                        # Ensure we only pick valid hex codes
-                        if rank < 5 and isinstance(hex_code, str) and hex_code.startswith('#'):
-                            rgb = hex_to_rgb(hex_code)
-                            self.color_pool.append(rgb)
-
                 # PATH C: OTHER TAGS
                 else:
+                    if isinstance(payload, dict) and "scores" in payload: 
+                        payload = payload["scores"]
+                    vectors = self._normalize(payload)
+
                     for rank, (label, score) in enumerate(vectors):
                         self.feature_registry[std_category][label].append({
                             "raw_score": score,
@@ -414,10 +422,14 @@ class UnifiedStyleEngine:
             final_json["results"]["Typography"] = typo_output
             final_json["results"]["Typography_Family"] = best_fam
 
-        # 3. Process Color Palette (K-Means)
-        if len(self.color_pool) >= PALETTE_SIZE:
+        # 3. Process Color Palette
+        if len(self.color_pool) > 0:
             try:
-                kmeans = KMeans(n_clusters=PALETTE_SIZE, n_init='auto', random_state=42)
+                # If we have very few colors, just use all of them
+                k_clusters = min(len(self.color_pool), PALETTE_SIZE)
+
+                # FIX: n_init='auto' crashes on older sklearn. Used n_init=1.
+                kmeans = KMeans(n_clusters=k_clusters, n_init=1, random_state=42)
                 kmeans.fit(self.color_pool)
                 centers = sorted(kmeans.cluster_centers_.astype(int).tolist(), key=sum)
 

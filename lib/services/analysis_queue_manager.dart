@@ -25,32 +25,42 @@ class AnalysisQueueManager {
     _isProcessing = true;
 
     try {
-      // 1. Fetch pending images from DB
-      List<ImageModel> pendingImages = await _imageRepo.getPendingImages();
-      if (pendingImages.isNotEmpty) {
-        debugPrint("[Queue]: Found ${pendingImages.length} pending images");
-        for (final image in pendingImages) {
-          await _processSingleImage(image);
-        }
-      }
+      // Loop until no items are left
+      while (true) {
+        bool processedAny = false;
 
-      // 2. Fetch pending notes from DB
-      List<NoteModel> pendingNotes = await _noteRepo.getPendingNotes();
-      if (pendingNotes.isNotEmpty) {
-        debugPrint("[Queue]: Found ${pendingNotes.length} pending notes");
-
-        // Group notes to avoid decoding parent image multiple times
-        final Map<String, List<NoteModel>> notesByImage = {};
-        for (var note in pendingNotes) {
-          if (!notesByImage.containsKey(note.imageId)) {
-            notesByImage[note.imageId] = [];
+        // 1. Fetch pending images from DB
+        List<ImageModel> pendingImages = await _imageRepo.getPendingImages();
+        if (pendingImages.isNotEmpty) {
+          processedAny = true;
+          debugPrint("[Queue]: Found ${pendingImages.length} pending images");
+          for (final image in pendingImages) {
+            await _processSingleImage(image);
           }
-          notesByImage[note.imageId]!.add(note);
         }
 
-        for (final entry in notesByImage.entries) {
-          await _processNoteGroup(entry.key, entry.value);
+        // 2. Fetch pending notes from DB
+        List<NoteModel> pendingNotes = await _noteRepo.getPendingNotes();
+        if (pendingNotes.isNotEmpty) {
+          processedAny = true;
+          debugPrint("[Queue]: Found ${pendingNotes.length} pending notes");
+
+          // Group notes to avoid decoding parent image multiple times
+          final Map<String, List<NoteModel>> notesByImage = {};
+          for (var note in pendingNotes) {
+            if (!notesByImage.containsKey(note.imageId)) {
+              notesByImage[note.imageId] = [];
+            }
+            notesByImage[note.imageId]!.add(note);
+          }
+
+          for (final entry in notesByImage.entries) {
+            await _processNoteGroup(entry.key, entry.value);
+          }
         }
+
+        // If no items were processed in this iteration, the queue is drained
+        if (!processedAny) break;
       }
     } catch (e) {
       debugPrint("[Queue]: Critical Error: $e");

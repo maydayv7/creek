@@ -1,198 +1,115 @@
-import os
 import sys
 import json
 import traceback
 import numpy as np
 import cv2
-import joblib
+from sklearn.cluster import KMeans
 
-# --- Global Cache ---
-_MODEL_DATA = None
+# ==========================================
+# HELPER FUNCTIONS
+# ==========================================
 
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, (np.integer, int)):
-            return int(obj)
-        elif isinstance(obj, (np.floating, float)):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return super(NumpyEncoder, self).default(obj)
+def get_dominant_colors(img_rgb, k=5):
+    """
+    Extracts dominant colors using KMeans.
+    Expects a Numpy array (RGB).
+    """
+    # Resize to speed up processing
+    img_small = cv2.resize(img_rgb, (150, 150), interpolation=cv2.INTER_AREA)
 
-def _load_model_if_needed():
-    global _MODEL_DATA
-    if _MODEL_DATA is not None:
-        return _MODEL_DATA
+    # Reshape to a list of pixels
+    pixels = img_small.reshape((-1, 3))
 
-    try:
-        base_dir = os.path.dirname(__file__)
-        model_path = os.path.join(base_dir, "color_style_model.joblib")
-        if os.path.exists(model_path):
-            _MODEL_DATA = joblib.load(model_path)
-    except Exception as e:
-        print(f"Error loading model: {e}")
-    return _MODEL_DATA
+    # KMeans Clustering
+    # FIX: n_init='auto' crashes on older sklearn versions found in Chaquopy.
+    # We use n_init=10 which is the standard default for older versions.
+    kmeans = KMeans(n_clusters=k, n_init=10, random_state=42)
+    kmeans.fit(pixels)
 
-# --- Feature Extraction Helpers ---
-def compute_color_features(bgr):
-    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-    lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
-    H, S, V = cv2.split(hsv)
-    L, A, B = cv2.split(lab)
+    colors = kmeans.cluster_centers_.astype(int)
 
-    def stats(x):
-        x = x.astype(np.float32) / 255.0
-        return float(x.mean()), float(x.std()), float(np.percentile(x, 1)), float(np.percentile(x, 99))
+    # Sort by brightness (Sum of RGB channels)
+    return sorted(colors.tolist(), key=lambda x: sum(x))
 
-    color = {}
+def classify_mood(rgb_colors):
+    """
+    Classifies mood based on HSV values.
+    Adapted to use OpenCV instead of Matplotlib to reduce APK size and dependencies.
+    """
+    # Normalize RGB values to 0-1 range (Float32 required for CV2 conversion)
+    norm_colors = np.array(rgb_colors, dtype=np.float32) / 255.0
 
-    # Lightness / brightness
-    mean_L, std_L, p1_L, p99_L = stats(L)
-    color.update({"mean_L": mean_L, "std_L": std_L, "p1_L": p1_L, "p99_L": p99_L})
+    # Reshape to (1, N, 3) image format for cv2.cvtColor
+    img_reshaped = norm_colors.reshape(1, -1, 3)
+    
+    # Convert RGB to HSV
+    # OpenCV with float32 input returns: H[0-360], S[0-1], V[0-1]
+    hsv_img = cv2.cvtColor(img_reshaped, cv2.COLOR_RGB2HSV)
+    hsv_stats = hsv_img[0] # Shape (N, 3)
 
-    # Saturation
-    mean_S, std_S, p1_S, p99_S = stats(S)
-    color.update({"mean_S": mean_S, "std_S": std_S, "p1_S": p1_S, "p99_S": p99_S})
+    # Normalize Hue to 0-1 range to match original logic (Matplotlib uses 0-1)
+    hsv_stats[:, 0] /= 360.0
 
-    # Value / luminance
-    mean_V, std_V, p1_V, p99_V = stats(V)
-    color.update({"mean_V": mean_V, "std_V": std_V, "p1_V": p1_V, "p99_V": p99_V})
+    # Extract averages
+    # hsv_stats structure is [Hue, Saturation, Value]
+    avg_sat = np.mean(hsv_stats[:, 1])
+    avg_val = np.mean(hsv_stats[:, 2])
 
-    # Hue stats
-    Hf = H.astype(np.float32) * 2.0
-    rad = np.deg2rad(Hf)
-    sin_mean, cos_mean = np.sin(rad).mean(), np.cos(rad).mean()
-    hue_mean_deg = np.rad2deg(np.arctan2(sin_mean, cos_mean)) % 360
-    R = np.sqrt(sin_mean**2 + cos_mean**2)
-    hue_dispersion = float(1 - R)
-    color.update({"hue_mean_deg": float(hue_mean_deg), "hue_dispersion": hue_dispersion})
+    # Logic Rules
+    if avg_sat < 0.15 and avg_val > 0.65: return "Minimalist"
+    if avg_val < 0.35: return "Dark/Moody"
+    if avg_sat < 0.45 and avg_val > 0.75: return "Pastel"
+    if avg_sat > 0.65 and avg_val > 0.5: return "Neon"
 
-    # Colorfulness
-    rg = (bgr[:, :, 2].astype(np.float32) - bgr[:, :, 1].astype(np.float32))
-    yb = 0.5 * (bgr[:, :, 2].astype(np.float32) + bgr[:, :, 1].astype(np.float32)) - bgr[:, :, 0].astype(np.float32)
-    sigma_rg, sigma_yb = rg.std(), yb.std()
-    mean_rg, mean_yb = rg.mean(), yb.mean()
-    colorfulness = np.sqrt(sigma_rg**2 + sigma_yb**2) + 0.3 * np.sqrt(mean_rg**2 + mean_yb**2)
-    color["colorfulness"] = float(colorfulness)
+    # Earthy logic: Hue between 0.02 and 0.42 (approx 7 to 150 deg), low saturation
+    earthy_votes = sum(1 for p in hsv_stats if (0.02 <= p[0] <= 0.42) and p[1] < 0.8)
+    if earthy_votes >= 3: return "Earthy"
 
-    # Palette
-    pixels = bgr.reshape(-1, 3).astype(np.float32)
-    K = 5
-    criteria = (cv2.TermCriteria_EPS + cv2.TermCriteria_MAX_ITER, 20, 1.0)
-    _, _, centers = cv2.kmeans(pixels, K, None, criteria, 1, cv2.KMEANS_PP_CENTERS)
-    color["palette_bgr"] = centers.astype(int).tolist()
+    # Warm/Cool logic: Warm is usually red/orange/yellow (low Hue or very high Hue)
+    warm_votes = sum(1 for p in hsv_stats if p[0] < 0.17 or p[0] > 0.83)
+    return "Warm" if warm_votes >= 3 else "Cool"
 
-    return color
+def rgb_to_hex(rgb):
+    return '#{:02x}{:02x}{:02x}'.format(rgb[0], rgb[1], rgb[2])
 
-
-def compute_editing_features(bgr):
-    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-    lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
-    H, S, V = cv2.split(hsv)
-    L, A, B = cv2.split(lab)
-
-    feats = {}
-
-    def stats(x):
-        x = x.astype(np.float32) / 255.0
-        return float(x.mean()), float(x.std()), float(np.percentile(x, 1)), float(np.percentile(x, 99))
-
-    mean_V, std_V, p1_V, p99_V = stats(V)
-    mean_S, std_S, p1_S, p99_S = stats(S)
-
-    feats["brightness_mean"] = mean_V
-    feats["brightness_range"] = p99_V - p1_V
-
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
-    feats["contrast_rms"] = float(gray.std())
-    feats["saturation_mean"] = mean_S
-    feats["saturation_range"] = p99_S - p1_S
-    feats["tint_a_mean"] = float(A.mean())
-    feats["tint_b_mean"] = float(B.mean())
-
-    Hf = H.astype(np.float32) * 2.0
-    rad = np.deg2rad(Hf)
-    sin_mean, cos_mean = np.sin(rad).mean(), np.cos(rad).mean()
-    hue_mean_deg = np.rad2deg(np.arctan2(sin_mean, cos_mean)) % 360
-    R = np.sqrt(sin_mean**2 + cos_mean**2)
-    feats["hue_mean_deg"] = float(hue_mean_deg)
-    feats["hue_dispersion"] = float(1 - R)
-
-    patch_std = []
-    step, k = 16, 16
-    for y in range(0, gray.shape[0] - k + 1, step):
-        for x in range(0, gray.shape[1] - k + 1, step):
-            patch = gray[y:y + k, x:x + k]
-            patch_std.append(patch.std())
-    if len(patch_std) > 0:
-        patch_std = np.array(patch_std)
-        feats["local_contrast_mean"] = float(patch_std.mean())
-        feats["local_contrast_std"] = float(patch_std.std())
-    else:
-        feats["local_contrast_mean"] = 0.0
-        feats["local_contrast_std"] = 0.0
-
-    return feats
-
-
-def flatten_features(features_dict):
-    flat_values = []
-    # 1. Color Features
-    color_feats = features_dict.get('color', {})
-    for key, val in color_feats.items():
-        if key == 'palette_bgr':
-            flat_values.extend(np.array(val).flatten())
-        else:
-            flat_values.append(val)
-    # 2. Editing Features
-    edit_feats = features_dict.get('editing', {})
-    for key, val in edit_feats.items():
-        flat_values.append(val)
-    return np.array(flat_values)
-
-
-# --- Public API ---
+# ==========================================
+# MAIN API
+# ==========================================
 
 def analyze_color_style(image_path):
     try:
-        model_data = _load_model_if_needed()
-        if model_data is None:
-            return json.dumps({"success": False, "scores": {}, "error": "Model failed to load"})
-
-        if not os.path.exists(image_path):
-            return json.dumps({"success": False, "scores": {}, "error": f"Image not found at: {image_path}"})
-
-        img = cv2.imread(image_path)
-        if img is None:
+        # 1. Load Image
+        # OpenCV reads in BGR by default
+        img_bgr = cv2.imread(image_path)
+        if img_bgr is None:
             return json.dumps({"success": False, "scores": {}, "error": "CV2 could not read image"})
+        
+        # Convert to RGB
+        img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
-        # Extract Features
-        raw_features = {
-            "color": compute_color_features(img),
-            "editing": compute_editing_features(img)
-        }
+        # 2. Extract Colors
+        colors = get_dominant_colors(img_rgb)
+        
+        # 3. Classify Mood
+        mood = classify_mood(colors)
+        
+        # 4. Format Results
+        hex_colors = [rgb_to_hex(c) for c in colors]
 
-        flat_vector = flatten_features(raw_features)
-
-        # Predict
-        clf = model_data['model']
-        le = model_data['encoder']
-
-        probs = clf.predict_proba([flat_vector])[0]
-        classes = le.classes_
-
-        results = {}
-        for c, p in zip(classes, probs):
-            results[c] = float(p)
-
-        sorted_features = sorted(results.items(), key=lambda x: x[1], reverse=True)
         response = {
             "success": True,
-            "scores": {k: float(v) for k, v in sorted_features}, #[:3]
+            # We return the mood as a score of 1.0 to maintain compatibility 
+            # with existing UI components that expect a map of scores.
+            "scores": {mood: 1.0},
+            "palette": hex_colors,
             "error": None,
         }
 
-        return json.dumps(response, cls=NumpyEncoder)
+        return json.dumps(response)
 
     except Exception as e:
-        return json.dumps({"success": False, "scores": {}, "error": f"Python Exception: {str(e)} | {traceback.format_exc()}"})
+        return json.dumps({
+            "success": False, 
+            "scores": {}, 
+            "error": f"Python Exception: {str(e)} | {traceback.format_exc()}"
+        })

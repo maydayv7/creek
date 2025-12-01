@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:adobe/ui/styles/variables.dart';
 import 'package:adobe/ui/widgets/bottom_bar.dart';
@@ -203,7 +204,11 @@ class _StylesheetPageState extends State<StylesheetPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text("No stylesheet data.", style: Variables.headerStyle.copyWith(fontSize: 18)),
+          Text(
+            "Are you ready to start building\nthe visual identity",
+            style: Variables.headerStyle.copyWith(fontSize: 18),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 24),
           _buildGenerateButton("Generate Stylesheet"),
         ],
@@ -281,7 +286,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
                 ),
                 const SizedBox(height: 32),
               ],
-              if (style != null) _buildSliderSection("Style & Aesthetic", style), // Matches Composition now
+              if (style != null) _buildSliderSection("Style & Aesthetic", style),
               if (emotions != null) _buildSliderSection("Mood & Emotions", emotions),
               if (lighting != null) _buildSliderSection("Lighting", lighting),
               if (era != null) _buildSliderSection("Era & Culture", era),
@@ -315,7 +320,19 @@ class _StylesheetPageState extends State<StylesheetPage> {
         width: 200, height: 44,
         decoration: BoxDecoration(color: Variables.textPrimary, borderRadius: BorderRadius.circular(112)),
         alignment: Alignment.center,
-        child: Text(label, style: Variables.buttonTextStyle),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(label, style: Variables.buttonTextStyle),
+            const SizedBox(width: 8),
+            SvgPicture.asset(
+              'assets/icons/generate_icon.svg',
+              width: 20, 
+              height: 20,
+              colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -372,6 +389,34 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
+  Widget _buildTypographyCard(String rawFontName) {
+    final String correctFontName = _resolveGoogleFontName(rawFontName);
+    TextStyle sampleStyle;
+    try {
+      sampleStyle = GoogleFonts.getFont(correctFontName);
+    } catch (_) {
+      sampleStyle = const TextStyle(fontFamily: 'GeneralSans');
+    }
+
+    return Container(
+      width: 160, padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white, borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Variables.borderSubtle),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Text("Aa", style: sampleStyle.copyWith(fontSize: 56, height: 1, fontWeight: FontWeight.w400, color: Colors.black))),
+          Text(correctFontName, style: const TextStyle(fontFamily: 'GeneralSans', fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black), maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 4),
+          const Text("Primary Typeface", style: TextStyle(fontFamily: 'GeneralSans', fontSize: 11, color: Variables.textSecondary, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTypographySection(dynamic data) {
     List<String> fontNames = [];
     if (data is List) {
@@ -405,34 +450,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
-  Widget _buildTypographyCard(String rawFontName) {
-    final String correctFontName = _resolveGoogleFontName(rawFontName);
-    TextStyle sampleStyle;
-    try {
-      sampleStyle = GoogleFonts.getFont(correctFontName);
-    } catch (_) {
-      sampleStyle = const TextStyle(fontFamily: 'GeneralSans');
-    }
-
-    return Container(
-      width: 160, padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Variables.borderSubtle),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: Text("Aa", style: sampleStyle.copyWith(fontSize: 56, height: 1, fontWeight: FontWeight.w400, color: Colors.black))),
-          Text(correctFontName, style: const TextStyle(fontFamily: 'GeneralSans', fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 4),
-          const Text("Primary Typeface", style: TextStyle(fontFamily: 'GeneralSans', fontSize: 11, color: Variables.textSecondary, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-
   Widget _buildColorSection(dynamic data) {
     List<Map<String, dynamic>> palette = [];
     if (data is List) {
@@ -452,7 +469,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
 
   Widget _buildColorCard(String label) {
     Color color = _getColorFromLabel(label);
-    String hexCode = "#${color.value.toRadixString(16).substring(2).toUpperCase()}";
+    String hexCode = label.toUpperCase(); 
+
     return Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Variables.borderSubtle)),
       clipBehavior: Clip.antiAlias,
@@ -470,7 +488,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
                 children: [
                   Text(hexCode, style: const TextStyle(fontFamily: 'GeneralSans', fontSize: 12, fontWeight: FontWeight.bold, color: Variables.textPrimary)),
                   const SizedBox(height: 2),
-                  Text(label.toUpperCase(), style: const TextStyle(fontFamily: 'GeneralSans', fontSize: 10, color: Variables.textSecondary, overflow: TextOverflow.ellipsis), maxLines: 1),
+                  const Text("HEX", style: TextStyle(fontFamily: 'GeneralSans', fontSize: 10, color: Variables.textSecondary, overflow: TextOverflow.ellipsis), maxLines: 1),
                 ],
               ),
             ),
@@ -521,16 +539,14 @@ class _StylesheetPageState extends State<StylesheetPage> {
   }
 
   Color _getColorFromLabel(String label) {
-    label = label.toLowerCase();
-    if (label.contains('neon')) return const Color(0xFF39FF14);
-    if (label.contains('earth')) return const Color(0xFF8D6E63);
-    if (label.contains('pastel')) return const Color(0xFFFFB7B2);
-    if (label.contains('neutral')) return const Color(0xFFE0E0E0);
-    if (label.contains('vintage')) return const Color(0xFFD2B48C);
-    if (label.contains('modern')) return const Color(0xFF212121);
-    if (label.contains('warm')) return const Color(0xFFFF9800);
-    if (label.contains('cool')) return const Color(0xFF00BCD4);
-    if (label.contains('dark')) return const Color(0xFF1a1a1a);
-    return Colors.grey.shade400;
+    if (label.startsWith('#') || label.length == 6) {
+      try {
+        String hex = label.replaceAll('#', '');
+        if (hex.length == 6) {
+          return Color(int.parse('0xFF$hex'));
+        }
+      } catch (_) {}
+    }
+    return Colors.grey.shade400; // Fallback
   }
 }

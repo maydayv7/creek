@@ -189,7 +189,6 @@ class StylesheetService {
   }
 
   Color _parseColor(String input) {
-    // 1. Try parsing Hex (e.g. "#FF0000" or "FF0000")
     if (input.startsWith('#') || input.length == 6) {
       try {
         String hex = input.replaceAll('#', '');
@@ -198,21 +197,6 @@ class StylesheetService {
         }
       } catch (_) {}
     }
-
-    // 2. Fallback to Semantic Labels
-    String label = input.toLowerCase();
-    if (label.contains('neon')) return const Color(0xFF39FF14);
-    if (label.contains('earth')) return const Color(0xFF8D6E63);
-    if (label.contains('pastel')) return const Color(0xFFFFB7B2);
-    if (label.contains('neutral')) return const Color(0xFFE0E0E0);
-    if (label.contains('vintage')) return const Color(0xFFD2B48C);
-    if (label.contains('modern')) return const Color(0xFF212121);
-    if (label.contains('warm')) return const Color(0xFFFF9800);
-    if (label.contains('cool')) return const Color(0xFF00BCD4);
-    if (label.contains('dark')) return const Color(0xFF1a1a1a);
-    if (label.contains('blue')) return Colors.blue;
-    if (label.contains('red')) return Colors.red;
-
     return Colors.grey.shade400; // Default fallback
   }
 }
