@@ -78,4 +78,20 @@ class NoteRepo {
     final db = await AppDatabase.db;
     await db.delete('notes', where: 'id = ?', whereArgs: [id]);
   }
+
+  // Inside NoteRepo
+
+  Future<NoteModel?> getByCropPath(String path) async {
+    final db = await AppDatabase.db;
+    final maps = await db.query(
+      'notes',
+      where: 'cropFilePath = ?',
+      whereArgs: [path],
+    );
+
+    if (maps.isNotEmpty) {
+      return NoteModel.fromMap(maps.first);
+    }
+    return null;
+  }
 }

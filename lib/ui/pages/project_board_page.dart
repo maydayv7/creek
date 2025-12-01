@@ -72,12 +72,12 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
         await Future.wait(
           images.map((img) async {
             final Set<String> distinctCategories = {...img.tags};
-            final notes = await _noteRepo.getNotesForImage(img.id);
-            for (var note in notes) {
-              if (note.category.isNotEmpty) {
-                distinctCategories.add(note.category);
-              }
-            }
+            // final notes = await _noteRepo.getNotesForImage(img.id);
+            // for (var note in notes) {
+            //   if (note.category.isNotEmpty) {
+            //     distinctCategories.add(note.category);
+            //   }
+            // }
             if (distinctCategories.isEmpty) {
               tempMap.putIfAbsent('Uncategorized', () => []).add(img);
             } else {
