@@ -8,6 +8,25 @@ class FileRepo {
     await db.insert('files', file.toMap());
   }
 
+  // New method: Gets all files, regardless of project ID, ordered by last_updated
+  Future<List<FileModel>> getAllFiles() async {
+    final db = await AppDatabase.db;
+    final res = await db.query('files', orderBy: 'last_updated DESC');
+    return res.map((e) => FileModel.fromMap(e)).toList();
+  }
+
+  // New method: Gets the most recent files across all projects, capped by limit
+  Future<List<FileModel>> getRecentFiles({int limit = 10}) async {
+    final db = await AppDatabase.db;
+    final res = await db.query(
+      'files',
+      orderBy: 'last_updated DESC',
+      limit: limit,
+    );
+    return res.map((e) => FileModel.fromMap(e)).toList();
+  }
+
+  // Retained original function for fetching files by a specific project ID
   Future<List<FileModel>> getFiles(int projectId) async {
     final db = await AppDatabase.db;
     final res = await db.query(
@@ -70,6 +89,29 @@ class FileRepo {
     return res.map((e) => e['file_path'] as String).toList();
   }
 
+  Future<List<FileModel>> getFilesForProjectAndEvents(int projectId) async {
+    final db = await AppDatabase.db;
+
+    // Fetch events of this project
+    final eventRows = await db.query(
+      'projects',
+      where: 'parent_id = ?',
+      whereArgs: [projectId],
+    );
+
+    final eventIds = eventRows.map((e) => e['id'] as int).toList();
+    final allIds = [projectId, ...eventIds];
+
+    final res = await db.query(
+      'files',
+      where: 'project_id IN (${List.filled(allIds.length, '?').join(',')})',
+      whereArgs: allIds,
+      orderBy: 'last_updated DESC',
+    );
+
+    return res.map((e) => FileModel.fromMap(e)).toList();
+  }
+
   Future<FileModel?> getByFilePath(String path) async {
     final db = await AppDatabase.db;
     final res = await db.query(
@@ -80,15 +122,5 @@ class FileRepo {
     );
     if (res.isNotEmpty) return FileModel.fromMap(res.first);
     return null;
-  }
-
-  Future<List<FileModel>> getRecentFiles({int limit = 10}) async {
-    final db = await AppDatabase.db;
-    final res = await db.query(
-      'files',
-      orderBy: 'last_updated DESC',
-      limit: limit,
-    );
-    return res.map((e) => FileModel.fromMap(e)).toList();
   }
 }

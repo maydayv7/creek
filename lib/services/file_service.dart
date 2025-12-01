@@ -37,8 +37,24 @@ class FileService {
     return id;
   }
 
+  // New method to get ALL files
+  Future<List<FileModel>> getAllFiles() async {
+    return await _repo.getAllFiles();
+  }
+
+  // New method to get recent files globally (limit 3 for the UI)
+  Future<List<FileModel>> getRecentFiles({int limit = 10}) async {
+    return await _repo.getRecentFiles(limit: limit);
+  }
+
+  // Retained for backwards compatibility, though generally deprecated for a global file list view.
+  @Deprecated('Use getAllFiles() or getRecentFiles() for the file list page.')
   Future<List<FileModel>> getFiles(int projectId) async {
     return await _repo.getFiles(projectId);
+  }
+
+  Future<List<FileModel>> getFilesForProjectAndEvents(int projectId) {
+    return _repo.getFilesForProjectAndEvents(projectId);
   }
 
   Future<void> openFile(String id) async {
@@ -67,4 +83,10 @@ class FileService {
       await _repo.deleteFile(id);
     }
   }
+
+  Future<void> renameFile(String id, String newName) async {
+    await _repo.updateDetails(id, name: newName);
+  }
+
+  
 }

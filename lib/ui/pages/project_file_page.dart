@@ -1,12 +1,17 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+
 import '../../data/models/file_model.dart';
+import '../../data/models/project_model.dart';
 import '../../services/file_service.dart';
+import '../../data/repos/project_repo.dart';
 import '../widgets/bottom_bar.dart';
 import 'create_file_page.dart';
-import 'canvas_board_page.dart'; // [IMPORTANT] Import this to open the canvas
+import 'canvas_board_page.dart';
+
+import 'package:image/image.dart' as img;
 
 class ProjectFilePage extends StatefulWidget {
   final int projectId;
@@ -19,442 +24,602 @@ class ProjectFilePage extends StatefulWidget {
 
 class _ProjectFilePageState extends State<ProjectFilePage> {
   final _fileService = FileService();
-  final _imagePicker = ImagePicker();
+  final _projectRepo = ProjectRepo();
 
-  List<FileModel> _files = [];
+  List<FileModel> _allFiles = [];
+  List<ProjectModel> _events = [];
+  List<FileModel> _eventFiles = [];
+
+  Map<String, Map<String, String>> _fileMetadata = {};
+
+  ProjectModel? _selectedEvent;
   bool _isLoading = true;
+  String _search = '';
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadEverything();
   }
 
-  Future<void> _loadData() async {
+  // ---------------------------------------
+  // LOAD EVERYTHING
+  // ---------------------------------------
+  Future<void> _loadEverything() async {
     setState(() => _isLoading = true);
     try {
-      final files = await _fileService.getFiles(widget.projectId);
-      if (mounted) {
-        setState(() {
-          _files = files;
-          _isLoading = false;
-        });
+      _events = await _projectRepo.getEvents(widget.projectId);
+
+      _allFiles = await _fileService.getFilesForProjectAndEvents(
+        widget.projectId,
+      );
+
+      await _loadMetadata(_allFiles);
+
+      if (_events.isNotEmpty) {
+        _selectedEvent = _events.first;
+        _eventFiles = await _fileService.getFiles(_selectedEvent!.id!);
+        await _loadMetadata(_eventFiles);
       }
     } catch (e) {
-      debugPrint('Error loading files: $e');
-      if (mounted) setState(() => _isLoading = false);
+      debugPrint("Error loading project page: $e");
+    }
+
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  // ---------------------------------------
+  // LOAD METADATA (Like HomePage)
+  // ---------------------------------------
+  Future<void> _loadMetadata(List<FileModel> list) async {
+    for (final file in list) {
+      try {
+        final f = File(file.filePath);
+        if (!await f.exists()) continue;
+
+        if (file.filePath.toLowerCase().endsWith(".json")) {
+          final content = await f.readAsString();
+          final data = jsonDecode(content);
+
+          String dims = "Unknown";
+          String preview = "";
+
+          if (data is Map) {
+            if (data["width"] != null && data["height"] != null) {
+              dims = "${data["width"]} x ${data["height"]} px";
+            }
+            if (data["preview_path"] != null) {
+              preview = data["preview_path"];
+            }
+          }
+
+          // Fix relative preview path
+          if (preview.isNotEmpty && !File(preview).existsSync()) {
+            final base = f.parent.path;
+            final candidate = "$base/$preview";
+            if (File(candidate).existsSync()) preview = candidate;
+          }
+
+          _fileMetadata[file.id] = {"preview": preview, "dimensions": dims};
+        } else {
+          final bytes = await f.readAsBytes();
+          final decoded = img.decodeImage(bytes);
+
+          String dims = "Unknown";
+          if (decoded != null) {
+            dims = "${decoded.width} x ${decoded.height} px";
+          }
+
+          _fileMetadata[file.id] = {
+            "preview": file.filePath,
+            "dimensions": dims,
+          };
+        }
+      } catch (_) {}
     }
   }
 
-  // --- ACTIONS ---
+  // ---------------------------------------
+  // SELECT EVENT
+  // ---------------------------------------
+  Future<void> _onSelectEvent(ProjectModel event) async {
+    setState(() => _selectedEvent = event);
+    _eventFiles = await _fileService.getFiles(event.id!);
+    await _loadMetadata(_eventFiles);
+    setState(() {});
+  }
 
-  void _navigateToCreateFile() {
+  // ---------------------------------------
+  // OPEN FILE
+  // ---------------------------------------
+  void _openFile(FileModel file) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder:
-            (_) => CreateFilePage(
-              // Pass the current projectId so the file is saved to THIS project
-              projectId: widget.projectId,
+            (_) => CanvasBoardPage(
+              projectId: file.projectId,
+              width: 1080,
+              height: 1920,
+              existingFile: file,
             ),
       ),
-    ).then((_) => _loadData());
-  }
-
-  void _openFile(FileModel file) {
-    // Check if it's a Canvas file (JSON)
-    if (file.filePath.toLowerCase().endsWith('.json')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) => CanvasBoardPage(
-                projectId: widget.projectId,
-                // Use default dimensions for viewing; the canvas content defines the actual size
-                width: 1080,
-                height: 1920,
-                existingFile: file, // [KEY FIX] Loads the saved canvas
-              ),
-        ),
-      ).then((_) => _loadData());
-    } else {
-      // It's a regular image
-      // You can add navigation to an Image Viewer page here if you have one
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Image preview coming soon")),
-      );
-    }
-  }
-
-  Future<void> _pickAndAddFile() async {
-    try {
-      final XFile? pickedFile = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-      );
-
-      if (pickedFile != null && mounted) {
-        // Navigate to CreateFilePage with the selected image
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (_) => CreateFilePage(
-                  file: File(pickedFile.path),
-                  projectId: widget.projectId, // PASS PROJECT ID
-                ),
-          ),
-        );
-
-        // Refresh the list after returning from the creation flow
-        if (mounted) {
-          _loadData();
-        }
-      }
-    } catch (e) {
-      debugPrint("Error picking file: $e");
-    }
-  }
-
-  Future<void> _showAddFileDialog(File file) async {
-    final nameController = TextEditingController(
-      text: file.path.split('/').last,
     );
-    final descriptionController = TextEditingController();
+  }
 
-    if (!mounted) return;
+  void _handleFileMenuAction(FileModel file, String action) {
+    switch (action) {
+      case "open":
+        _openFile(file);
+        break;
 
-    await showDialog(
+      case "rename":
+        _renameFile(file);
+        break;
+
+      case "delete":
+        _deleteFile(file);
+        break;
+    }
+  }
+
+  Future<void> _renameFile(FileModel file) async {
+    final controller = TextEditingController(text: file.name);
+
+    final newName = await showDialog<String>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text(
-              "Save File",
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontWeight: FontWeight.w600,
-              ),
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Rename File"),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: "New file name",
+              border: OutlineInputBorder(),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: "File Name",
-                    border: OutlineInputBorder(),
-                  ),
-                  style: const TextStyle(fontFamily: 'GeneralSans'),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: "Description (optional)",
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                  style: const TextStyle(fontFamily: 'GeneralSans'),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Cancel"),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (nameController.text.trim().isNotEmpty) {
-                    try {
-                      await _fileService.saveFile(
-                        file,
-                        widget.projectId,
-                        name: nameController.text.trim(),
-                        description:
-                            descriptionController.text.trim().isEmpty
-                                ? null
-                                : descriptionController.text.trim(),
-                      );
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        _loadData();
-                      }
-                    } catch (e) {
-                      debugPrint("Error saving file: $e");
-                    }
-                  }
-                },
-                child: const Text("Save"),
-              ),
-            ],
           ),
+          actions: [
+            TextButton(
+              child: const Text("Cancel"),
+              onPressed: () => Navigator.pop(context),
+            ),
+            FilledButton(
+              child: const Text("Save"),
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+            ),
+          ],
+        );
+      },
     );
+
+    if (newName == null || newName.isEmpty) return;
+
+    // ✔ Update DB
+    await _fileService.renameFile(file.id, newName);
+
+    // ✔ Reload UI
+    await _loadEverything();
   }
 
-  Future<void> _deleteFile(String fileId) async {
+  
+  Future<void> _deleteFile(FileModel file) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
-          (context) => AlertDialog(
+          (_) => AlertDialog(
             title: const Text("Delete File?"),
-            content: const Text("This action cannot be undone."),
+            content: Text("This will permanently remove ${file.name}."),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
                 child: const Text("Cancel"),
               ),
-              TextButton(
+              FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
                 child: const Text("Delete"),
               ),
             ],
           ),
     );
 
-    if (confirm == true) {
-      await _fileService.deleteFile(fileId);
-      _loadData();
+    if (confirm != true) return;
+
+    try {
+      await _fileService.deleteFile(file.id!);
+
+      final disk = File(file.filePath);
+      if (await disk.exists()) await disk.delete();
+
+      setState(() {
+        _allFiles.removeWhere((f) => f.id == file.id);
+        _eventFiles.removeWhere((f) => f.id == file.id);
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("File deleted")));
+    } catch (e) {
+      debugPrint("Delete error: $e");
     }
   }
 
+
+  // ---------------------------------------
+  // CREATE FILE
+  // ---------------------------------------
+  void _navigateToCreateFile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateFilePage(projectId: widget.projectId),
+      ),
+    ).then((_) => _loadEverything());
+  }
+
+  // ---------------------------------------
+  // FILE CARD (Same UI but thumbnail updated)
+  // ---------------------------------------
+  Widget _fileCard(FileModel file) {
+    final date = DateFormat.yMMMd().format(file.lastUpdated);
+    final meta = _fileMetadata[file.id] ?? {};
+    final preview = meta["preview"] ?? "";
+    final realPreview =
+        preview.isNotEmpty && File(preview).existsSync()
+            ? preview
+            : file.filePath;
+
+    return GestureDetector(
+      onTap: () => _openFile(file),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE4E4E7)),
+        ),
+        child: Row(
+          children: [
+            // ---------------------------------------
+            // ✔ NEW THUMBNAIL SIZE (HomePage style)
+            // ---------------------------------------
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.grey[300],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  File(realPreview),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.image),
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            // ---------------------------------------
+            // TEXT INFO (unchanged UI)
+            // ---------------------------------------
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _breadcrumbFor(file),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                      fontFamily: 'GeneralSans',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+
+                  const SizedBox(height: 2),
+
+                  Text(
+                    file.name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'GeneralSans',
+                    ),
+                  ),
+
+                  const SizedBox(height: 2),
+
+                  Text(
+                    "Edited $date",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontFamily: 'GeneralSans',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 8),
+            PopupMenuButton<String>(
+              onSelected: (value) => _handleFileMenuAction(file, value),
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(value: "open", child: Text("Open")),
+                    const PopupMenuItem(value: "rename", child: Text("Rename")),
+                    const PopupMenuItem(value: "delete", child: Text("Delete")),
+                  ],
+              icon: const Icon(Icons.more_vert, size: 20),
+            ),
+
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------
+  // BREADCRUMB
+  // ---------------------------------------
+  String _breadcrumbFor(FileModel file) {
+    final event = _events.firstWhere(
+      (e) => e.id == file.projectId,
+      orElse:
+          () => ProjectModel(
+            id: widget.projectId,
+            title: "",
+            lastAccessedAt: DateTime.now(),
+            createdAt: DateTime.now(),
+          ),
+    );
+
+    if (event.parentId == null) return "";
+
+    final parent = _events.firstWhere(
+      (e) => e.id == event.parentId,
+      orElse:
+          () => ProjectModel(
+            id: widget.projectId,
+            title: "",
+            lastAccessedAt: DateTime.now(),
+            createdAt: DateTime.now(),
+          ),
+    );
+
+    return "${parent.title} / ${event.title}";
+  }
+
+  // ---------------------------------------
+  // UI
+  // ---------------------------------------
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: const Color(0xFFF7F7F8),
       appBar: AppBar(
-        title: const Text("Project Files"),
-        backgroundColor: theme.appBarTheme.backgroundColor,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: "Create New File",
-            onPressed: _navigateToCreateFile,
+        backgroundColor: const Color(0xFFF7F7F8),
+        elevation: 0,
+        title: const Text(
+          "Project Files",
+          style: TextStyle(
+            fontFamily: 'GeneralSans',
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF27272A),
           ),
-        ],
+        ),
       ),
+
       bottomNavigationBar: BottomBar(
         currentTab: BottomBarItem.files,
         projectId: widget.projectId,
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _pickAndAddFile,
-        child: const Icon(Icons.upload_file),
+
+      floatingActionButton: GestureDetector(
+        onTap: _navigateToCreateFile,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF27272A),
+            borderRadius: BorderRadius.circular(50),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text(
+                "Create File",
+                style: TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              SizedBox(width: 8),
+              Icon(Icons.add, color: Colors.white),
+            ],
+          ),
+        ),
       ),
+
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : RefreshIndicator(
-                onRefresh: _loadData,
+                onRefresh: _loadEverything,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildSectionHeader("Files", theme),
-                          Text(
-                            "${_files.length} items",
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurface.withOpacity(
-                                0.6,
-                              ),
-                              fontFamily: 'GeneralSans',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      if (_files.isEmpty)
-                        _buildEmptyState(isDark)
-                      else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _files.length,
-                          separatorBuilder:
-                              (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final file = _files[index];
-                            return _buildFileCard(file, theme, isDark);
-                          },
-                        ),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
-                ),
-              ),
-    );
-  }
+                      const SizedBox(height: 12),
 
-  Widget _buildEmptyState(bool isDark) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.folder_open, size: 48, color: Colors.grey[400]),
-          const SizedBox(height: 8),
-          Text("No files added yet", style: TextStyle(color: Colors.grey[500])),
-        ],
-      ),
-    );
-  }
+                      _buildSearchBar(),
 
-  Widget _buildSectionHeader(String title, ThemeData theme) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        fontFamily: 'GeneralSans',
-        color: theme.colorScheme.onSurface,
-      ),
-    );
-  }
+                      const SizedBox(height: 24),
 
-  Widget _buildFileCard(FileModel file, ThemeData theme, bool isDark) {
-    final dateStr = DateFormat.yMMMd().format(file.lastUpdated);
-    final isCanvas = file.filePath.toLowerCase().endsWith('.json');
-
-    return InkWell(
-      onTap: () => _openFile(file), // [KEY FIX] Make the card clickable
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? Colors.grey[850] : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Icon based on type
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: (isCanvas
-                            ? Colors.orange
-                            : theme.colorScheme.primary)
-                        .withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    isCanvas ? Icons.brush : Icons.insert_drive_file,
-                    color: isCanvas ? Colors.orange : theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        file.name,
-                        style: const TextStyle(
+                      // -------------------------
+                      // ALL FILES
+                      // -------------------------
+                      const Text(
+                        "All Files",
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           fontFamily: 'GeneralSans',
+                          color: Color(0xFF27272A),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Updated $dateStr",
+
+                      const SizedBox(height: 12),
+
+                      if (_filteredAllFiles().isEmpty)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(
+                              "No files found",
+                              style: TextStyle(color: Colors.grey[500]),
+                            ),
+                          ),
+                        )
+                      else
+                        Column(
+                          children:
+                              _filteredAllFiles()
+                                  .map((f) => _fileCard(f))
+                                  .toList(),
+                        ),
+
+                      const SizedBox(height: 32),
+
+                      // -------------------------
+                      // FILES FOR EVENTS
+                      // -------------------------
+                      const Text(
+                        "Files for Events",
                         style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                           fontFamily: 'GeneralSans',
+                          color: Color(0xFF27272A),
                         ),
                       ),
+
+                      const SizedBox(height: 12),
+
+                      if (_events.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(32),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            "No events yet",
+                            style: TextStyle(color: Colors.grey[500]),
+                          ),
+                        )
+                      else
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // -----------------------
+                            // DROPDOWN ONLY
+                            // -----------------------
+                            _buildEventDropdown(),
+
+                            const SizedBox(height: 16),
+
+                            _eventFiles.isEmpty
+                                ? Text(
+                                  "No files in this event yet",
+                                  style: TextStyle(color: Colors.grey[500]),
+                                )
+                                : Column(
+                                  children:
+                                      _eventFiles
+                                          .map((f) => _fileCard(f))
+                                          .toList(),
+                                ),
+                          ],
+                        ),
+
+                      const SizedBox(height: 100),
                     ],
                   ),
                 ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (value) {
-                    if (value == 'delete') {
-                      _deleteFile(file.id);
-                    } else if (value == 'open') {
-                      _openFile(file);
-                    }
-                  },
-                  itemBuilder:
-                      (context) => [
-                        const PopupMenuItem(value: 'open', child: Text("Open")),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Text(
-                            "Delete",
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                ),
-              ],
-            ),
-            if (file.description != null && file.description!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                file.description!,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: theme.colorScheme.onSurface.withOpacity(0.7),
-                  fontFamily: 'GeneralSans',
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
-            ],
-            if (file.tags.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children:
-                    file.tags
-                        .map(
-                          (tag) => Chip(
-                            label: Text(
-                              tag,
-                              style: const TextStyle(fontSize: 10),
-                            ),
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        )
-                        .toList(),
-              ),
-            ],
-          ],
+    );
+  }
+
+  // ---------------------------------------
+  // SEARCH
+  // ---------------------------------------
+  Widget _buildSearchBar() {
+    return TextField(
+      onChanged: (v) => setState(() => _search = v.trim()),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: Colors.grey[200],
+        hintText: "Search your files",
+        prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
         ),
       ),
     );
+  }
+
+  // ---------------------------------------
+  // DROPDOWN (ONLY — add event removed)
+  // ---------------------------------------
+  Widget _buildEventDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: DropdownButton<ProjectModel>(
+        value: _selectedEvent,
+        items:
+            _events
+                .map(
+                  (e) => DropdownMenuItem(
+                    value: e,
+                    child: Text(
+                      e.title,
+                      style: const TextStyle(
+                        fontFamily: 'GeneralSans',
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+        onChanged: (e) {
+          if (e != null) _onSelectEvent(e);
+        },
+        underline: const SizedBox(),
+        isExpanded: true,
+      ),
+    );
+  }
+  
+  // ---------------------------------------
+  // FILTER
+  // ---------------------------------------
+  List<FileModel> _filteredAllFiles() {
+    if (_search.isEmpty) return _allFiles;
+    return _allFiles
+        .where(
+          (f) =>
+              f.name.toLowerCase().contains(_search.toLowerCase()) ||
+              _breadcrumbFor(f).toLowerCase().contains(_search.toLowerCase()),
+        )
+        .toList();
   }
 }
