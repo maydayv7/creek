@@ -928,7 +928,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         final baseImage = frameInfo.image;
         
         paintImage(
-          canvas: canvas,
+          canvas: canvas, 
           rect: Rect.fromLTWH(0, 0, size.width, size.height),
           image: baseImage,
           fit: BoxFit.cover, // Or contain, depending on your logic
