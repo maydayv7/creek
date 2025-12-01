@@ -908,39 +908,72 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       return;
     }
 
-    if (_tempBaseImage == null) {
-      debugPrint("❌ No base image captured! Capturing now (might include strokes)...");
-      _tempBaseImage = await _captureCanvasToFile();
-    }
-
-    if (_tempBaseImage == null) return;
-
     setState(() => _isInpainting = true);
+    _resetInactivityTimer();
 
     try {
-      // 1. Generate Mask Image using ONLY MAGIC PATHS
-      // Passing _tempBaseImage to ensure mask = Base Image + Drawing
-      File? maskFile = await _generateMaskImageFromPaths(
-        _magicPaths,
-        _canvasSize,
-        _tempBaseImage, 
-      );
+      // 1. Check for Image Layers
+      bool hasImageLayers = elements.any((e) => e['type'] == 'file_image');
 
-      if (maskFile == null) throw Exception("Failed to generate mask");
+      if (hasImageLayers) {
+        // --- INPAINTING FLOW (Existing) ---
+        if (_tempBaseImage == null) {
+          _tempBaseImage = await _captureCanvasToFile();
+        }
 
-      // 2. Call Service
-      final String? newImageUrl = await FlaskService().inpaintImage(
-        imagePath: _tempBaseImage!.path,
-        maskPath: maskFile.path,
-        prompt: prompt,
-      );
+        if (_tempBaseImage == null) return;
 
-      // 3. Update Canvas with New Image
+        File? maskFile = await _generateMaskImageFromPaths(
+          _magicPaths,
+          _canvasSize,
+          _tempBaseImage, 
+        );
+
+        if (maskFile == null) throw Exception("Failed to generate mask");
+
+        final String? newImageUrl = await FlaskService().inpaintImage(
+          imagePath: _tempBaseImage!.path,
+          maskPath: maskFile.path,
+          prompt: prompt,
+        );
+
+        _addGeneratedImage(newImageUrl);
+
+      } else {
+        // --- SKETCH-TO-IMAGE FLOW (New) ---
+        // Capture the entire canvas (strokes only since no images exist)
+        File? sketchFile = await _captureCanvasToFile();
+        if (sketchFile == null) throw Exception("Failed to capture sketch");
+
+        final String? newImageUrl = await FlaskService().sketchToImage(
+          sketchPath: sketchFile.path,
+          userPrompt: prompt,
+          stylePrompt: "high quality, realistic", // Default style
+        );
+
+        _addGeneratedImage(newImageUrl);
+      }
+
+    } catch (e) {
+      debugPrint("Generation Error: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Generation failed.")));
+    } finally {
+      setState(() {
+        _isInpainting = false;
+        _tempBaseImage = null; // Reset base image
+        _magicPaths.clear(); // Always clear magic paths on end
+      });
+    }
+  }
+
+  void _addGeneratedImage(String? newImageUrl) {
       if (newImageUrl != null) {
-        debugPrint("✅ Adding inpainted image to canvas: $newImageUrl");
+        debugPrint("✅ Adding generated image to canvas: $newImageUrl");
         setState(() {
           elements.add({
-            'id': 'inpaint_${DateTime.now().millisecondsSinceEpoch}',
+            'id': 'gen_${DateTime.now().millisecondsSinceEpoch}',
             'type': 'file_image',
             'content': newImageUrl,
             'position': const Offset(0, 0),
@@ -950,21 +983,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
           // Clear magic paths now that operation is done
           _magicPaths.clear(); 
         });
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Inpainting failed.")));
       }
-    } catch (e) {
-      debugPrint("Inpainting Error: $e");
-    } finally {
-      setState(() {
-        _isInpainting = false;
-        _tempBaseImage = null; // Reset base image
-        _magicPaths.clear(); // Always clear magic paths on end
-      });
-      _resetInactivityTimer();
-    }
   }
 
   // Updated to generate mask as: Base Image + Drawing Strokes
@@ -988,7 +1007,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         final baseImage = frameInfo.image;
         
         paintImage(
-          canvas: canvas,
+          canvas: canvas, 
           rect: Rect.fromLTWH(0, 0, size.width, size.height),
           image: baseImage,
           fit: BoxFit.cover, // Or contain, depending on your logic
