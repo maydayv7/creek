@@ -29,7 +29,7 @@ class _HomePageState extends State<HomePage> {
   final Map<int, List<String>> _projectPreviews = {};
   Map<String, String> _fileDimensions = {};
   bool _isLoading = true;
-  final String _userName = "Alex"; // Can be loaded from preferences later
+  final String _userName = "Alex"; 
 
   @override
   void initState() {
@@ -40,23 +40,18 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      // Load all projects and create a map for quick lookup
       final allProjects = await _projectRepo.getAllProjects();
       final Map<int, ProjectModel> projectMap = {};
       for (final project in allProjects) {
         if (project.id != null) {
           projectMap[project.id!] = project;
-          // Load preview images for each project
           final images = await _imageRepo.getImages(project.id!);
           _projectPreviews[project.id!] =
               images.take(4).map((img) => img.filePath).toList();
         }
       }
 
-      // Load recent files
       final recentFiles = await _fileRepo.getRecentFiles(limit: 10);
-
-      // Load dimensions for files
       final Map<String, String> fileDimensions = {};
       for (final file in recentFiles) {
         try {
@@ -113,8 +108,7 @@ class _HomePageState extends State<HomePage> {
   String _getProjectBreadcrumb(FileModel file) {
     final project = _projectMap[file.projectId];
     if (project == null) return '';
-
-    // Check if project is an event (has parentId)
+    
     if (project.isEvent) {
       final parentProject = _projectMap[project.parentId!];
       if (parentProject != null) {
@@ -139,12 +133,12 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  // --- NEW METHOD: Test the Canvas Page ---
+
+
   void _openProject(ProjectModel project) {
-    // Update last accessed time
     if (project.id != null) {
       _projectService.openProject(project.id!);
-
-      // Navigate to project detail page
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -155,7 +149,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _openFile(FileModel file) {
-    // Navigate to file detail or project detail
     final project = _projectMap[file.projectId];
     if (project != null) {
       _openProject(project);
@@ -169,52 +162,52 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : SafeArea(
-                child: RefreshIndicator(
-                  onRefresh: _loadData,
-                  child: CustomScrollView(
-                    slivers: [
-                      // Header Section
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-                          child: Row(
-                            children: [
-                              Text(
-                                "Hello, $_userName!",
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: 'GeneralSans',
-                                  color: theme.colorScheme.onSurface,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SafeArea(
+              child: RefreshIndicator(
+                onRefresh: _loadData,
+                child: CustomScrollView(
+                  slivers: [
+                    // Header Section
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+                        child: Row(
+                          children: [
+                            Text(
+                              "Hello, $_userName!",
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: 'GeneralSans',
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            const Spacer(),
+
+                            // Profile Picture
+                            Container(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: theme.scaffoldBackgroundColor,
+                                  width: 1.25,
                                 ),
                               ),
-                              const Spacer(),
-                              // Profile Picture
-                              Container(
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primaryContainer,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: theme.scaffoldBackgroundColor,
-                                    width: 1.25,
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 16,
-                                  color: theme.colorScheme.onPrimaryContainer,
-                                ),
+                              child: Icon(
+                                Icons.person,
+                                size: 16,
+                                color: theme.colorScheme.onPrimaryContainer,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
+                    ),
 
                       // Search Bar
                       SliverToBoxAdapter(
@@ -270,7 +263,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
 
-                      const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
                       // Content Sections
                       SliverToBoxAdapter(
@@ -333,28 +326,26 @@ class _HomePageState extends State<HomePage> {
                               ),
                               const SizedBox(height: 24),
 
-                              // Explore Templates Section
-                              _buildSectionHeader(
-                                'Explore templates',
-                                theme,
-                                onTap: () {
-                                  // Navigate to templates
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              _buildTemplatesSection(theme, isDark),
-                              const SizedBox(height: 24),
-                            ],
-                          ),
+                            // Explore Templates Section
+                            _buildSectionHeader(
+                              'Explore templates',
+                              theme,
+                              onTap: () {},
+                            ),
+                            const SizedBox(height: 12),
+                            _buildTemplatesSection(theme, isDark),
+                            const SizedBox(height: 24),
+                          ],
                         ),
                       ),
+                    ),
 
-                      // Bottom padding
-                      const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                    ],
-                  ),
+                    // Bottom padding
+                    const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                  ],
                 ),
               ),
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: _createNewProject,
         backgroundColor: isDark ? Colors.grey[900] : Colors.grey[900],
@@ -409,7 +400,6 @@ class _HomePageState extends State<HomePage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail
             Container(
               width: 104,
               height: 106,
@@ -437,7 +427,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(width: 8),
-            // File Info
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -541,7 +530,6 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Preview Image
             Expanded(
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(
@@ -581,7 +569,6 @@ class _HomePageState extends State<HomePage> {
                         ),
               ),
             ),
-            // Project Title and Actions
             Padding(
               padding: const EdgeInsets.all(8),
               child: Row(
@@ -615,7 +602,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTemplatesSection(ThemeData theme, bool isDark) {
-    // Static templates for now - can be made dynamic later
     final templates = [
       {'title': 'Diwali Lights', 'subtitle': 'Instagram Post'},
       {'title': 'Business Opening', 'subtitle': 'Flyer'},
