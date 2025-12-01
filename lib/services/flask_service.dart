@@ -5,6 +5,7 @@ import 'package:adobe/data/repos/image_repo.dart';
 import 'package:adobe/data/repos/note_repo.dart';
 import 'package:adobe/data/repos/project_repo.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -14,8 +15,11 @@ class FlaskService {
   // CONFIGURATION
   // ===========================================================================
 
-  // NOTE: REPLACE WITH IP ADDRESS OF LOCAL SERVER
-  static const String _serverUrl = 'http://10.150.40.117:5000';
+  // Ensure SERVER_URL is defined in .env file
+  static String get _serverUrl {
+    return dotenv.env['SERVER_URL'] ?? 'http://127.0.0.1:5000';
+  }
+
   static const Map<String, String> _headers = {
     'Content-Type': 'application/json',
   };
