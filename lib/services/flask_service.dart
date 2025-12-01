@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:adobe/data/repos/file_repo.dart';
 import 'package:adobe/data/repos/image_repo.dart';
+import 'package:adobe/data/repos/note_repo.dart';
 import 'package:adobe/data/repos/project_repo.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -13,11 +15,20 @@ class FlaskService {
   // CONFIGURATION
   // ===========================================================================
 
-  // NOTE: REPLACE WITH IP ADDRESS OF LOCAL SERVER
-  static const String _serverUrl = 'http://10.150.40.117:5000';
+  // Ensure SERVER_URL is defined in .env file
+  static String get _serverUrl {
+    return dotenv.env['SERVER_URL'] ?? 'http://127.0.0.1:5000';
+  }
+
   static const Map<String, String> _headers = {
     'Content-Type': 'application/json',
   };
+
+  // --- OPTIMIZATION: Instantiate Repos once ---
+  final _imageRepo = ImageRepo();
+  final _noteRepo = NoteRepo();
+  final _projectRepo = ProjectRepo();
+  final _fileRepo = FileRepo();
 
   // ===========================================================================
   // 1. PIPELINES (Complex workflows)
@@ -97,42 +108,64 @@ class FlaskService {
 
   /// [Background Removal]
   Future<String?> generateAsset({required String imagePath}) async {
+    // 1. Prepare and Upload
     final String? base64Image = await _encodeFile(imagePath);
     if (base64Image == null) return null;
-
-    final String? path = await _performImageOperation(
+  
+    final String? generatedAssetPath = await _performImageOperation(
       endpoint: '/asset',
       logPrefix: '✂️ Asset Gen',
       body: {'image': base64Image},
       filenamePrefix: 'asset',
     );
-
-    if (path != null) {
-      // 1. Find the project ID
+  
+    // 2. Resolve Project ID and Save
+    if (generatedAssetPath != null) {
       int? projectId;
-
-      final imagemodel = await ImageRepo().getByFilePath(imagePath);
-      if (imagemodel != null) {
-        projectId = imagemodel.projectId;
-      } else {
-        final filemodel = await FileRepo().getByFilePath(imagePath);
-        if (filemodel != null) {
-          projectId = filemodel.projectId;
+  
+      // --- CHECK 1: Is this a Main Image? ---
+      final imageModel = await _imageRepo.getByFilePath(imagePath);
+      if (imageModel != null) {
+        projectId = imageModel.projectId;
+      }
+  
+      // --- CHECK 2: Is this a Note Crop? (NEW) ---
+      if (projectId == null) {
+        // You need a method in NoteRepo to find a note by its crop path
+        final noteModel = await _noteRepo.getByCropPath(imagePath); 
+        
+        if (noteModel != null) {
+          // Traverse up: Note -> Parent Image -> Project
+          final parentImage = await _imageRepo.getById(noteModel.imageId);
+          if (parentImage != null) {
+            projectId = parentImage.projectId;
+            debugPrint("🔗 Linked Asset to Project via Note: ${noteModel.id}");
+          }
         }
       }
-
-      // 2. Update the Project Repo AND SAVE TO DATABASE
-      if (projectId != null) {
-        final project = await ProjectRepo().getProjectById(projectId);
-        if (project != null) {
-          project.assetsPath.add(path); // Update memory
-          await ProjectRepo().updateAssets(projectId, project.assetsPath);
-          debugPrint("✅ Asset path saved to Project DB: $path");
+  
+      // --- CHECK 3: Is this a generic File? ---
+      if (projectId == null) {
+        final fileModel = await _fileRepo.getByFilePath(imagePath);
+        if (fileModel != null) {
+          projectId = fileModel.projectId;
         }
+      }
+  
+      // 3. Update the Project
+      if (projectId != null) {
+        final project = await _projectRepo.getProjectById(projectId);
+        if (project != null) {
+          project.assetsPath.add(generatedAssetPath); 
+          await _projectRepo.updateAssets(projectId, project.assetsPath);
+          debugPrint("✅ Asset path saved to Project DB: $generatedAssetPath");
+        }
+      } else {
+        debugPrint("⚠️ Asset generated but could not link to a Project ID.");
       }
     }
-
-    return path;
+  
+    return generatedAssetPath;
   }
 
   // ===========================================================================
@@ -185,9 +218,7 @@ class FlaskService {
       return _saveImageFromResponse(response, filenamePrefix);
     }
 
-    debugPrint(
-      "❌ $logPrefix Failed: ${response?.statusCode ?? 'No Connection'}",
-    );
+    debugPrint("❌ $logPrefix Failed: ${response?.statusCode ?? 'No Connection'}");
     return null;
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:adobe/data/models/project_model.dart';
 import 'package:adobe/data/repos/project_repo.dart';
 import '../styles/variables.dart';
@@ -96,7 +97,7 @@ class _TopBarState extends State<TopBar> {
         child: SizedBox(
           height: kToolbarHeight,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               children: [
                 // 1. Back Button
@@ -107,45 +108,50 @@ class _TopBarState extends State<TopBar> {
                       color: Variables.textPrimary,
                     ),
                     onPressed: widget.onBack,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                 ],
 
                 // 2. Title & Selector
                 Expanded(
                   child:
                       widget.titleOverride != null
-                          ? Text(
-                            widget.titleOverride!,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: Variables.textPrimary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          )
-                          : (!_isLoading &&
-                              _currentProject != null &&
-                              _rootProject != null)
-                          ? Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  _rootProject!.title,
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w600,
-                                    color: Variables.textPrimary,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                          ? Padding(
+                              padding: const EdgeInsets.only(left: 8.0),
+                              child: Text(
+                                widget.titleOverride!,
+                                style: const TextStyle(
+                                  fontFamily: 'GeneralSans',
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w500,
+                                  color: Variables.textPrimary,
                                 ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(width: 8),
-                            ],
-                          )
-                          : const SizedBox(),
+                            )
+                          : (!_isLoading &&
+                                  _currentProject != null &&
+                                  _rootProject != null)
+                              ? Row(
+                                  children: [
+                                    if (widget.onBack == null)
+                                      const SizedBox(width: 12),
+                                    Flexible(
+                                      child: Text(
+                                        _rootProject!.title,
+                                        style: const TextStyle(
+                                          fontFamily: 'GeneralSans',
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w500,
+                                          color: Variables.textPrimary,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                )
+                              : const SizedBox(),
                 ),
                 if (!_isLoading &&
                     _currentProject != null &&
@@ -160,7 +166,7 @@ class _TopBarState extends State<TopBar> {
                     ),
                     offset: const Offset(0, 38),
                     child: Container(
-                      padding: EdgeInsets.symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 10,
                       ),
@@ -176,6 +182,7 @@ class _TopBarState extends State<TopBar> {
                                 ? "Main"
                                 : _currentProject!.title,
                             style: Variables.bodyStyle.copyWith(
+                              fontFamily: 'GeneralSans',
                               fontSize: 15 * textScaler.scale(1.1),
                               fontWeight: FontWeight.w500,
                               color: Variables.textPrimary,
@@ -199,6 +206,7 @@ class _TopBarState extends State<TopBar> {
                           child: Text(
                             isRoot ? "Main Project" : project.title,
                             style: Variables.bodyStyle.copyWith(
+                              fontFamily: 'GeneralSans',
                               fontWeight:
                                   isSelected
                                       ? FontWeight.bold
@@ -213,17 +221,20 @@ class _TopBarState extends State<TopBar> {
                       }).toList();
                     },
                   ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 4),
 
                 // 3. Settings Icon
                 IconButton(
-                  icon: const Icon(
-                    Icons.settings_outlined,
-                    color: Variables.textPrimary,
+                  icon: SvgPicture.asset(
+                    'assets/icons/settings-line.svg',
+                    width: 24,
+                    height: 24,
+                    colorFilter: const ColorFilter.mode(
+                      Variables.textPrimary,
+                      BlendMode.srcIn,
+                    ),
                   ),
                   onPressed: widget.onSettingsPressed,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
                 ),
               ],
             ),

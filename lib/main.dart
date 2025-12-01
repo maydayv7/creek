@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:adobe/services/theme_service.dart';
 import 'package:adobe/ui/pages/share_handler_page.dart';
@@ -9,6 +10,7 @@ import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   AnalysisQueueManager().processQueue();
   runApp(const MyApp());
 }
