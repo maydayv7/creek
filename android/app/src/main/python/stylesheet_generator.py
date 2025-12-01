@@ -398,7 +398,7 @@ class UnifiedStyleEngine:
                     candidates.append({"label": tag, "score": round(score, 2)})
 
             candidates.sort(key=lambda x: x['score'], reverse=True)
-            if candidates: final_json["results"][category] = candidates
+            if candidates: final_json["results"][category] = candidates[:5]
 
         # 2. Process Typography
         if self.font_family_scores:

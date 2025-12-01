@@ -161,6 +161,13 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
         onBack: () => Navigator.pop(context),
         onProjectChanged: _onProjectChanged,
         onSettingsPressed: () {},
+        isAlternateView: _showAlternateView,
+        onLayoutToggle: () {
+          setState(() {
+            _showAlternateView = !_showAlternateView;
+            if (!_showAlternateView) _loadImagesForSelected();
+          });
+        },
       ),
       bottomNavigationBar: BottomBar(
         currentTab: BottomBarItem.moodboard,
@@ -174,93 +181,6 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 12.0,
-            ),
-            child: Row(
-              children: [
-                InkWell(
-                  onTap: () {
-                    setState(() {
-                      _showAlternateView = !_showAlternateView;
-                      if (!_showAlternateView) _loadImagesForSelected();
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Variables.surfaceSubtle,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Variables.borderSubtle),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _showAlternateView
-                              ? Icons.dashboard
-                              : Icons.view_agenda_outlined,
-                          size: 18,
-                          color: Variables.textPrimary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _showAlternateView ? "Categorized" : "All Images",
-                          style: Variables.bodyStyle.copyWith(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                if (_showAlternateView)
-                  InkWell(
-                    onTap: () {
-                      _alternatePageKey.currentState?.showFilterDialog();
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Variables.surfaceSubtle,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Variables.borderSubtle),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.tune_outlined,
-                            size: 18,
-                            color: Variables.textPrimary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            "Filter",
-                            style: Variables.bodyStyle.copyWith(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
           Expanded(
             child:
                 _showAlternateView

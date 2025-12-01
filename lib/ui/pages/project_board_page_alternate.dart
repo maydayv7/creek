@@ -221,14 +221,6 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: Row(
             children: [
-              Text(
-                "ALL IMAGES (${_filteredImages.length})",
-                style: Variables.captionStyle.copyWith(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                  color: Variables.textSecondary,
-                ),
-              ),
               const Spacer(),
               if (_selectedTags.isNotEmpty)
                 Container(

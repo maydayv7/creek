@@ -216,6 +216,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ),
         backgroundColor: const Color(0xFFFAFAFA),
         elevation: 0,
+        leadingWidth: 40,
+        titleSpacing: 4,
         actions: [
           IconButton(
             icon: SvgPicture.asset(
@@ -509,46 +511,44 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             width: 1,
           ),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Three images side by side (or fewer if not available)
             Container(
               height: 115,
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.only(bottom: 4),
               child: Row(
                 children: [
                   // Show up to 3 images
-                  for (int i = 0; i < 3; i++)
+                  for (int i = 0; i < 3; i++) ...[
                     Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: i < 2 ? 4 : 0,
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: i < eventImages.length
-                              ? Image.file(
-                                  File(eventImages[i].filePath),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: Colors.grey[300],
-                                    );
-                                  },
-                                )
-                              : Container(
-                                  color: Colors.grey[200],
-                                ),
-                        ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: i < eventImages.length
+                            ? Image.file(
+                                File(eventImages[i].filePath),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[300],
+                                  );
+                                },
+                              )
+                            : Container(
+                                color: Colors.grey[200],
+                              ),
                       ),
                     ),
+                    if (i < 2) const SizedBox(width: 4),
+                  ],
                 ],
               ),
             ),
             // Event title
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              padding: const EdgeInsets.fromLTRB(4, 16, 16, 16),
               child: Text(
                 event.title,
                 style: const TextStyle(
