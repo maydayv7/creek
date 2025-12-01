@@ -362,7 +362,10 @@ class ImageAnalyzerService {
             'Style': {"scores": results[3]['scores']},
             'Texture': {"scores": results[2]['scores']},
             'Lighting': {"scores": results[5]['scores']},
-            'Colour Palette': {"scores": results[1]['scores']},
+            'Colour Palette': {
+              "scores": results[1]['scores'],
+              "palette": results[1]['palette']
+            },
             'Emotions': {"scores": results[4]['scores']},
             'Era': {"scores": results[6]['scores']},
             'Layout': {"scores": results[0]['scores']},

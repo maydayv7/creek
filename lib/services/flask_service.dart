@@ -45,8 +45,7 @@ class FlaskService {
   }) async {
     debugPrint("🔗 [Pipeline] Starting Sketch-to-Image...");
 
-    // Step 1: Get the description of the sketch
-    // We use a specific prompt to ensure we get structural details
+    // 1. Analyze Sketch
     final String? sketchDescription = await describeImage(
       imagePath: sketchPath,
       prompt: '<MORE_DETAILED_CAPTION>',
@@ -57,15 +56,24 @@ class FlaskService {
       return null;
     }
 
-    // Step 2: Construct the Global Prompt
-    // Strategy: Style + User Intent + Content context
+    // 2. Construct Prompt & Generate
     final String globalPrompt =
         "$stylePrompt. $userPrompt. The image features: $sketchDescription";
 
-    debugPrint("🔗 [Pipeline] Generated Global Prompt: \n$globalPrompt");
+    debugPrint("🔗 [Pipeline] Generating base image...");
+    
+    final String? generatedImagePath = await generateAndSaveImage(globalPrompt);
 
-    // Step 3: Generate the final image
-    return generateAndSaveImage(globalPrompt);
+    if (generatedImagePath == null) {
+      debugPrint("❌ [Pipeline] Failed: Image generation returned null.");
+      return null;
+    }
+
+    // 3. Remove Background (Pipeline Extension)
+    debugPrint("🔗 [Pipeline] Removing background from generated result...");
+    
+    // This returns the path to the no-background version
+    return generateAsset(imagePath: generatedImagePath);
   }
 
   // ===========================================================================
