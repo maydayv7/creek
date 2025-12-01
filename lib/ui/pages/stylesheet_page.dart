@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:adobe/ui/styles/variables.dart';
@@ -8,6 +9,8 @@ import 'package:adobe/data/repos/image_repo.dart';
 import 'package:adobe/data/repos/project_repo.dart';
 import 'package:adobe/services/python_service.dart';
 import 'package:adobe/data/repos/note_repo.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 class StylesheetPage extends StatefulWidget {
   final int projectId;
@@ -27,6 +30,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
   
   Map<String, dynamic>? _stylesheetMap;
   String? _rawJsonString;
+  
+  // New state variable to hold assets from ProjectRepo
+  List<String> _projectAssets = [];
 
   // Cache for font name lookups
   final Map<String, String> _fontNameCache = {};
@@ -79,17 +85,51 @@ class _StylesheetPageState extends State<StylesheetPage> {
     return dirtyName; 
   }
 
+  Future<File?> _resolveFile(String path) async {
+    // 1. Try the path exactly as saved
+    final file = File(path);
+    if (await file.exists()) return file;
+
+    // 2. If that fails (iOS UUID change?), try to find it in the current docs dir
+    try {
+      final filename = p.basename(path); // Get "image_123.png" from the long path
+      final dir = await getApplicationDocumentsDirectory();
+      
+      // Reconstruct path: CurrentDir + generated_images + filename
+      final fixedPath = p.join(dir.path, 'generated_images', filename);
+      
+      final fixedFile = File(fixedPath);
+      if (await fixedFile.exists()) {
+        return fixedFile;
+      }
+    } catch (e) {
+      debugPrint("Error resolving file path: $e");
+    }
+
+    return null;
+  }
+
   Future<void> _loadSavedStylesheet() async {
     final project = await ProjectRepo().getProjectById(_currentProjectId);
-    if (project?.globalStylesheet != null && project!.globalStylesheet!.isNotEmpty) {
-      String raw = project.globalStylesheet!;
+    
+    if (project == null) return;
+
+    // 1. Load Assets directly from Project Model
+    List<String> currentAssets = project.assetsPath;
+
+    // 2. Load Stylesheet JSON
+    Map<String, dynamic>? parsedMap;
+    String? rawJson;
+
+    if (project.globalStylesheet != null && project.globalStylesheet!.isNotEmpty) {
+      rawJson = project.globalStylesheet!;
       dynamic parsed;
       
       try {
-        parsed = jsonDecode(raw);
+        parsed = jsonDecode(rawJson);
       } catch (e) {
         try {
-          parsed = jsonDecode(_cleanJsonString(raw));
+          parsed = jsonDecode(_cleanJsonString(rawJson));
         } catch (_) {}
       }
 
@@ -97,20 +137,21 @@ class _StylesheetPageState extends State<StylesheetPage> {
         try { parsed = jsonDecode(parsed); } catch (_) {}
       }
 
-      if (mounted) {
-        setState(() {
-          _rawJsonString = raw;
-          if (parsed is Map<String, dynamic>) {
-            if (parsed.containsKey('results') && parsed['results'] is Map) {
-              _stylesheetMap = parsed['results'];
-            } else {
-              _stylesheetMap = parsed;
-            }
-          } else {
-            _stylesheetMap = null;
-          }
-        });
+      if (parsed is Map<String, dynamic>) {
+        if (parsed.containsKey('results') && parsed['results'] is Map) {
+          parsedMap = parsed['results'];
+        } else {
+          parsedMap = parsed;
+        }
       }
+    }
+
+    if (mounted) {
+      setState(() {
+        _projectAssets = currentAssets;
+        _rawJsonString = rawJson;
+        _stylesheetMap = parsedMap;
+      });
     }
   }
 
@@ -156,14 +197,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
         final jsonString = jsonEncode(result);
         await ProjectRepo().updateStylesheet(_currentProjectId, jsonString);
         
-        setState(() {
-          if (result.containsKey('results') && result['results'] is Map) {
-            _stylesheetMap = result['results'];
-          } else {
-            _stylesheetMap = result;
-          }
-          _rawJsonString = jsonString;
-        });
+        // Reload everything (assets + stylesheet) to keep sync
+        await _loadSavedStylesheet();
       }
     } catch (e) {
       debugPrint("Gen Error: $e");
@@ -193,12 +228,13 @@ class _StylesheetPageState extends State<StylesheetPage> {
         onProjectChanged: (p) => setState(() {
           _currentProjectId = p.id!;
           _stylesheetMap = null;
+          _projectAssets = [];
           _loadSavedStylesheet();
         }),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Variables.textPrimary))
-          : (_stylesheetMap == null && _rawJsonString == null)
+          : (_stylesheetMap == null && _rawJsonString == null && _projectAssets.isEmpty)
               ? _buildEmptyState()
               : _buildContent(),
       bottomNavigationBar: BottomBar(
@@ -228,8 +264,11 @@ class _StylesheetPageState extends State<StylesheetPage> {
     final emotions = _getData(['Emotions', 'emotions']);
     final era = _getData(['Era/Cultural Reference', 'era']);
     final typography = _getData(['Typography', 'fonts']);
-
-    final foundAny = (style != null || lighting != null || colors != null || emotions != null || era != null || typography != null);
+    
+    // We check _projectAssets.isNotEmpty to determine if we show the section
+    final hasAssets = _projectAssets.isNotEmpty;
+    
+    final foundAny = (style != null || lighting != null || colors != null || emotions != null || era != null || typography != null || hasAssets);
 
     return RefreshIndicator(
       onRefresh: _generateStylesheet,
@@ -257,11 +296,15 @@ class _StylesheetPageState extends State<StylesheetPage> {
             const SizedBox(height: 32),
 
             if (foundAny) ...[
-              // 1. Typography (Now a Slider)
+              // 1. Assets / Subjects Section (From Project Repo)
+              if (hasAssets)
+                _buildAssetsSection(_projectAssets),
+
+              // 2. Typography (Now a Slider)
               if (typography != null) 
                 _buildTypographySection(typography),
 
-              // 2. Color Palette
+              // 3. Color Palette
               if (colors != null) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -276,7 +319,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
                 const SizedBox(height: 32),
               ],
 
-              // 3. Slider Sections
+              // 4. Slider Sections
               if (style != null) _buildSliderSection("Style & Aesthetic", style),
               if (emotions != null) _buildSliderSection("Mood & Emotions", emotions),
               if (lighting != null) _buildSliderSection("Lighting", lighting),
@@ -330,6 +373,92 @@ class _StylesheetPageState extends State<StylesheetPage> {
           letterSpacing: 1.2, color: Variables.textSecondary,
         ),
       ),
+    );
+  }
+
+  // --- ASSETS SECTION ---
+  Widget _buildAssetsSection(List<String> imagePaths) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _buildSectionHeader("Subjects & Assets"),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.8,
+            ),
+            itemCount: imagePaths.length,
+            itemBuilder: (context, index) => _buildAssetCard(imagePaths[index]),
+          ),
+        ),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildAssetCard(String savedPath) {
+    return FutureBuilder<File?>(
+      future: _resolveFile(savedPath),
+      builder: (context, snapshot) {
+        final File? file = snapshot.data;
+        final bool exists = file != null;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12), // Matching color card radius
+            border: Border.all(color: Variables.borderSubtle),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: exists
+                    ? Image.file(file, fit: BoxFit.cover)
+                    : Container(
+                        color: Colors.grey.shade100,
+                        child: const Center(
+                          child: Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                        ),
+                      ),
+              ),
+              // Container(
+              //   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              //   color: Colors.white,
+              //   child: const Text(
+              //     "Asset",
+              //     textAlign: TextAlign.center,
+              //     style: TextStyle(
+              //       fontFamily: 'GeneralSans',
+              //       fontSize: 10,
+              //       fontWeight: FontWeight.w600,
+              //       color: Variables.textPrimary,
+              //     ),
+              //     maxLines: 1,
+              //     overflow: TextOverflow.ellipsis,
+              //   ),
+              // )
+            ],
+          ),
+        );
+      },
     );
   }
 

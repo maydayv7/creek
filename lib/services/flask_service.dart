@@ -1,7 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:adobe/data/repos/file_repo.dart';
+import 'package:adobe/data/repos/image_repo.dart';
+import 'package:adobe/data/repos/project_repo.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 class FlaskService {
@@ -9,7 +13,11 @@ class FlaskService {
   // CONFIGURATION
   // ===========================================================================
   
-  static const String _serverUrl = 'https://locustlike-trieciously-rudolph.ngrok-free.dev';
+  // NOTE: REPLACE WITH YOUR WIFI IP ADDRESS
+  //       BOTH PC AND MOBILE SHOULD BE ON SAME WIFI
+  //       NO NEED FOR NGORK OR SMEE
+  //       PORT: 5000, http
+  static const String _serverUrl = 'http://172.16.114.193:5000'; // --> READ NOTE (REPLACE WITH IITG_CONNECT WIFI IP)
   static const Map<String, String> _headers = {'Content-Type': 'application/json'};
 
   // ===========================================================================
@@ -93,12 +101,39 @@ class FlaskService {
     final String? base64Image = await _encodeFile(imagePath);
     if (base64Image == null) return null;
 
-    return _performImageOperation(
-      endpoint: '/remove-background',
+    final String? path = await _performImageOperation(
+      endpoint: '/asset',
       logPrefix: '✂️ Asset Gen',
       body: {'image': base64Image},
       filenamePrefix: 'asset',
     );
+
+    if (path != null) {
+      // 1. Find the project ID
+      int? projectId;
+      
+      final imagemodel = await ImageRepo().getByFilePath(imagePath);
+      if (imagemodel != null) {
+        projectId = imagemodel.projectId;
+      } else {
+        final filemodel = await FileRepo().getByFilePath(imagePath);
+        if (filemodel != null) {
+          projectId = filemodel.projectId;
+        }
+      }
+
+      // 2. Update the Project Repo AND SAVE TO DATABASE
+      if (projectId != null) {
+        final project = await ProjectRepo().getProjectById(projectId);
+        if (project != null) {
+          project.assetsPath.add(path); // Update memory
+          await ProjectRepo().updateAssets(projectId, project.assetsPath); 
+          debugPrint("✅ Asset path saved to Project DB: $path");
+        }
+      }
+    }
+
+    return path;
   }
 
   // ===========================================================================
@@ -190,13 +225,18 @@ class FlaskService {
       final Uint8List imageBytes = base64Decode(data['image']);
       
       final directory = await getApplicationDocumentsDirectory();
-      final imagesDir = Directory('${directory.path}/generated_images');
+      // Use join for safe path construction
+      final imagesDirPath = p.join(directory.path, 'generated_images');
+      final imagesDir = Directory(imagesDirPath);
+      
       if (!await imagesDir.exists()) await imagesDir.create(recursive: true);
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final safePrefix = prefix.replaceAll(RegExp(r'[^\w\s]'), '').trim().replaceAll(' ', '_');
       final shortPrefix = safePrefix.length > 20 ? safePrefix.substring(0, 20) : safePrefix;
-      final String filePath = '${imagesDir.path}/${shortPrefix}_$timestamp.png';
+      
+      // Use join here too
+      final String filePath = p.join(imagesDir.path, '${shortPrefix}_$timestamp.png');
 
       await File(filePath).writeAsBytes(imageBytes);
       debugPrint("✅ Image saved: $filePath");

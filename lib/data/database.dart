@@ -1,11 +1,5 @@
-import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-
-import 'models/project_model.dart';
-import 'models/image_model.dart';
-import 'models/file_model.dart';
-import 'models/note_model.dart';
 
 class AppDatabase {
   static Database? _db;
@@ -36,6 +30,7 @@ class AppDatabase {
             parent_id INTEGER, 
             global_stylesheet TEXT,
             last_accessed_at TEXT,
+            assets_path TEXT DEFAULT '[]',
             created_at TEXT,
             FOREIGN KEY (parent_id) REFERENCES projects (id) ON DELETE CASCADE
           )

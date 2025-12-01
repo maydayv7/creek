@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../database.dart';
 import '../models/project_model.dart';
 
@@ -116,5 +118,19 @@ class ProjectRepo {
   Future<void> deleteProject(int id) async {
     final db = await AppDatabase.db;
     await db.delete('projects', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateAssets(int projectId, List<String> assets) async {
+    final db = await AppDatabase.db;
+
+    await db.update(
+      'projects',
+      {
+        'assets_path': jsonEncode(assets),
+        'last_accessed_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [projectId],
+    );
   }
 }

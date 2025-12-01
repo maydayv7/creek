@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:ui';
 import 'dart:developer' as dev;
+import 'package:adobe/services/flask_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -89,6 +90,7 @@ class ImageAnalyzerService {
         result = await task(imagePath, assetPaths);
       }
 
+      debugPrint("📱: ${result.toString()}");
       stopwatch.stop();
       timelineTask.finish();
       result['execution_time'] = stopwatch.elapsedMilliseconds;
@@ -153,8 +155,6 @@ class ImageAnalyzerService {
       // 2. Run Analysis
       final results = await Future.wait([
         // --- GROUP A: PARALLEL ---
-
-        // TODO: 'Subject'
 
         // 1. Layout
         shouldRun(['Compositions'])
@@ -307,6 +307,25 @@ class ImageAnalyzerService {
               },
             )
             : skipTask(),
+
+        // --- GROUP C: SERVER SIDE ---
+
+        // 9. Subject
+        shouldRun(['Subject', 'Asset'])
+            ? _runProfiledJob(
+              name: 'Subject',
+              imagePath: imagePath,
+              rootToken: token,
+              runInIsolate: false,
+              assetPaths: assetPaths,
+              task: (path, _) async {
+                final String? location = await FlaskService().generateAsset(imagePath: path);
+                final res = {"success": true, "scores": {'image': location}, "error": null};
+                return res;
+              },
+            )
+            : skipTask(),
+
       ]);
 
       totalSw.stop();
@@ -325,6 +344,7 @@ class ImageAnalyzerService {
           'Lighting': results[5]['execution_time'],
           'Era': results[6]['execution_time'],
           'Font': results[7]['execution_time'],
+          'Subject': results[8]['execution_time'],
         },
       };
       _logSummary(logResult);
@@ -342,6 +362,7 @@ class ImageAnalyzerService {
             'Era': {"scores": results[6]['scores']},
             'Layout': {"scores": results[0]['scores']},
             'Font': {"scores": results[7]['scores']},
+            'Subject': {"scores": results[8]['scores']},
           },
         },
         'error': null,

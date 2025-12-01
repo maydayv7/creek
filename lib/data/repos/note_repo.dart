@@ -2,8 +2,6 @@ import '../database.dart';
 import '../models/note_model.dart';
 
 class NoteRepo {
-  final _db = AppDatabase();
-
   Future<int> addNote(NoteModel note) async {
     final db = await AppDatabase.db;
     return await db.insert('notes', note.toMap());
