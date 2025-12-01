@@ -492,98 +492,76 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
   }
 
   Widget _buildRecentFileItem(FileModel file) {
-    final previewPath = _resolvePreviewPath(file);
+    final preview = _resolvePreviewPath(file);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: () => _onFileSelected(file),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE4E4E7), width: 1),
-          ),
-          child: Row(
-            children: [
-              // thumbnail
-              SizedBox(
-                width: 72,
-                height: 72,
-                child: Center(
-                  child: Container(
-                    width: 66,
-                    height: 66,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child:
-                          previewPath.isNotEmpty &&
-                                  File(previewPath).existsSync()
-                              ? Image.file(
-                                File(previewPath),
-                                fit: BoxFit.cover,
-                                errorBuilder: (c, e, s) => _placeholderIcon(),
-                              )
-                              : _placeholderIcon(),
-                    ),
-                  ),
-                ),
+    return InkWell(
+      onTap: () => _onFileSelected(file),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Color(0xFFE4E4E7)),
+        ),
+        child: Row(
+          children: [
+            // ---- FLUSH LEFT THUMBNAIL ----
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
               ),
+              child: Image.file(
+                File(preview),
+                width: 120,
+                height: 120,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (_, __, ___) => Container(
+                      width: 120,
+                      height: 120,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.image),
+                    ),
+              ),
+            ),
 
-              const SizedBox(width: 12),
+            const SizedBox(width: 12),
 
-              // info
-              Expanded(
+            // ---- TEXT ----
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     FutureBuilder<String>(
                       future: _getProjectEventLabel(file),
-                      builder: (context, snapshot) {
-                        final label = snapshot.data ?? "";
-                        return Text(
-                          label,
-                          style: const TextStyle(
-                            fontFamily: 'GeneralSans',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w400,
-                            color: Color(0xFF71717B),
+                      builder:
+                          (_, s) => Text(
+                            s.data ?? "",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF71717B),
+                              fontFamily: "GeneralSans",
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        );
-                      },
                     ),
                     const SizedBox(height: 6),
                     Text(
                       file.name,
                       style: const TextStyle(
-                        fontFamily: 'GeneralSans',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF27272A),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: "GeneralSans",
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
                     Text(
                       _formatDate(file.lastUpdated),
                       style: const TextStyle(
-                        fontFamily: 'GeneralSans',
                         fontSize: 12,
                         color: Color(0xFF71717B),
                       ),
@@ -591,104 +569,89 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+
   Widget _buildFileItem(FileModel file) {
-    final previewPath = _resolvePreviewPath(file);
+    final preview = _resolvePreviewPath(file);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: () => _onFileSelected(file),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE4E4E7), width: 1),
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 72,
-                height: 72,
-                child: Center(
-                  child: Container(
-                    width: 66,
-                    height: 66,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child:
-                          previewPath.isNotEmpty &&
-                                  File(previewPath).existsSync()
-                              ? Image.file(
-                                File(previewPath),
-                                fit: BoxFit.cover,
-                                errorBuilder: (c, e, s) => _placeholderIcon(),
-                              )
-                              : _placeholderIcon(),
-                    ),
-                  ),
-                ),
+    return InkWell(
+      onTap: () => _onFileSelected(file),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Color(0xFFE4E4E7)),
+        ),
+        child: Row(
+          children: [
+            // ---- FLUSH LEFT THUMBNAIL ----
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
               ),
+              child: Image.file(
+                File(preview),
+                width: 120,
+                height: 120,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (_, __, ___) => Container(
+                      width: 120,
+                      height: 120,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.image),
+                    ),
+              ),
+            ),
 
-              const SizedBox(width: 12),
+            const SizedBox(width: 12),
 
-              Expanded(
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     FutureBuilder<String>(
                       future: _getProjectEventLabel(file),
-                      builder: (context, snapshot) {
-                        final label = snapshot.data ?? "";
-                        return Text(
-                          label,
-                          style: const TextStyle(
-                            fontFamily: 'GeneralSans',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w400,
-                            color: Color(0xFF71717B),
+                      builder:
+                          (_, s) => Text(
+                            s.data ?? "",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF71717B),
+                              fontFamily: "GeneralSans",
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        );
-                      },
                     ),
+
                     const SizedBox(height: 4),
+
                     Text(
                       file.name,
                       style: const TextStyle(
-                        fontFamily: 'GeneralSans',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                         color: Color(0xFF27272A),
+                        fontFamily: "GeneralSans",
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+
+                    const SizedBox(height: 6),
+
                     Text(
                       _formatDate(file.lastUpdated),
                       style: const TextStyle(
-                        fontFamily: 'GeneralSans',
                         fontSize: 12,
                         color: Color(0xFF71717B),
                       ),
@@ -696,8 +659,8 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
