@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
@@ -17,8 +19,10 @@ import '../../services/stylesheet_service.dart';
 import '../../services/file_service.dart';
 import '../../data/models/file_model.dart';
 
-// --- MODELS WITH JSON SUPPORT ---
+import '../../services/flask_service.dart';
 
+// --- MODELS WITH JSON SUPPORT ---
+ 
 class DrawingPoint {
   final Offset offset;
   final Paint paint;
@@ -103,10 +107,23 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   // --- STATE ---
   bool _hasUnsavedChanges = false;
   List<Map<String, dynamic>> elements = [];
-  List<DrawingPath> _paths = []; // Keeps drawing strokes live
+  List<DrawingPath> _paths = []; // Keeps normal drawing strokes
+  List<DrawingPath> _magicPaths = []; // Keeps temporary magic draw mask strokes
 
   // Snapshots for undo grouping
   CanvasState? _gestureStartSnapshot;
+
+  // Detection Timer & AI Analysis
+  Timer? _inactivityTimer;
+  final GlobalKey _canvasGlobalKey = GlobalKey();
+  String? _aiDescription;
+  bool _isAnalyzing = false;
+  bool _isDescriptionExpanded = false; // Track expansion state
+
+  // Magic Draw / Inpainting State
+  File? _tempBaseImage;
+  bool _isInpainting = false;
+  bool _isCapturingBase = false; // New flag to hide strokes during capture
 
   String? selectedId;
   late Size _canvasSize;
@@ -156,10 +173,75 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 
   @override
   void dispose() {
+    _inactivityTimer?.cancel();
     _textEditingController.dispose();
     _textFocusNode.dispose();
     _transformationController.dispose();
     super.dispose();
+  }
+
+  // Handle inactivity timer logic
+  void _resetInactivityTimer() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer(const Duration(seconds: 2), () {
+      _analyzeCanvas();
+    });
+  }
+
+  Future<void> _analyzeCanvas() async {
+    if (_isAnalyzing || _isInpainting) return; // Skip if busy
+    setState(() => _isAnalyzing = true);
+
+    try {
+      debugPrint("🧠 [AI] Starting canvas analysis...");
+
+      File? imageFile = await _captureCanvasToFile();
+      if (imageFile == null) return;
+
+      // Call the service
+      final description = await FlaskService().describeImage(
+        imagePath: imageFile.path,
+      );
+
+      debugPrint("🤖 [AI] Service Response: $description");
+
+      if (description != null && mounted) {
+        setState(() {
+          _aiDescription = description;
+          _isDescriptionExpanded = false; // Reset to collapsed on new description
+        });
+      }
+    } catch (e) {
+      debugPrint("❌ [AI] Analysis Failed: $e");
+    } finally {
+      if (mounted) setState(() => _isAnalyzing = false);
+    }
+  }
+
+  Future<File?> _captureCanvasToFile() async {
+    try {
+      RenderRepaintBoundary? boundary =
+          _canvasGlobalKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+
+      ui.Image image = await boundary.toImage(pixelRatio: 1.0);
+      ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      if (byteData == null) return null;
+      Uint8List pngBytes = byteData.buffer.asUint8List();
+
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File(
+        '${tempDir.path}/canvas_capture_${DateTime.now().millisecondsSinceEpoch}.png',
+      );
+      await tempFile.writeAsBytes(pngBytes);
+      return tempFile;
+    } catch (e) {
+      debugPrint("Error capturing canvas: $e");
+      return null;
+    }
   }
 
   Future<void> _fetchBrandColors() async {
@@ -184,6 +266,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   // --- UNDO/REDO ---
 
   void _recordChange(CanvasState oldState) {
+    _resetInactivityTimer(); // Reset timer on undoable actions
     final newState = CanvasState(
       _deepCopyElements(elements),
       List.from(_paths),
@@ -326,7 +409,35 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   }
 
   void _handleGestureStart() {
+    // Check if we need to capture a clean base image
+    if (_isMagicDrawActive && !_isInpainting && _tempBaseImage == null) {
+      _ensureBaseImageCaptured();
+    }
     _gestureStartSnapshot = _getCurrentState();
+  }
+
+  // Captures the base image by temporarily hiding the magic strokes
+  Future<void> _ensureBaseImageCaptured() async {
+    if (_tempBaseImage != null) return;
+
+    debugPrint("📸 [Magic Draw] Hiding strokes to capture clean base...");
+    
+    // 1. Hide strokes by updating state
+    setState(() => _isCapturingBase = true);
+    
+    // 2. Wait for frame to render
+    await Future.delayed(const Duration(milliseconds: 50));
+
+    // 3. Capture
+    try {
+      _tempBaseImage = await _captureCanvasToFile();
+      debugPrint("✅ [Magic Draw] Base image captured.");
+    } catch (e) {
+      debugPrint("❌ [Magic Draw] Failed to capture base: $e");
+    } finally {
+      // 4. Show strokes again
+      if (mounted) setState(() => _isCapturingBase = false);
+    }
   }
 
   void _handleElementUpdate(
@@ -335,6 +446,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     Size newSize,
     double newRotation,
   ) {
+    _resetInactivityTimer(); // Reset timer while dragging/resizing
     final index = elements.indexWhere((e) => e['id'] == id);
     if (index == -1) return;
 
@@ -354,8 +466,708 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   }
 
   // ===========================================================================
-  //  SAVE & LOAD LOGIC
+  //  UI BUILDER
   // ===========================================================================
+
+  @override
+  Widget build(BuildContext context) {
+    Map<String, dynamic>? selectedEl;
+    try {
+      selectedEl = elements.firstWhere((e) => e['id'] == selectedId);
+    } catch (_) {}
+
+    final bool isTextSelected =
+        selectedEl != null && selectedEl['type'] == 'text';
+    final bool showTextOverlay = _isTextToolsActive || isTextSelected;
+
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        _handleBackNavigation();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFE0E0E0),
+        appBar: _buildAppBar(),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            if (!_hasInitializedView) {
+              _hasInitializedView = true;
+              final double scaleX =
+                  (constraints.maxWidth - 40) / _canvasSize.width;
+              final double scaleY =
+                  (constraints.maxHeight - 40) / _canvasSize.height;
+              final double initialScale = math
+                  .min(scaleX, scaleY)
+                  .clamp(0.01, 1.0);
+
+              final double transX =
+                  (constraints.maxWidth - (_canvasSize.width * initialScale)) /
+                  2;
+              final double transY =
+                  (constraints.maxHeight -
+                      (_canvasSize.height * initialScale)) /
+                  2;
+
+              _transformationController.value =
+                  Matrix4.identity()
+                    ..translate(transX, transY)
+                    ..scale(initialScale);
+            }
+
+            return Stack(
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    if (!_isMagicDrawActive) {
+                      _exitEditMode();
+                      setState(() => selectedId = null);
+                    }
+                  },
+                  behavior: HitTestBehavior.translucent,
+                  child: InteractiveViewer(
+                    transformationController: _transformationController,
+                    constrained: false,
+                    boundaryMargin: const EdgeInsets.all(double.infinity),
+                    minScale: 0.01,
+                    maxScale: 10.0,
+                    scaleEnabled: !_isMagicDrawActive,
+                    panEnabled: !_isMagicDrawActive,
+                    child: RepaintBoundary(
+                      // WRAPPED CANVAS IN REPAINT BOUNDARY
+                      key: _canvasGlobalKey,
+                      child: SizedBox(
+                        width: _canvasSize.width,
+                        height: _canvasSize.height,
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              height: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.15),
+                                    blurRadius: 40,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ...elements.map((e) {
+                              final bool isSelected = selectedId == e['id'];
+                              return _ManipulatingBox(
+                                key: ValueKey(e['id']),
+                                id: e['id'],
+                                position: e['position'],
+                                size: e['size'],
+                                rotation: e['rotation'],
+                                type: e['type'],
+                                content: e['content'],
+                                styleData: e,
+                                isSelected: isSelected && !_isMagicDrawActive,
+                                isEditing:
+                                    isSelected &&
+                                    _isEditingText &&
+                                    e['type'] == 'text',
+                                viewScale:
+                                    _transformationController.value
+                                        .getMaxScaleOnAxis(),
+                                onTap: () {
+                                  if (!_isMagicDrawActive) {
+                                    if (_isEditingText && selectedId != e['id'])
+                                      _exitEditMode();
+                                    setState(() {
+                                      selectedId = e['id'];
+                                      if (e['type'] == 'text')
+                                        _isTextToolsActive = true;
+                                    });
+                                    setState(() {
+                                      // Bring to front
+                                      elements.remove(e);
+                                      elements.add(e);
+                                    });
+                                  }
+                                },
+                                onDoubleTap: () {
+                                  if (e['type'] == 'text') _enterEditMode(e);
+                                },
+                                onDragStart: _handleGestureStart,
+                                onUpdate:
+                                    (newPos, newSize, newRot) =>
+                                        _handleElementUpdate(
+                                          e['id'],
+                                          newPos,
+                                          newSize,
+                                          newRot,
+                                        ),
+                                onDragEnd: (newPos, newSize, newRot) {
+                                  _handleElementUpdate(
+                                    e['id'],
+                                    newPos,
+                                    newSize,
+                                    newRot,
+                                  );
+                                  _handleGestureEnd();
+                                },
+                                textController:
+                                    isSelected ? _textEditingController : null,
+                                focusNode: isSelected ? _textFocusNode : null,
+                                transformationController:
+                                    _transformationController,
+                              );
+                            }),
+                            // Drawing Layer
+                            IgnorePointer(
+                              ignoring: !_isMagicDrawActive,
+                              child: RepaintBoundary(
+                                key: _drawingKey,
+                                child: GestureDetector(
+                                  onPanStart: (_) => _handleGestureStart(),
+                                  onPanUpdate: _onPanUpdate,
+                                  onPanEnd: (details) {
+                                    _onPanEnd(details);
+                                    _handleGestureEnd();
+                                  },
+                                  child: CustomPaint(
+                                    size: Size.infinite,
+                                    painter: CanvasPainter(
+                                      paths: _paths,
+                                      // CONDITIONALLY HIDE MAGIC PATHS DURING CAPTURE
+                                      magicPaths: _isCapturingBase ? [] : _magicPaths,
+                                      // CONDITIONALLY HIDE CURRENT POINTS DURING CAPTURE
+                                      currentPoints: _isCapturingBase ? [] : _currentPoints,
+                                      currentColor:
+                                          _isEraser
+                                              ? Colors.transparent
+                                              : _selectedColor,
+                                      currentWidth: _strokeWidth,
+                                      isEraser: _isEraser,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // AI Description Banner
+                if (_aiDescription != null && !_isMagicDrawActive)
+                  Positioned(
+                    top: 10,
+                    left: 16,
+                    right: 16,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isDescriptionExpanded = !_isDescriptionExpanded;
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.95),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2.0),
+                              child: Icon(
+                                Icons.auto_awesome,
+                                size: 20,
+                                color: Colors.indigo.shade400,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _aiDescription!,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                                maxLines: _isDescriptionExpanded ? null : 1,
+                                overflow:
+                                    _isDescriptionExpanded
+                                        ? TextOverflow.visible
+                                        : TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              _isDescriptionExpanded
+                                  ? Icons.keyboard_arrow_up
+                                  : Icons.keyboard_arrow_down,
+                              size: 20,
+                              color: Colors.grey[600],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                MagicDrawTools(
+                  isActive: _isMagicDrawActive,
+                  selectedColor: _selectedColor,
+                  strokeWidth: _strokeWidth,
+                  isEraser: _isEraser,
+                  brandColors: _brandColors,
+                  onClose: _saveAndCloseMagicDraw,
+                  onColorChanged: (c) => setState(() => _selectedColor = c),
+                  onWidthChanged: (w) => setState(() => _strokeWidth = w),
+                  onEraserToggle: (e) => setState(() => _isEraser = e),
+                  // CONNECTED CALLBACKS:
+                  onPromptSubmit: (prompt) => _processInpainting(prompt),
+                  isProcessing: _isInpainting,
+                ),
+
+                TextToolsOverlay(
+                  isActive: showTextOverlay && !_isMagicDrawActive,
+                  isTextSelected: isTextSelected,
+                  currentColor: Color(
+                    selectedEl?['style_color'] ?? Colors.black.value,
+                  ),
+                  currentFontSize:
+                      (selectedEl?['style_fontSize'] ?? 24.0) as double,
+                  onClose: () {
+                    _exitEditMode();
+                    setState(() {
+                      _isTextToolsActive = false;
+                      selectedId = null;
+                    });
+                  },
+                  onAddText: _addTextElement,
+                  onDelete: _deleteSelectedElement,
+                  onColorChanged:
+                      (c) =>
+                          _updateSelectedTextProperty('style_color', c.value),
+                  onFontSizeChanged:
+                      (s) => _updateSelectedTextProperty('style_fontSize', s),
+                ),
+
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: CanvasBottomBar(
+                    activeItem:
+                        _isMagicDrawActive
+                            ? "Magic Draw"
+                            : (_isTextToolsActive ? "Text" : null),
+                    onMagicDraw:
+                        () => setState(() {
+                          _isMagicDrawActive = !_isMagicDrawActive;
+                          _isTextToolsActive = false;
+                          _exitEditMode();
+                          _magicPaths.clear(); // Clear old magic paths
+                          _tempBaseImage = null; // Force recapture next time
+                        }),
+                    onMedia: _pickImageFromGallery,
+                    onStylesheet: () => _showComingSoon('Stylesheet'),
+                    onTools: () => _showComingSoon('Tools'),
+                    onText: _toggleTextTools,
+                    onSelect: () => _showComingSoon('Select'),
+                    onPlugins: () => _showComingSoon('Plugins'),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // --- DRAWING HELPERS ---
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    setState(() {
+      _currentPoints.add(
+        DrawingPoint(offset: details.localPosition, paint: Paint()),
+      );
+    });
+  }
+
+  Future<void> _onPanEnd(DragEndDetails details) async {
+    setState(() {
+      if (_currentPoints.isNotEmpty) {
+        if (_isMagicDrawActive) {
+          // ADD TO MAGIC PATHS (Temporary mask)
+          _magicPaths.add(
+            DrawingPath(
+              points: List.from(_currentPoints),
+              color: _selectedColor,
+              strokeWidth: _strokeWidth,
+              isEraser: _isEraser,
+            ),
+          );
+          _currentPoints = [];
+        } else {
+          // NORMAL DRAWING
+          _paths.add(
+            DrawingPath(
+              points: List.from(_currentPoints),
+              color: _selectedColor,
+              strokeWidth: _strokeWidth,
+              isEraser: _isEraser,
+            ),
+          );
+          _currentPoints = [];
+          _hasUnsavedChanges = true;
+          _resetInactivityTimer();
+        }
+      }
+    });
+  }
+
+  Future<void> _processInpainting(String prompt) async {
+    if (prompt.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Please enter a prompt!")));
+      return;
+    }
+
+    if (_tempBaseImage == null) {
+      debugPrint("❌ No base image captured! Capturing now (might include strokes)...");
+      _tempBaseImage = await _captureCanvasToFile();
+    }
+
+    if (_tempBaseImage == null) return;
+
+    setState(() => _isInpainting = true);
+
+    try {
+      // 1. Generate Mask Image using ONLY MAGIC PATHS
+      // Passing _tempBaseImage to ensure mask = Base Image + Drawing
+      File? maskFile = await _generateMaskImageFromPaths(
+        _magicPaths,
+        _canvasSize,
+        _tempBaseImage, 
+      );
+
+      if (maskFile == null) throw Exception("Failed to generate mask");
+
+      // 2. Call Service
+      final String? newImageUrl = await FlaskService().inpaintImage(
+        imagePath: _tempBaseImage!.path,
+        maskPath: maskFile.path,
+        prompt: prompt,
+      );
+
+      // 3. Update Canvas with New Image
+      if (newImageUrl != null) {
+        debugPrint("✅ Adding inpainted image to canvas: $newImageUrl");
+        setState(() {
+          elements.add({
+            'id': 'inpaint_${DateTime.now().millisecondsSinceEpoch}',
+            'type': 'file_image',
+            'content': newImageUrl,
+            'position': const Offset(0, 0),
+            'size': _canvasSize,
+            'rotation': 0.0,
+          });
+          // Clear magic paths now that operation is done
+          _magicPaths.clear(); 
+        });
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Inpainting failed.")));
+      }
+    } catch (e) {
+      debugPrint("Inpainting Error: $e");
+    } finally {
+      setState(() {
+        _isInpainting = false;
+        _tempBaseImage = null; // Reset base image
+        _magicPaths.clear(); // Always clear magic paths on end
+      });
+      _resetInactivityTimer();
+    }
+  }
+
+  // Updated to generate mask as: Base Image + Drawing Strokes
+  Future<File?> _generateMaskImageFromPaths(
+    List<DrawingPath> paths,
+    Size size,
+    File? baseImageFile,
+  ) async {
+    try {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(
+        recorder,
+        Rect.fromLTWH(0, 0, size.width, size.height),
+      );
+
+      // 1. Draw Base Image First (if available)
+      if (baseImageFile != null) {
+        final data = await baseImageFile.readAsBytes();
+        final codec = await ui.instantiateImageCodec(data);
+        final frameInfo = await codec.getNextFrame();
+        final baseImage = frameInfo.image;
+        
+        paintImage(
+          canvas: canvas,
+          rect: Rect.fromLTWH(0, 0, size.width, size.height),
+          image: baseImage,
+          fit: BoxFit.cover, // Or contain, depending on your logic
+        );
+      } else {
+        // Fallback to black if no base image (shouldn't happen based on logic)
+        canvas.drawRect(
+          Rect.fromLTWH(0, 0, size.width, size.height),
+          Paint()..color = Colors.black,
+        );
+      }
+
+      // 2. Draw Strokes ON TOP of the base image
+      for (final path in paths) {
+        final paint =
+            Paint()
+              ..color = path.color // Use the drawing color (e.g. Blue)
+              ..strokeWidth = path.strokeWidth
+              ..strokeCap = StrokeCap.round
+              ..strokeJoin = StrokeJoin.round
+              ..style = PaintingStyle.stroke;
+
+        if (path.points.length > 1) {
+          final Path p = Path();
+          p.moveTo(path.points.first.offset.dx, path.points.first.offset.dy);
+          for (int i = 1; i < path.points.length; i++) {
+            p.lineTo(path.points[i].offset.dx, path.points[i].offset.dy);
+          }
+          canvas.drawPath(p, paint);
+        } else if (path.points.isNotEmpty) {
+          canvas.drawPoints(
+            ui.PointMode.points,
+            [path.points.first.offset],
+            paint,
+          );
+        }
+      }
+
+      final picture = recorder.endRecording();
+      final img = await picture.toImage(
+        size.width.toInt(),
+        size.height.toInt(),
+      );
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return null;
+
+      final tempDir = await getTemporaryDirectory();
+      final file = File(
+        '${tempDir.path}/mask_${DateTime.now().millisecondsSinceEpoch}.png',
+      );
+      await file.writeAsBytes(byteData.buffer.asUint8List());
+      return file;
+    } catch (e) {
+      debugPrint("Mask Generation Error: $e");
+      return null;
+    }
+  }
+
+  // Just toggles state; drawing data stays in _paths and is saved via _saveCanvas
+  Future<void> _saveAndCloseMagicDraw() async {
+    setState(() {
+      _isMagicDrawActive = false;
+      _magicPaths.clear(); // Clear magic strokes if canceled
+      _tempBaseImage = null;
+    });
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      leadingWidth: 140,
+      leading: SafeArea(
+        child: Row(
+          children: [
+            IconButton(
+              icon: SvgPicture.asset(
+                'assets/icons/arrow-left-s-line.svg',
+                width: 22,
+                colorFilter: const ColorFilter.mode(
+                  Colors.black,
+                  BlendMode.srcIn,
+                ),
+              ),
+              onPressed: () {
+                if (_isMagicDrawActive) {
+                  _saveAndCloseMagicDraw();
+                } else {
+                  _handleBackNavigation();
+                }
+              },
+            ),
+            IconButton(
+              icon: SvgPicture.asset(
+                'assets/icons/arrow-go-back-line.svg',
+                width: 22,
+                colorFilter: ColorFilter.mode(
+                  _changeStack.canUndo ? Colors.black : Colors.grey[400]!,
+                  BlendMode.srcIn,
+                ),
+              ),
+              onPressed:
+                  _changeStack.canUndo
+                      ? () => setState(() => _changeStack.undo())
+                      : null,
+            ),
+            IconButton(
+              icon: SvgPicture.asset(
+                'assets/icons/arrow-go-forward-line.svg',
+                width: 22,
+                colorFilter: ColorFilter.mode(
+                  _changeStack.canRedo ? Colors.black : Colors.grey[400]!,
+                  BlendMode.srcIn,
+                ),
+              ),
+              onPressed:
+                  _changeStack.canRedo
+                      ? () => setState(() => _changeStack.redo())
+                      : null,
+            ),
+          ],
+        ),
+      ),
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black,
+      elevation: 0,
+      actions: [
+        SafeArea(
+          child: Row(
+            children: [
+              if (selectedId != null)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: _deleteSelectedElement,
+                  tooltip: "Delete Selected",
+                ),
+              IconButton(
+                icon: SvgPicture.asset(
+                  'assets/icons/file-image-line.svg',
+                  width: 22,
+                ),
+                onPressed: _saveCanvas,
+              ),
+              IconButton(
+                icon: SvgPicture.asset(
+                  'assets/icons/upload-2-line.svg',
+                  width: 22,
+                ),
+                onPressed: _exportProject,
+              ),
+              IconButton(
+                icon: SvgPicture.asset(
+                  'assets/icons/settings-line.svg',
+                  width: 22,
+                ),
+                onPressed: _openSettings,
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    final List<XFile> images = await _picker.pickMultiImage();
+    if (images.isNotEmpty) {
+      final oldState = _getCurrentState();
+      setState(() {
+        for (int i = 0; i < images.length; i++) {
+          elements.add({
+            'id': '${DateTime.now().millisecondsSinceEpoch}_$i',
+            'type': 'file_image',
+            'content': images[i].path,
+            'position': const Offset(50, 50),
+            'size': const Size(150, 150),
+            'rotation': 0.0,
+          });
+        }
+        _hasUnsavedChanges = true;
+      });
+      _recordChange(oldState);
+    }
+  }
+
+  List<Map<String, dynamic>> _deepCopyElements(
+    List<Map<String, dynamic>> source,
+  ) {
+    return source.map((e) {
+      final copy = Map<String, dynamic>.from(e);
+      if (e['position'] is Offset) {
+        copy['position'] = Offset(
+          (e['position'] as Offset).dx,
+          (e['position'] as Offset).dy,
+        );
+      }
+      if (e['size'] is Size) {
+        copy['size'] = Size(
+          (e['size'] as Size).width,
+          (e['size'] as Size).height,
+        );
+      }
+      return copy;
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _elementsToJson(
+    List<Map<String, dynamic>> elements,
+  ) {
+    return elements.map((e) {
+      final copy = Map<String, dynamic>.from(e);
+      if (e['position'] is Offset) {
+        copy['position'] = {
+          'dx': (e['position'] as Offset).dx,
+          'dy': (e['position'] as Offset).dy,
+        };
+      }
+      if (e['size'] is Size) {
+        copy['size'] = {
+          'width': (e['size'] as Size).width,
+          'height': (e['size'] as Size).height,
+        };
+      }
+      return copy;
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _jsonToElements(List<dynamic> jsonList) {
+    return jsonList.map((item) {
+      final e = Map<String, dynamic>.from(item);
+      if (e['position'] is Map) {
+        e['position'] = Offset(e['position']['dx'], e['position']['dy']);
+      }
+      if (e['size'] is Map) {
+        e['size'] = Size(e['size']['width'], e['size']['height']);
+      }
+      e['rotation'] = (e['rotation'] as num).toDouble();
+      return e;
+    }).toList();
+  }
 
   void _handleBackNavigation() {
     // If in magic draw mode, just close tool first
@@ -511,467 +1323,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     } catch (e) {
       debugPrint("Error loading canvas: $e");
     }
-  }
-
-  List<Map<String, dynamic>> _elementsToJson(
-    List<Map<String, dynamic>> elements,
-  ) {
-    return elements.map((e) {
-      final copy = Map<String, dynamic>.from(e);
-      if (e['position'] is Offset) {
-        copy['position'] = {
-          'dx': (e['position'] as Offset).dx,
-          'dy': (e['position'] as Offset).dy,
-        };
-      }
-      if (e['size'] is Size) {
-        copy['size'] = {
-          'width': (e['size'] as Size).width,
-          'height': (e['size'] as Size).height,
-        };
-      }
-      return copy;
-    }).toList();
-  }
-
-  List<Map<String, dynamic>> _jsonToElements(List<dynamic> jsonList) {
-    return jsonList.map((item) {
-      final e = Map<String, dynamic>.from(item);
-      if (e['position'] is Map) {
-        e['position'] = Offset(e['position']['dx'], e['position']['dy']);
-      }
-      if (e['size'] is Map) {
-        e['size'] = Size(e['size']['width'], e['size']['height']);
-      }
-      e['rotation'] = (e['rotation'] as num).toDouble();
-      return e;
-    }).toList();
-  }
-
-  // ===========================================================================
-  //  UI BUILDER
-  // ===========================================================================
-
-  @override
-  Widget build(BuildContext context) {
-    Map<String, dynamic>? selectedEl;
-    try {
-      selectedEl = elements.firstWhere((e) => e['id'] == selectedId);
-    } catch (_) {}
-
-    final bool isTextSelected =
-        selectedEl != null && selectedEl['type'] == 'text';
-    final bool showTextOverlay = _isTextToolsActive || isTextSelected;
-
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) {
-        if (didPop) return;
-        _handleBackNavigation();
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFFE0E0E0),
-        appBar: _buildAppBar(),
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            if (!_hasInitializedView) {
-              _hasInitializedView = true;
-              final double scaleX =
-                  (constraints.maxWidth - 40) / _canvasSize.width;
-              final double scaleY =
-                  (constraints.maxHeight - 40) / _canvasSize.height;
-              final double initialScale = math
-                  .min(scaleX, scaleY)
-                  .clamp(0.01, 1.0);
-
-              final double transX =
-                  (constraints.maxWidth - (_canvasSize.width * initialScale)) /
-                  2;
-              final double transY =
-                  (constraints.maxHeight -
-                      (_canvasSize.height * initialScale)) /
-                  2;
-
-              _transformationController.value =
-                  Matrix4.identity()
-                    ..translate(transX, transY)
-                    ..scale(initialScale);
-            }
-
-            return Stack(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    if (!_isMagicDrawActive) {
-                      _exitEditMode();
-                      setState(() => selectedId = null);
-                    }
-                  },
-                  behavior: HitTestBehavior.translucent,
-                  child: InteractiveViewer(
-                    transformationController: _transformationController,
-                    constrained: false,
-                    boundaryMargin: const EdgeInsets.all(double.infinity),
-                    minScale: 0.01,
-                    maxScale: 10.0,
-                    scaleEnabled: !_isMagicDrawActive,
-                    panEnabled: !_isMagicDrawActive,
-                    child: SizedBox(
-                      width: _canvasSize.width,
-                      height: _canvasSize.height,
-                      child: Stack(
-                        children: [
-                          Container(
-                            width: double.infinity,
-                            height: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.15),
-                                  blurRadius: 40,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
-                            ),
-                          ),
-                          ...elements.map((e) {
-                            final bool isSelected = selectedId == e['id'];
-                            return _ManipulatingBox(
-                              key: ValueKey(e['id']),
-                              id: e['id'],
-                              position: e['position'],
-                              size: e['size'],
-                              rotation: e['rotation'],
-                              type: e['type'],
-                              content: e['content'],
-                              styleData: e,
-                              isSelected: isSelected && !_isMagicDrawActive,
-                              isEditing:
-                                  isSelected &&
-                                  _isEditingText &&
-                                  e['type'] == 'text',
-                              viewScale:
-                                  _transformationController.value
-                                      .getMaxScaleOnAxis(),
-                              onTap: () {
-                                if (!_isMagicDrawActive) {
-                                  if (_isEditingText && selectedId != e['id'])
-                                    _exitEditMode();
-                                  setState(() {
-                                    selectedId = e['id'];
-                                    if (e['type'] == 'text')
-                                      _isTextToolsActive = true;
-                                  });
-                                  setState(() {
-                                    // Bring to front
-                                    elements.remove(e);
-                                    elements.add(e);
-                                  });
-                                }
-                              },
-                              onDoubleTap: () {
-                                if (e['type'] == 'text') _enterEditMode(e);
-                              },
-                              onDragStart: _handleGestureStart,
-                              onUpdate:
-                                  (newPos, newSize, newRot) =>
-                                      _handleElementUpdate(
-                                        e['id'],
-                                        newPos,
-                                        newSize,
-                                        newRot,
-                                      ),
-                              onDragEnd: (newPos, newSize, newRot) {
-                                _handleElementUpdate(
-                                  e['id'],
-                                  newPos,
-                                  newSize,
-                                  newRot,
-                                );
-                                _handleGestureEnd();
-                              },
-                              textController:
-                                  isSelected ? _textEditingController : null,
-                              focusNode: isSelected ? _textFocusNode : null,
-                              transformationController:
-                                  _transformationController,
-                            );
-                          }),
-                          // Drawing Layer - Always Visible (ignoring touches when not active)
-                          IgnorePointer(
-                            ignoring: !_isMagicDrawActive,
-                            child: RepaintBoundary(
-                              key: _drawingKey,
-                              child: GestureDetector(
-                                onPanStart: (_) {
-                                  _gestureStartSnapshot = _getCurrentState();
-                                },
-                                onPanUpdate: _onPanUpdate,
-                                onPanEnd: (details) {
-                                  _onPanEnd(details);
-                                  if (_gestureStartSnapshot != null) {
-                                    _recordChange(_gestureStartSnapshot!);
-                                    _gestureStartSnapshot = null;
-                                  }
-                                },
-                                child: CustomPaint(
-                                  size: Size.infinite,
-                                  painter: CanvasPainter(
-                                    paths: _paths,
-                                    currentPoints: _currentPoints,
-                                    currentColor:
-                                        _isEraser
-                                            ? Colors.transparent
-                                            : _selectedColor,
-                                    currentWidth: _strokeWidth,
-                                    isEraser: _isEraser,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                MagicDrawTools(
-                  isActive: _isMagicDrawActive,
-                  selectedColor: _selectedColor,
-                  strokeWidth: _strokeWidth,
-                  isEraser: _isEraser,
-                  brandColors: _brandColors,
-                  onClose: _saveAndCloseMagicDraw,
-                  onColorChanged: (c) => setState(() => _selectedColor = c),
-                  onWidthChanged: (w) => setState(() => _strokeWidth = w),
-                  onEraserToggle: (e) => setState(() => _isEraser = e),
-                ),
-
-                TextToolsOverlay(
-                  isActive: showTextOverlay && !_isMagicDrawActive,
-                  isTextSelected: isTextSelected,
-                  currentColor: Color(
-                    selectedEl?['style_color'] ?? Colors.black.value,
-                  ),
-                  currentFontSize:
-                      (selectedEl?['style_fontSize'] ?? 24.0) as double,
-                  onClose: () {
-                    _exitEditMode();
-                    setState(() {
-                      _isTextToolsActive = false;
-                      selectedId = null;
-                    });
-                  },
-                  onAddText: _addTextElement,
-                  onDelete: _deleteSelectedElement,
-                  onColorChanged:
-                      (c) =>
-                          _updateSelectedTextProperty('style_color', c.value),
-                  onFontSizeChanged:
-                      (s) => _updateSelectedTextProperty('style_fontSize', s),
-                ),
-
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: CanvasBottomBar(
-                    activeItem:
-                        _isMagicDrawActive
-                            ? "Magic Draw"
-                            : (_isTextToolsActive ? "Text" : null),
-                    onMagicDraw:
-                        () => setState(() {
-                          _isMagicDrawActive = !_isMagicDrawActive;
-                          _isTextToolsActive = false;
-                          _exitEditMode();
-                        }),
-                    onMedia: _pickImageFromGallery,
-                    onStylesheet: () => _showComingSoon('Stylesheet'),
-                    onTools: () => _showComingSoon('Tools'),
-                    onText: _toggleTextTools,
-                    onSelect: () => _showComingSoon('Select'),
-                    onPlugins: () => _showComingSoon('Plugins'),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  // --- DRAWING HELPERS ---
-
-  void _onPanUpdate(DragUpdateDetails details) {
-    setState(() {
-      _currentPoints.add(
-        DrawingPoint(offset: details.localPosition, paint: Paint()),
-      );
-    });
-  }
-
-  void _onPanEnd(DragEndDetails details) {
-    setState(() {
-      if (_currentPoints.isNotEmpty) {
-        _paths.add(
-          DrawingPath(
-            points: List.from(_currentPoints),
-            color: _selectedColor,
-            strokeWidth: _strokeWidth,
-            isEraser: _isEraser,
-          ),
-        );
-        _currentPoints = [];
-        _hasUnsavedChanges = true;
-      }
-    });
-  }
-
-  // Just toggles state; drawing data stays in _paths and is saved via _saveCanvas
-  Future<void> _saveAndCloseMagicDraw() async {
-    setState(() => _isMagicDrawActive = false);
-  }
-
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      leadingWidth: 140,
-      leading: SafeArea(
-        child: Row(
-          children: [
-            IconButton(
-              icon: SvgPicture.asset(
-                'assets/icons/arrow-left-s-line.svg',
-                width: 22,
-                colorFilter: const ColorFilter.mode(
-                  Colors.black,
-                  BlendMode.srcIn,
-                ),
-              ),
-              onPressed: () {
-                if (_isMagicDrawActive) {
-                  _saveAndCloseMagicDraw();
-                } else {
-                  _handleBackNavigation();
-                }
-              },
-            ),
-            IconButton(
-              icon: SvgPicture.asset(
-                'assets/icons/arrow-go-back-line.svg',
-                width: 22,
-                colorFilter: ColorFilter.mode(
-                  _changeStack.canUndo ? Colors.black : Colors.grey[400]!,
-                  BlendMode.srcIn,
-                ),
-              ),
-              onPressed:
-                  _changeStack.canUndo
-                      ? () => setState(() => _changeStack.undo())
-                      : null,
-            ),
-            IconButton(
-              icon: SvgPicture.asset(
-                'assets/icons/arrow-go-forward-line.svg',
-                width: 22,
-                colorFilter: ColorFilter.mode(
-                  _changeStack.canRedo ? Colors.black : Colors.grey[400]!,
-                  BlendMode.srcIn,
-                ),
-              ),
-              onPressed:
-                  _changeStack.canRedo
-                      ? () => setState(() => _changeStack.redo())
-                      : null,
-            ),
-          ],
-        ),
-      ),
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
-      elevation: 0,
-      actions: [
-        SafeArea(
-          child: Row(
-            children: [
-              if (selectedId != null)
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: _deleteSelectedElement,
-                  tooltip: "Delete Selected",
-                ),
-              IconButton(
-                icon: SvgPicture.asset(
-                  'assets/icons/file-image-line.svg',
-                  width: 22,
-                ),
-                onPressed: _saveCanvas,
-              ),
-              IconButton(
-                icon: SvgPicture.asset(
-                  'assets/icons/upload-2-line.svg',
-                  width: 22,
-                ),
-                onPressed: _exportProject,
-              ),
-              IconButton(
-                icon: SvgPicture.asset(
-                  'assets/icons/settings-line.svg',
-                  width: 22,
-                ),
-                onPressed: _openSettings,
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _pickImageFromGallery() async {
-    final List<XFile> images = await _picker.pickMultiImage();
-    if (images.isNotEmpty) {
-      final oldState = _getCurrentState();
-      setState(() {
-        for (int i = 0; i < images.length; i++) {
-          elements.add({
-            'id': '${DateTime.now().millisecondsSinceEpoch}_$i',
-            'type': 'file_image',
-            'content': images[i].path,
-            'position': const Offset(50, 50),
-            'size': const Size(150, 150),
-            'rotation': 0.0,
-          });
-        }
-        _hasUnsavedChanges = true;
-      });
-      _recordChange(oldState);
-    }
-  }
-
-  List<Map<String, dynamic>> _deepCopyElements(
-    List<Map<String, dynamic>> source,
-  ) {
-    return source.map((e) {
-      final copy = Map<String, dynamic>.from(e);
-      if (e['position'] is Offset) {
-        copy['position'] = Offset(
-          (e['position'] as Offset).dx,
-          (e['position'] as Offset).dy,
-        );
-      }
-      if (e['size'] is Size) {
-        copy['size'] = Size(
-          (e['size'] as Size).width,
-          (e['size'] as Size).height,
-        );
-      }
-      return copy;
-    }).toList();
   }
 
   void _openLayers() => _showComingSoon('Layers');
@@ -1260,12 +1611,14 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
 // --- PAINTER ---
 class CanvasPainter extends CustomPainter {
   final List<DrawingPath> paths;
+  final List<DrawingPath> magicPaths; // ADDED: Magic paths for temporary mask
   final List<DrawingPoint> currentPoints;
   final Color currentColor;
   final double currentWidth;
   final bool isEraser;
   CanvasPainter({
     required this.paths,
+    this.magicPaths = const [], // ADDED
     required this.currentPoints,
     required this.currentColor,
     required this.currentWidth,
@@ -1275,7 +1628,37 @@ class CanvasPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
+    
+    // Draw normal paths
     for (final path in paths) {
+      _drawPath(canvas, path);
+    }
+    
+    // Draw magic paths (unless hidden by empty list passed in)
+    for (final path in magicPaths) {
+      _drawPath(canvas, path);
+    }
+
+    // Draw current points
+    if (currentPoints.isNotEmpty) {
+      final paint =
+          Paint()
+            ..color = isEraser ? Colors.transparent : currentColor
+            ..blendMode = isEraser ? BlendMode.clear : BlendMode.srcOver
+            ..strokeWidth = currentWidth
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round
+            ..style = PaintingStyle.stroke;
+      final Path p = Path();
+      p.moveTo(currentPoints.first.offset.dx, currentPoints.first.offset.dy);
+      for (int i = 1; i < currentPoints.length; i++)
+        p.lineTo(currentPoints[i].offset.dx, currentPoints[i].offset.dy);
+      canvas.drawPath(p, paint);
+    }
+    canvas.restore();
+  }
+
+  void _drawPath(Canvas canvas, DrawingPath path) {
       final paint =
           Paint()
             ..color = path.isEraser ? Colors.transparent : path.color
@@ -1296,23 +1679,6 @@ class CanvasPainter extends CustomPainter {
           path.points.first.offset,
         ], paint);
       }
-    }
-    if (currentPoints.isNotEmpty) {
-      final paint =
-          Paint()
-            ..color = isEraser ? Colors.transparent : currentColor
-            ..blendMode = isEraser ? BlendMode.clear : BlendMode.srcOver
-            ..strokeWidth = currentWidth
-            ..strokeCap = StrokeCap.round
-            ..strokeJoin = StrokeJoin.round
-            ..style = PaintingStyle.stroke;
-      final Path p = Path();
-      p.moveTo(currentPoints.first.offset.dx, currentPoints.first.offset.dy);
-      for (int i = 1; i < currentPoints.length; i++)
-        p.lineTo(currentPoints[i].offset.dx, currentPoints[i].offset.dy);
-      canvas.drawPath(p, paint);
-    }
-    canvas.restore();
   }
 
   @override
