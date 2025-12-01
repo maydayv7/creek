@@ -31,7 +31,7 @@ class _HomePageState extends State<HomePage> {
   Map<int, List<String>> _projectPreviews = {};
   Map<String, String> _fileDimensions = {};
   bool _isLoading = true;
-  final String _userName = "Alex"; // Can be loaded from preferences later
+  final String _userName = "Alex"; 
 
   @override
   void initState() {
@@ -42,23 +42,18 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      // Load all projects and create a map for quick lookup
       final allProjects = await _projectRepo.getAllProjects();
       final Map<int, ProjectModel> projectMap = {};
       for (final project in allProjects) {
         if (project.id != null) {
           projectMap[project.id!] = project;
-          // Load preview images for each project
           final images = await _imageRepo.getImages(project.id!);
           _projectPreviews[project.id!] =
               images.take(4).map((img) => img.filePath).toList();
         }
       }
 
-      // Load recent files
       final recentFiles = await _fileRepo.getRecentFiles(limit: 10);
-
-      // Load dimensions for files
       final Map<String, String> fileDimensions = {};
       for (final file in recentFiles) {
         try {
@@ -116,7 +111,6 @@ class _HomePageState extends State<HomePage> {
     final project = _projectMap[file.projectId];
     if (project == null) return '';
     
-    // Check if project is an event (has parentId)
     if (project.isEvent) {
       final parentProject = _projectMap[project.parentId!];
       if (parentProject != null) {
@@ -141,12 +135,12 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  // --- NEW METHOD: Test the Canvas Page ---
+
+
   void _openProject(ProjectModel project) {
-    // Update last accessed time
     if (project.id != null) {
       _projectService.openProject(project.id!);
-
-      // Navigate to project detail page
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -157,7 +151,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _openFile(FileModel file) {
-    // Navigate to file detail or project detail
     final project = _projectMap[file.projectId];
     if (project != null) {
       _openProject(project);
@@ -171,161 +164,155 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : SafeArea(
-                child: RefreshIndicator(
-                  onRefresh: _loadData,
-                  child: CustomScrollView(
-                    slivers: [
-                      // Header Section
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-                          child: Row(
-                            children: [
-                              Text(
-                                "Hello, $_userName!",
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: 'GeneralSans',
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                              ),
-                              const Spacer(),
-                              // Profile Picture
-                              Container(
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primaryContainer,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: theme.scaffoldBackgroundColor,
-                                    width: 1.25,
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 16,
-                                  color: theme.colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Search Bar
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.grey[800] : Colors.grey[200],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: TextField(
-                              decoration: InputDecoration(
-                                hintText: 'Search',
-                                hintStyle: TextStyle(
-                                  fontSize: 12,
-                                  color: theme.colorScheme.onSurface.withOpacity(0.5),
-                                  fontFamily: 'GeneralSans',
-                                ),
-                                prefixIcon: Icon(
-                                  Icons.search,
-                                  size: 18,
-                                  color: theme.colorScheme.onSurface.withOpacity(0.5),
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                              ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SafeArea(
+              child: RefreshIndicator(
+                onRefresh: _loadData,
+                child: CustomScrollView(
+                  slivers: [
+                    // Header Section
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+                        child: Row(
+                          children: [
+                            Text(
+                              "Hello, $_userName!",
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w500,
                                 fontFamily: 'GeneralSans',
                                 color: theme.colorScheme.onSurface,
                               ),
                             ),
+                            const Spacer(),
+
+                            // Profile Picture
+                            Container(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: theme.scaffoldBackgroundColor,
+                                  width: 1.25,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.person,
+                                size: 16,
+                                color: theme.colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Search Bar
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.grey[800] : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Search',
+                              hintStyle: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                fontFamily: 'GeneralSans',
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                size: 18,
+                                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontFamily: 'GeneralSans',
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
                         ),
                       ),
+                    ),
 
-                      const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-                      // Content Sections
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Recent Files Section
-                              if (_recentFiles.isNotEmpty) ...[
-                                _buildSectionHeader(
-                                  'Recent Files',
-                                  theme,
-                                  onTap: () {
-                                    // Navigate to recent files page
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                ...(_recentFiles.take(2).map((file) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _buildRecentFileCard(file, theme, isDark),
-                                )).toList()),
-                                const SizedBox(height: 24),
-                              ],
-
-                              // Projects Section
+                    // Content Sections
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Recent Files Section
+                            if (_recentFiles.isNotEmpty) ...[
                               _buildSectionHeader(
-                                'Projects',
+                                'Recent Files',
                                 theme,
-                                onTap: () {
-                                  // Navigate to all projects
-                                },
+                                onTap: () {},
                               ),
                               const SizedBox(height: 12),
-                              SizedBox(
-                                height: 100,
-                                child: ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: _allProjects.length,
-                                  itemBuilder: (context, index) {
-                                    final project = _allProjects[index];
-                                    return _buildProjectCard(project, theme, isDark);
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-
-                              // Explore Templates Section
-                              _buildSectionHeader(
-                                'Explore templates',
-                                theme,
-                                onTap: () {
-                                  // Navigate to templates
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              _buildTemplatesSection(theme, isDark),
+                              ...(_recentFiles.take(2).map((file) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _buildRecentFileCard(file, theme, isDark),
+                              )).toList()),
                               const SizedBox(height: 24),
                             ],
-                          ),
+
+                            // Projects Section
+                            _buildSectionHeader(
+                              'Projects',
+                              theme,
+                              onTap: () {},
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 100,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _allProjects.length,
+                                itemBuilder: (context, index) {
+                                  final project = _allProjects[index];
+                                  return _buildProjectCard(project, theme, isDark);
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Explore Templates Section
+                            _buildSectionHeader(
+                              'Explore templates',
+                              theme,
+                              onTap: () {},
+                            ),
+                            const SizedBox(height: 12),
+                            _buildTemplatesSection(theme, isDark),
+                            const SizedBox(height: 24),
+                          ],
                         ),
                       ),
+                    ),
 
-                      // Bottom padding
-                      const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                    ],
-                  ),
+                    // Bottom padding
+                    const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                  ],
                 ),
               ),
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: _createNewProject,
         backgroundColor: isDark ? Colors.grey[900] : Colors.grey[900],
@@ -376,7 +363,6 @@ class _HomePageState extends State<HomePage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail
             Container(
               width: 104,
               height: 106,
@@ -401,7 +387,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(width: 8),
-            // File Info
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -498,46 +483,36 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Preview Image
             Expanded(
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(8),
                 ),
-                child:
-                    previewImages.isEmpty
-                        ? Container(
-                          color: isDark ? Colors.grey[800] : Colors.grey[200],
-                          child: Center(
-                            child: Icon(
-                              Icons.folder_outlined,
-                              size: 32,
-                              color: theme.colorScheme.onSurface.withOpacity(
-                                0.3,
-                              ),
-                            ),
+                child: previewImages.isEmpty
+                    ? Container(
+                        color: isDark ? Colors.grey[800] : Colors.grey[200],
+                        child: Center(
+                          child: Icon(
+                            Icons.folder_outlined,
+                            size: 32,
+                            color: theme.colorScheme.onSurface.withOpacity(0.3),
                           ),
-                        )
-                        : Image.file(
-                          File(previewImages.first),
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          errorBuilder:
-                              (context, error, stackTrace) => Container(
-                                color:
-                                    isDark
-                                        ? Colors.grey[800]
-                                        : Colors.grey[200],
-                                child: Icon(
-                                  Icons.broken_image,
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacity(0.3),
-                                ),
-                              ),
                         ),
+                      )
+                    : Image.file(
+                        File(previewImages.first),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: isDark ? Colors.grey[800] : Colors.grey[200],
+                          child: Icon(
+                            Icons.broken_image,
+                            color: theme.colorScheme.onSurface.withOpacity(0.3),
+                          ),
+                        ),
+                      ),
               ),
             ),
-            // Project Title and Actions
             Padding(
               padding: const EdgeInsets.all(8),
               child: Row(
@@ -571,7 +546,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTemplatesSection(ThemeData theme, bool isDark) {
-    // Static templates for now - can be made dynamic later
     final templates = [
       {'title': 'Diwali Lights', 'subtitle': 'Instagram Post'},
       {'title': 'Business Opening', 'subtitle': 'Flyer'},
