@@ -44,6 +44,5 @@ app.*.map.json
 python_env/
 
 # AI Models
-.env
 assets/*.onnx*
 /.vscode/
