@@ -16,6 +16,7 @@ import './canvas_toolbar/text_tools_overlay.dart';
 import '../../data/repos/project_repo.dart';
 import '../../services/stylesheet_service.dart';
 import 'project_file_page.dart';
+import 'package:path/path.dart' as p;
 
 import '../../services/file_service.dart';
 import '../../data/models/file_model.dart';
@@ -597,6 +598,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
             // Legacy support
             elements = _jsonToElements(decoded);
             _paths = [];
+            _hasInitializedView = false;
           }
           _hasUnsavedChanges = false;
         });
@@ -641,6 +643,49 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     }).toList();
   }
 
+  // [UPDATED] New Bottom Sheet for Assets
+  void _openStylesheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.9,
+            builder:
+                (_, controller) => _AssetPickerSheet(
+                  projectId: widget.projectId,
+                  scrollController: controller,
+                  onAddAssets: (List<String> paths) {
+                    _addAssetsToCanvas(paths);
+                    Navigator.pop(context);
+                  },
+                ),
+          ),
+    );
+  }
+
+  void _addAssetsToCanvas(List<String> paths) {
+    if (paths.isEmpty) return;
+    final oldState = _getCurrentState();
+    setState(() {
+      for (var path in paths) {
+        elements.add({
+          'id':
+              'asset_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(1000)}',
+          'type': 'file_image',
+          'content': path,
+          'position': const Offset(50, 50),
+          'size': const Size(150, 150),
+          'rotation': 0.0,
+        });
+      }
+      _hasUnsavedChanges = true;
+    });
+    _recordChange(oldState);
+  }
   // ===========================================================================
   //  UI BUILDER
   // ===========================================================================
@@ -899,7 +944,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                           _exitEditMode();
                         }),
                     onMedia: _pickImageFromGallery,
-                    onStylesheet: () => _showComingSoon('Stylesheet'),
+                    onStylesheet: _openStylesheet,
                     onTools: () => _showComingSoon('Tools'),
                     onText: _toggleTextTools,
                     onSelect: () => _showComingSoon('Select'),
@@ -1565,6 +1610,271 @@ class _BottomBarItem extends StatelessWidget {
                         : const Color(0xFF9F9FA9),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AssetPickerSheet extends StatefulWidget {
+  final int projectId;
+  final ScrollController scrollController;
+  final Function(List<String>) onAddAssets; // Accepts List
+
+  const _AssetPickerSheet({
+    required this.projectId,
+    required this.scrollController,
+    required this.onAddAssets,
+  });
+
+  @override
+  State<_AssetPickerSheet> createState() => _AssetPickerSheetState();
+}
+
+class _AssetPickerSheetState extends State<_AssetPickerSheet> {
+  List<String> _assets = [];
+  bool _isLoading = true;
+  Set<String> _selectedPaths = {}; // Supports multi-select
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAssets();
+  }
+
+  Future<void> _loadAssets() async {
+    try {
+      final project = await ProjectRepo().getProjectById(widget.projectId);
+      if (mounted) {
+        setState(() {
+          _assets = project?.assetsPath ?? [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading assets: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<File?> _resolveFile(String path) async {
+    final file = File(path);
+    if (await file.exists()) return file;
+    try {
+      final filename = p.basename(path);
+      final dir = await getApplicationDocumentsDirectory();
+      final fixedPath = '${dir.path}/generated_images/$filename';
+      final fixedFile = File(fixedPath);
+      if (await fixedFile.exists()) return fixedFile;
+    } catch (e) {
+      debugPrint("Error resolving file: $e");
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Column(
+        children: [
+          // Handle
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Search Bar
+          Container(
+            height: 40,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                const Icon(Icons.search, color: Colors.grey),
+                const SizedBox(width: 8),
+                const Text(
+                  "Search Stylesheet",
+                  style: TextStyle(
+                    fontFamily: 'GeneralSans',
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Category Tabs
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              children: [
+                _buildFilterChip("Assets", true),
+                const SizedBox(width: 12),
+                _buildFilterChip("Backgrounds & Texture", false),
+              ],
+            ),
+          ),
+
+          // Grid
+          Expanded(
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _assets.isEmpty
+                    ? Center(
+                      child: Text(
+                        "No assets found in stylesheet",
+                        style: TextStyle(color: Colors.grey[500]),
+                      ),
+                    )
+                    : Stack(
+                      children: [
+                        GridView.builder(
+                          controller: widget.scrollController,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                                childAspectRatio: 1.0,
+                              ),
+                          itemCount: _assets.length,
+                          itemBuilder: (context, index) {
+                            final assetPath = _assets[index];
+                            final isSelected = _selectedPaths.contains(
+                              assetPath,
+                            );
+
+                            return FutureBuilder<File?>(
+                              future: _resolveFile(assetPath),
+                              builder: (context, snapshot) {
+                                final file = snapshot.data;
+                                return _buildAssetTile(
+                                  child:
+                                      file != null
+                                          ? Image.file(file, fit: BoxFit.cover)
+                                          : const Icon(
+                                            Icons.broken_image,
+                                            color: Colors.grey,
+                                          ),
+                                  isSelected: isSelected,
+                                  onTap: () {
+                                    if (file != null) {
+                                      setState(() {
+                                        if (isSelected) {
+                                          _selectedPaths.remove(assetPath);
+                                        } else {
+                                          _selectedPaths.add(assetPath);
+                                        }
+                                      });
+                                    }
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+          ),
+
+          // Bottom CTA
+          SafeArea(
+            top: false,
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(top: 16, bottom: 16),
+              child: ElevatedButton(
+                onPressed: () => widget.onAddAssets(_selectedPaths.toList()),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF27272A),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: const Text(
+                  "Add to File",
+                  style: TextStyle(
+                    fontFamily: 'GeneralSans',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, bool isSelected) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFFF4F4F5) : Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isSelected ? Colors.transparent : Colors.grey[300]!,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'GeneralSans',
+          fontSize: 14,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          color: isSelected ? Colors.black : Colors.grey[600],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssetTile({
+    required Widget child,
+    required VoidCallback onTap,
+    bool isSelected = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Colors.blue : Colors.grey[200]!,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            child,
+            if (isSelected)
+              Container(
+                color: Colors.blue.withOpacity(0.1),
+                child: const Center(
+                  child: Icon(Icons.check_circle, color: Colors.blue),
+                ),
+              ),
           ],
         ),
       ),
