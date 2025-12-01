@@ -1,12 +1,18 @@
 import 'dart:io';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
+
 import '../../services/file_service.dart';
+import '../../services/project_service.dart';
 import '../../data/models/file_model.dart';
-import 'create_file_page.dart'; // Import the new creation page
+import '../../data/models/project_model.dart';
+import 'create_file_page.dart';
+import 'canvas_board_page.dart';
 
 class ShareToFilePage extends StatefulWidget {
-  final File sharedImage; // This is the image passed from ShareHandler
-
+  final File sharedImage;
   const ShareToFilePage({super.key, required this.sharedImage});
 
   @override
@@ -15,11 +21,20 @@ class ShareToFilePage extends StatefulWidget {
 
 class _ShareToFilePageState extends State<ShareToFilePage> {
   final FileService _fileService = FileService();
+  final ProjectService _projectService = ProjectService();
+
   final TextEditingController _searchController = TextEditingController();
 
   List<FileModel> _allFiles = [];
   List<FileModel> _filteredFiles = [];
   List<FileModel> _recentFiles = [];
+
+  // file.id -> { 'preview': path, 'dimensions': str }
+  Map<String, Map<String, String>> _fileMetadata = {};
+
+  // project cache to avoid repeated fetches
+  final Map<int, ProjectModel> _projectCache = {};
+
   bool _isLoading = true;
   String _searchQuery = "";
 
@@ -36,44 +51,159 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
   }
 
   Future<void> _fetchFiles() async {
+    setState(() => _isLoading = true);
     try {
-      setState(() => _isLoading = true);
+      // Using service-style API: fetch all files and recent files
+      // If your FileService has different method names, adapt them here.
+      final List<FileModel> files = await _fileService.getAllFiles();
+      final List<FileModel> recent = await _fileService.getRecentFiles(
+        limit: 10,
+      );
 
-      // Assuming projectId 0 is your 'Inbox' or default folder
-      final files = await _fileService.getFiles(0);
-
-      // Sort by last updated to get recent files
+      // Sort by lastUpdated descending
       files.sort((a, b) => b.lastUpdated.compareTo(a.lastUpdated));
+      recent.sort((a, b) => b.lastUpdated.compareTo(a.lastUpdated));
 
-      setState(() {
-        _allFiles = files;
-        _filteredFiles = files;
-        _recentFiles = files.take(3).toList(); // Get 3 most recent files
-        _isLoading = false;
-      });
+      _allFiles = files;
+      _filteredFiles = List.from(files);
+      _recentFiles = recent.take(3).toList();
+
+      // Load metadata for files (previews, dimensions)
+      await _loadFileMetadata(files);
+
+      setState(() => _isLoading = false);
     } catch (e) {
-      debugPrint("Error fetching files: $e");
+      debugPrint('Error fetching files in ShareToFilePage: $e');
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _loadFileMetadata(List<FileModel> files) async {
+    final Map<String, Map<String, String>> meta = {};
+
+    for (final fmodel in files) {
+      try {
+        final f = File(fmodel.filePath);
+        if (!await f.exists()) {
+          // skip if disk file missing
+          continue;
+        }
+
+        if (fmodel.filePath.toLowerCase().endsWith('.json')) {
+          // Canvas JSON - attempt to parse preview_path, width/height
+          try {
+            final content = await f.readAsString();
+            final data = jsonDecode(content);
+            String preview = '';
+            String dims = 'Unknown';
+
+            if (data is Map) {
+              if (data['preview_path'] != null &&
+                  data['preview_path'].toString().isNotEmpty) {
+                preview = data['preview_path'].toString();
+                // If preview is relative, try to resolve relative to JSON file
+                if (!File(preview).existsSync()) {
+                  final parentDir = f.parent.path;
+                  final candidate = File('$parentDir/$preview');
+                  if (candidate.existsSync()) preview = candidate.path;
+                }
+              }
+
+              if (data['width'] != null && data['height'] != null) {
+                final w = (data['width'] as num).toInt();
+                final h = (data['height'] as num).toInt();
+                dims = '$w x $h px';
+              }
+            }
+
+            meta[fmodel.id] = {'preview': preview, 'dimensions': dims};
+          } catch (e) {
+            debugPrint('Error parsing canvas json for ${fmodel.id}: $e');
+          }
+        } else {
+          // Regular image file - assign path and try to get dims
+          String dims = 'Unknown';
+          try {
+            final bytes = await f.readAsBytes();
+            final image = img.decodeImage(bytes);
+            if (image != null) dims = '${image.width} x ${image.height} px';
+          } catch (_) {
+            // ignore
+          }
+          meta[fmodel.id] = {'preview': fmodel.filePath, 'dimensions': dims};
+        }
+      } catch (e) {
+        debugPrint('Error while loading metadata for ${fmodel.id}: $e');
+      }
+    }
+
+    _fileMetadata = meta;
   }
 
   void _filterFiles(String query) {
     setState(() {
       _searchQuery = query;
-      if (query.isEmpty) {
-        _filteredFiles = _allFiles;
+      if (query.trim().isEmpty) {
+        _filteredFiles = List.from(_allFiles);
       } else {
         final q = query.toLowerCase();
         _filteredFiles =
-            _allFiles
-                .where((file) => file.name.toLowerCase().contains(q))
-                .toList();
+            _allFiles.where((file) {
+              final nameMatch = file.name.toLowerCase().contains(q);
+              final breadcrumb = _getProjectBreadcrumbSync(file).toLowerCase();
+              final projectMatch = breadcrumb.contains(q);
+              return nameMatch || projectMatch;
+            }).toList();
       }
     });
   }
 
+  // Synchronous breadcrumb using cached project; returns empty if not cached
+  String _getProjectBreadcrumbSync(FileModel file) {
+    final proj = _projectCache[file.projectId];
+    if (proj == null) return '';
+    if (proj.parentId != null) {
+      final parent = _projectCache[proj.parentId!];
+      if (parent != null) return '${parent.title} / ${proj.title}';
+    }
+    return proj.title;
+  }
+
+  // Async breadcrumb loader that fetches projects into cache as needed
+  Future<String> _getProjectEventLabel(FileModel file) async {
+    // load file.projectId
+    if (!_projectCache.containsKey(file.projectId)) {
+      try {
+        final p = await _projectService.getProjectById(file.projectId);
+        if (p != null) _projectCache[file.projectId] = p;
+      } catch (e) {
+        debugPrint('Project load failed for ${file.projectId}: $e');
+      }
+    }
+
+    final project = _projectCache[file.projectId];
+    if (project == null) return "Unknown";
+
+    if (project.parentId == null) {
+      return project.title;
+    }
+
+    final parentId = project.parentId!;
+    if (!_projectCache.containsKey(parentId)) {
+      try {
+        final parent = await _projectService.getProjectById(parentId);
+        if (parent != null) _projectCache[parentId] = parent;
+      } catch (e) {
+        debugPrint('Parent project load failed for $parentId: $e');
+      }
+    }
+
+    final parentProject = _projectCache[parentId];
+    if (parentProject == null) return project.title;
+    return "${parentProject.title} / ${project.title}";
+  }
+
   void _onAddPressed() {
-    // Redirect to the CreateFilePage (Canvas Selection) with the shared image
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -82,16 +212,90 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
     );
   }
 
-  void _onFileSelected(FileModel file) {
-    // TODO: Handle file selection - maybe open editor with this file
-    // For now, just show a snackbar
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Selected: ${file.name}')));
+  void _onFileSelected(FileModel file) async {
+    try {
+      final f = File(file.filePath);
+      if (!await f.exists()) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("File not found")));
+        return;
+      }
+
+      double width = 1080;
+      double height = 1080;
+
+      if (file.filePath.toLowerCase().endsWith('.json')) {
+        final content = await f.readAsString();
+        final data = jsonDecode(content);
+
+        if (data is Map) {
+          if (data['width'] != null && data['height'] != null) {
+            width = (data['width'] as num).toDouble();
+            height = (data['height'] as num).toDouble();
+          }
+        }
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => CanvasBoardPage(
+                projectId: file.projectId,
+                width: width,
+                height: height,
+                existingFile: file,
+                injectedMedia: widget.sharedImage, // 🔥 THIS IS THE FIX
+              ),
+        ),
+      );
+    } catch (e) {
+      debugPrint("Error opening file: $e");
+    }
+  }
+
+
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+    if (diff.inDays == 0) return 'Today';
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  // Resolve preview path; if empty or missing, fallback to original filePath
+  String _resolvePreviewPath(FileModel file) {
+    final meta = _fileMetadata[file.id];
+    if (meta == null) return file.filePath;
+    final preview = meta['preview'] ?? '';
+    if (preview.isNotEmpty && File(preview).existsSync()) return preview;
+    // fallback: if file is json and has no preview, return placeholder or file.path
+    if (file.filePath.toLowerCase().endsWith('.json')) {
+      // attempt to find PNG/JPG sibling in same folder with same base name
+      final f = File(file.filePath);
+      final base = f.uri.pathSegments.last;
+      final nameWithoutExt = base.split('.').first;
+      final parent = f.parent;
+      final candidates = [
+        '${parent.path}/$nameWithoutExt.png',
+        '${parent.path}/$nameWithoutExt.jpg',
+        '${parent.path}/preview_$nameWithoutExt.png',
+      ];
+      for (final c in candidates) {
+        if (File(c).existsSync()) return c;
+      }
+    }
+    if (File(file.filePath).existsSync()) return file.filePath;
+    return '';
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -102,7 +306,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Your Files',
+          'Files',
           style: TextStyle(
             color: Color(0xFF27272A),
             fontFamily: 'GeneralSans',
@@ -126,7 +330,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
               ? _buildEmptyState()
               : Column(
                 children: [
-                  // --- Search Bar ---
+                  // Search bar
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     child: SizedBox(
@@ -175,7 +379,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                                     padding: EdgeInsets.zero,
                                     onPressed: () {
                                       _searchController.clear();
-                                      _filterFiles("");
+                                      _filterFiles('');
                                     },
                                   )
                                   : null,
@@ -189,9 +393,9 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // --- RECENT FILES SECTION ---
-                          if (_searchQuery.isEmpty &&
-                              _recentFiles.isNotEmpty) ...[
+                          // Recent Files (UI like screenshot)
+                          if (_recentFiles.isNotEmpty &&
+                              _searchQuery.isEmpty) ...[
                             const Padding(
                               padding: EdgeInsets.symmetric(
                                 horizontal: 20,
@@ -224,7 +428,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                             const SizedBox(height: 24),
                           ],
 
-                          // --- ALL FILES SECTION ---
+                          // All files header
                           Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
@@ -243,6 +447,8 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                               ),
                             ),
                           ),
+
+                          // All files list
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             child: ListView.builder(
@@ -286,6 +492,8 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
   }
 
   Widget _buildRecentFileItem(FileModel file) {
+    final previewPath = _resolvePreviewPath(file);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -300,42 +508,66 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
           ),
           child: Row(
             children: [
-              // File Thumbnail
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFAFAFA),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child:
-                      File(file.filePath).existsSync()
-                          ? Image.file(
-                            File(file.filePath),
-                            fit: BoxFit.cover,
-                            errorBuilder:
-                                (_, __, ___) => Icon(
-                                  Icons.image,
-                                  color: Colors.grey[400],
-                                  size: 28,
-                                ),
-                          )
-                          : Icon(
-                            Icons.image,
-                            color: Colors.grey[400],
-                            size: 28,
-                          ),
+              // thumbnail
+              SizedBox(
+                width: 72,
+                height: 72,
+                child: Center(
+                  child: Container(
+                    width: 66,
+                    height: 66,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child:
+                          previewPath.isNotEmpty &&
+                                  File(previewPath).existsSync()
+                              ? Image.file(
+                                File(previewPath),
+                                fit: BoxFit.cover,
+                                errorBuilder: (c, e, s) => _placeholderIcon(),
+                              )
+                              : _placeholderIcon(),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
-              // File Info
+
+              const SizedBox(width: 12),
+
+              // info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    FutureBuilder<String>(
+                      future: _getProjectEventLabel(file),
+                      builder: (context, snapshot) {
+                        final label = snapshot.data ?? "";
+                        return Text(
+                          label,
+                          style: const TextStyle(
+                            fontFamily: 'GeneralSans',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF71717B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 6),
                     Text(
                       file.name,
                       style: const TextStyle(
@@ -347,20 +579,18 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 6),
                     Text(
                       _formatDate(file.lastUpdated),
                       style: const TextStyle(
                         fontFamily: 'GeneralSans',
                         fontSize: 12,
                         color: Color(0xFF71717B),
-                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
             ],
           ),
         ),
@@ -369,6 +599,8 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
   }
 
   Widget _buildFileItem(FileModel file) {
+    final previewPath = _resolvePreviewPath(file);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -383,42 +615,64 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
           ),
           child: Row(
             children: [
-              // File Thumbnail
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFAFAFA),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child:
-                      File(file.filePath).existsSync()
-                          ? Image.file(
-                            File(file.filePath),
-                            fit: BoxFit.cover,
-                            errorBuilder:
-                                (_, __, ___) => Icon(
-                                  Icons.description,
-                                  color: Colors.grey[400],
-                                  size: 24,
-                                ),
-                          )
-                          : Icon(
-                            Icons.description,
-                            color: Colors.grey[400],
-                            size: 24,
-                          ),
+              SizedBox(
+                width: 72,
+                height: 72,
+                child: Center(
+                  child: Container(
+                    width: 66,
+                    height: 66,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child:
+                          previewPath.isNotEmpty &&
+                                  File(previewPath).existsSync()
+                              ? Image.file(
+                                File(previewPath),
+                                fit: BoxFit.cover,
+                                errorBuilder: (c, e, s) => _placeholderIcon(),
+                              )
+                              : _placeholderIcon(),
+                    ),
+                  ),
                 ),
               ),
+
               const SizedBox(width: 12),
-              // File Info
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    FutureBuilder<String>(
+                      future: _getProjectEventLabel(file),
+                      builder: (context, snapshot) {
+                        final label = snapshot.data ?? "";
+                        return Text(
+                          label,
+                          style: const TextStyle(
+                            fontFamily: 'GeneralSans',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF71717B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       file.name,
                       style: const TextStyle(
@@ -430,20 +684,18 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
                       _formatDate(file.lastUpdated),
                       style: const TextStyle(
                         fontFamily: 'GeneralSans',
                         fontSize: 12,
                         color: Color(0xFF71717B),
-                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
             ],
           ),
         ),
@@ -451,18 +703,10 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
     );
   }
 
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) {
-      return "Today";
-    } else if (difference.inDays == 1) {
-      return "Yesterday";
-    } else if (difference.inDays < 7) {
-      return "${difference.inDays} days ago";
-    } else {
-      return "${date.day}/${date.month}/${date.year}";
-    }
+  Widget _placeholderIcon() {
+    return Container(
+      color: Colors.grey[200],
+      child: Icon(Icons.image, size: 28, color: Colors.grey[400]),
+    );
   }
 }

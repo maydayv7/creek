@@ -87,6 +87,7 @@ class CanvasBoardPage extends StatefulWidget {
   final double height;
   final File? initialImage;
   final FileModel? existingFile;
+  final File? injectedMedia; 
 
   const CanvasBoardPage({
     super.key,
@@ -95,6 +96,7 @@ class CanvasBoardPage extends StatefulWidget {
     required this.height,
     this.initialImage,
     this.existingFile,
+    this.injectedMedia,
   });
 
   @override
@@ -172,6 +174,26 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       });
       _hasUnsavedChanges = true;
     }
+
+    // Inject shared image EXACTLY like gallery images
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.injectedMedia != null && widget.existingFile != null) {
+        final oldState = _getCurrentState();
+        setState(() {
+          elements.add({
+            'id': 'shared_${DateTime.now().millisecondsSinceEpoch}',
+            'type': 'file_image',
+            'content': widget.injectedMedia!.path,
+            'position': const Offset(50, 50),
+            'size': const Size(150, 150), // EXACT match
+            'rotation': 0.0,
+          });
+          _hasUnsavedChanges = true;
+        });
+        _recordChange(oldState);
+      }
+    });
+
   }
 
   @override
@@ -1469,6 +1491,20 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
           }
           _hasUnsavedChanges = false;
         });
+         if (widget.injectedMedia != null) {
+          final oldState = _getCurrentState();
+          setState(() {
+            elements.add({
+              'id': 'shared_${DateTime.now().millisecondsSinceEpoch}',
+              'type': 'file_image',
+              'content': widget.injectedMedia!.path,
+              'position': const Offset(50, 50),
+              'size': const Size(150, 150),
+              'rotation': 0.0,
+            });
+          });
+          _recordChange(oldState);
+        }
       }
     } catch (e) {
       debugPrint("Error loading canvas: $e");
