@@ -494,67 +494,74 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   Widget _buildEventCard(ProjectModel event) {
     final eventImages = _eventImages[event.id] ?? [];
     
-    return Container(
-      width: 328,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFE4E4E7),
-          width: 1,
+    return GestureDetector(
+      onTap: () {
+        if (event.id != null) {
+          _navigateToBoard(event.id!);
+        }
+      },
+      child: Container(
+        width: 328,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFFE4E4E7),
+            width: 1,
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Three images side by side (or fewer if not available)
-          Container(
-            height: 115,
-            padding: const EdgeInsets.all(4),
-            child: Row(
-              children: [
-                // Show up to 3 images
-                for (int i = 0; i < 3; i++)
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        right: i < 2 ? 4 : 0,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: i < eventImages.length
-                            ? Image.file(
-                                File(eventImages[i].filePath),
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[300],
-                                  );
-                                },
-                              )
-                            : Container(
-                                color: Colors.grey[200],
-                              ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Three images side by side (or fewer if not available)
+            Container(
+              height: 115,
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                children: [
+                  // Show up to 3 images
+                  for (int i = 0; i < 3; i++)
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          right: i < 2 ? 4 : 0,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: i < eventImages.length
+                              ? Image.file(
+                                  File(eventImages[i].filePath),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: Colors.grey[300],
+                                    );
+                                  },
+                                )
+                              : Container(
+                                  color: Colors.grey[200],
+                                ),
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-          // Event title
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Text(
-              event.title,
-              style: const TextStyle(
-                fontFamily: 'GeneralSans',
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF27272A),
-                letterSpacing: 0.25,
+                ],
               ),
             ),
-          ),
-        ],
+            // Event title
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Text(
+                event.title,
+                style: const TextStyle(
+                  fontFamily: 'GeneralSans',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF27272A),
+                  letterSpacing: 0.25,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
