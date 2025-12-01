@@ -187,11 +187,12 @@ class FlaskService {
       body: {'image': base64Image, 'prompt': prompt},
     );
 
+    // debugPrint(response);
     if (response != null && response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['caption'] != null) {
-        debugPrint("✅ [Describe] Success: ${data['caption']}");
-        return data['caption'];
+      if (data['output'] != null) {
+        debugPrint("✅ [Describe] Success: ${data['output']}");
+        return data['output'];
       }
     }
 

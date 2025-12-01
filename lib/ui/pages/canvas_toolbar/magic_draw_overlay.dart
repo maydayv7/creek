@@ -9,7 +9,9 @@ class MagicDrawTools extends StatefulWidget {
   final Function(Color) onColorChanged;
   final Function(double) onWidthChanged;
   final Function(bool) onEraserToggle;
-  final VoidCallback onClose; // Added onClose callback signature to match usage
+  final VoidCallback onClose;
+  final Function(String) onPromptSubmit; // Callback for prompt submission
+  final bool isProcessing; // Loading state
   final List<Color> brandColors;
 
   const MagicDrawTools({
@@ -22,6 +24,8 @@ class MagicDrawTools extends StatefulWidget {
     required this.onWidthChanged,
     required this.onEraserToggle,
     required this.onClose,
+    required this.onPromptSubmit,
+    required this.isProcessing,
     required this.brandColors,
   });
 
@@ -31,6 +35,7 @@ class MagicDrawTools extends StatefulWidget {
 
 class _MagicDrawToolsState extends State<MagicDrawTools> {
   bool _showStrokeSlider = false;
+  final TextEditingController _promptController = TextEditingController();
 
   // Initialize recent colors here so they persist
   final List<Color> _recentColors = [
@@ -42,11 +47,24 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
   ];
 
   @override
+  void dispose() {
+    _promptController.dispose();
+    super.dispose();
+  }
+
+  void _handleSubmit() {
+    if (_promptController.text.trim().isNotEmpty && !widget.isProcessing) {
+      widget.onPromptSubmit(_promptController.text.trim());
+      // Optional: Clear text after submit or keep it? 
+      // Usually keeping it is better for iterations, clearing if successful.
+      // We'll let the parent decide or just keep it for now.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (!widget.isActive) return const SizedBox.shrink();
 
-    // KEEPING YOUR LOGIC: Only displaying the bottom tool panel.
-    // The top header/close button from the other branch is ignored.
     return Positioned(
       bottom: 140,
       left: 16,
@@ -97,9 +115,11 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: TextField(
-                    decoration: InputDecoration.collapsed(
+                    controller: _promptController,
+                    onSubmitted: (_) => _handleSubmit(),
+                    decoration: const InputDecoration.collapsed(
                       hintText: "tap imagination...",
                       hintStyle: TextStyle(fontSize: 14, color: Colors.black54),
                     ),
@@ -107,17 +127,28 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                 ),
                 const Icon(Icons.mic_none, color: Colors.grey),
                 const SizedBox(width: 8),
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF2B2B2B),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome,
-                    color: Colors.white,
-                    size: 20,
+                GestureDetector(
+                  onTap: _handleSubmit,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF2B2B2B),
+                      shape: BoxShape.circle,
+                    ),
+                    child: widget.isProcessing
+                        ? const Padding(
+                            padding: EdgeInsets.all(12.0),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.auto_awesome,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                   ),
                 ),
               ],
@@ -156,17 +187,15 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                 ),
 
                 GestureDetector(
-                  onTap:
-                      () => setState(
-                        () => _showStrokeSlider = !_showStrokeSlider,
-                      ),
+                  onTap: () => setState(
+                    () => _showStrokeSlider = !_showStrokeSlider,
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color:
-                          _showStrokeSlider
-                              ? Colors.grey.shade200
-                              : Colors.transparent,
+                      color: _showStrokeSlider
+                          ? Colors.grey.shade200
+                          : Colors.transparent,
                       shape: BoxShape.circle,
                     ),
                     child: Container(
@@ -271,10 +300,9 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
 class _TaperedSliderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint =
-        Paint()
-          ..color = const Color(0xFF2B2B2B)
-          ..style = PaintingStyle.fill;
+    final paint = Paint()
+      ..color = const Color(0xFF2B2B2B)
+      ..style = PaintingStyle.fill;
     final path = Path();
     path.moveTo(10, size.height / 2 - 2);
     path.lineTo(size.width - 10, size.height / 2 - 10);
