@@ -498,6 +498,42 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     );
   }
 
+  // Helper to generate preview image
+  Future<String?> _generatePreviewImage() async {
+    try {
+      final boundary =
+          _canvasGlobalKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+
+      // Capture image with lower pixel ratio for preview thumbnail
+      final ui.Image image = await boundary.toImage(pixelRatio: 1.0);
+      final ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+
+      if (byteData == null) return null;
+      final Uint8List pngBytes = byteData.buffer.asUint8List();
+
+      final directory = await getApplicationDocumentsDirectory();
+      final previewDir = Directory('${directory.path}/previews');
+      if (!await previewDir.exists()) {
+        await previewDir.create(recursive: true);
+      }
+
+      final String fileName =
+          "preview_${DateTime.now().millisecondsSinceEpoch}.png";
+      final String filePath = '${previewDir.path}/$fileName';
+
+      final File imgFile = File(filePath);
+      await imgFile.writeAsBytes(pngBytes);
+      return filePath;
+    } catch (e) {
+      debugPrint("Error generating preview: $e");
+      return null;
+    }
+  }
+
   Future<void> _saveCanvas() async {
     try {
       String fileName = "Canvas ${DateTime.now().toString().split(' ')[0]}";
@@ -510,16 +546,19 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         fileName = userFileName;
       }
 
-      // 2. Serialize Elements AND Paths (Drawing) to JSON
+      // 2. Generate Preview
+      final String? previewPath = await _generatePreviewImage();
+
+      // 3. Serialize Elements AND Paths (Drawing) to JSON
       final jsonList = _elementsToJson(elements);
       final pathsJson = _paths.map((p) => p.toMap()).toList();
 
-      // [FIX] SAVE CANVAS DIMENSIONS
       final saveData = {
         'elements': jsonList,
         'paths': pathsJson,
         'width': _canvasSize.width, // Saving Width
         'height': _canvasSize.height, // Saving Height
+        'preview_path': previewPath, // Saving Preview Path
       };
       final jsonString = jsonEncode(saveData);
 
