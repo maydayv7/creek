@@ -213,7 +213,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            "Are you ready to start building\nthe visual identity",
+            "Are you ready to start building\nyour stylesheet",
             style: Variables.headerStyle.copyWith(fontSize: 18),
             textAlign: TextAlign.center,
           ),
@@ -266,11 +266,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: const Text("Visual Identity", style: TextStyle(fontFamily: 'GeneralSans', fontSize: 24, fontWeight: FontWeight.w600)),
-            ),
-            const SizedBox(height: 32),
 
             if (foundAny) ...[
               if (hasAssets) _buildAssetsSection(_projectAssets),

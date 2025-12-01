@@ -455,7 +455,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
             ),
           );
         },
-        hideDropdown: true,
+        hideSecondRow: true,
         onSettingsPressed: () {},
         onLayoutToggle: () {},
         isAlternateView: false,
