@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:flutter/widgets.dart';
+
 import '../database.dart';
 import '../models/image_model.dart';
 
@@ -96,7 +98,7 @@ class ImageRepo {
         final List<dynamic> decoded = jsonDecode(tagsJson);
         return decoded.map((e) => e.toString()).toList();
       } catch (e) {
-        print("Error decoding tags: $e");
+        debugPrint("Error decoding tags: $e");
         return [];
       }
     }

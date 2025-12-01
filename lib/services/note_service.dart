@@ -38,8 +38,7 @@ class NoteService {
     double? normWidth,
     double? normHeight,
   }) async {
-    // TODO
-    // If category or crop area changes, need to re-analyze
+    // TODO: If category or crop area changes, need to re-analyze
     await _repo.updateNote(
       noteId,
       content: content,

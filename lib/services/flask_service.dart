@@ -12,13 +12,16 @@ class FlaskService {
   // ===========================================================================
   // CONFIGURATION
   // ===========================================================================
-  
+
   // NOTE: REPLACE WITH YOUR WIFI IP ADDRESS
   //       BOTH PC AND MOBILE SHOULD BE ON SAME WIFI
   //       NO NEED FOR NGORK OR SMEE
   //       PORT: 5000, http
-  static const String _serverUrl = 'http://172.16.114.193:5000'; // --> READ NOTE (REPLACE WITH IITG_CONNECT WIFI IP)
-  static const Map<String, String> _headers = {'Content-Type': 'application/json'};
+  static const String _serverUrl =
+      'http://172.16.114.193:5000'; // --> READ NOTE (REPLACE WITH IITG_CONNECT WIFI IP)
+  static const Map<String, String> _headers = {
+    'Content-Type': 'application/json',
+  };
 
   // ===========================================================================
   // 1. PIPELINES (Complex workflows)
@@ -38,8 +41,8 @@ class FlaskService {
     // Step 1: Get the description of the sketch
     // We use a specific prompt to ensure we get structural details
     final String? sketchDescription = await describeImage(
-      imagePath: sketchPath, 
-      prompt: '<MORE_DETAILED_CAPTION>'
+      imagePath: sketchPath,
+      prompt: '<MORE_DETAILED_CAPTION>',
     );
 
     if (sketchDescription == null) {
@@ -49,7 +52,7 @@ class FlaskService {
 
     // Step 2: Construct the Global Prompt
     // Strategy: Style + User Intent + Content context
-    final String globalPrompt = 
+    final String globalPrompt =
         "$stylePrompt. $userPrompt. The image features: $sketchDescription";
 
     debugPrint("🔗 [Pipeline] Generated Global Prompt: \n$globalPrompt");
@@ -111,7 +114,7 @@ class FlaskService {
     if (path != null) {
       // 1. Find the project ID
       int? projectId;
-      
+
       final imagemodel = await ImageRepo().getByFilePath(imagePath);
       if (imagemodel != null) {
         projectId = imagemodel.projectId;
@@ -127,7 +130,7 @@ class FlaskService {
         final project = await ProjectRepo().getProjectById(projectId);
         if (project != null) {
           project.assetsPath.add(path); // Update memory
-          await ProjectRepo().updateAssets(projectId, project.assetsPath); 
+          await ProjectRepo().updateAssets(projectId, project.assetsPath);
           debugPrint("✅ Asset path saved to Project DB: $path");
         }
       }
@@ -146,16 +149,13 @@ class FlaskService {
     String prompt = '<MORE_DETAILED_CAPTION>',
   }) async {
     debugPrint("👁️ [Describe] Preparing request...");
-    
+
     final String? base64Image = await _encodeFile(imagePath);
     if (base64Image == null) return null;
 
     final response = await _postRequest(
       endpoint: '/describe',
-      body: {
-        'image': base64Image,
-        'prompt': prompt,
-      },
+      body: {'image': base64Image, 'prompt': prompt},
     );
 
     if (response != null && response.statusCode == 200) {
@@ -187,8 +187,10 @@ class FlaskService {
     if (response != null && response.statusCode == 200) {
       return _saveImageFromResponse(response, filenamePrefix);
     }
-    
-    debugPrint("❌ $logPrefix Failed: ${response?.statusCode ?? 'No Connection'}");
+
+    debugPrint(
+      "❌ $logPrefix Failed: ${response?.statusCode ?? 'No Connection'}",
+    );
     return null;
   }
 
@@ -217,26 +219,36 @@ class FlaskService {
     return base64Encode(await file.readAsBytes());
   }
 
-  Future<String?> _saveImageFromResponse(http.Response response, String prefix) async {
+  Future<String?> _saveImageFromResponse(
+    http.Response response,
+    String prefix,
+  ) async {
     try {
       final data = jsonDecode(response.body);
       if (data['image'] == null) return null;
 
       final Uint8List imageBytes = base64Decode(data['image']);
-      
+
       final directory = await getApplicationDocumentsDirectory();
       // Use join for safe path construction
       final imagesDirPath = p.join(directory.path, 'generated_images');
       final imagesDir = Directory(imagesDirPath);
-      
+
       if (!await imagesDir.exists()) await imagesDir.create(recursive: true);
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final safePrefix = prefix.replaceAll(RegExp(r'[^\w\s]'), '').trim().replaceAll(' ', '_');
-      final shortPrefix = safePrefix.length > 20 ? safePrefix.substring(0, 20) : safePrefix;
-      
+      final safePrefix = prefix
+          .replaceAll(RegExp(r'[^\w\s]'), '')
+          .trim()
+          .replaceAll(' ', '_');
+      final shortPrefix =
+          safePrefix.length > 20 ? safePrefix.substring(0, 20) : safePrefix;
+
       // Use join here too
-      final String filePath = p.join(imagesDir.path, '${shortPrefix}_$timestamp.png');
+      final String filePath = p.join(
+        imagesDir.path,
+        '${shortPrefix}_$timestamp.png',
+      );
 
       await File(filePath).writeAsBytes(imageBytes);
       debugPrint("✅ Image saved: $filePath");

@@ -23,7 +23,7 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
   List<ImageModel> _filteredImages = [];
 
   List<String> _allTags = [];
-  Set<String> _selectedTags = {};
+  final Set<String> _selectedTags = {};
   bool _isLoading = true;
 
   @override
@@ -133,7 +133,7 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                                     }
                                   });
                                   // Update main state
-                                  this.setState(() {
+                                  setState(() {
                                     _applyFilter();
                                   });
                                 },
@@ -162,7 +162,7 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                       Expanded(
                         child: TextButton(
                           onPressed: () {
-                            this.setState(() {
+                            setState(() {
                               _selectedTags.clear();
                               _applyFilter();
                             });
@@ -365,7 +365,7 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         colors: [
-                          Colors.black.withOpacity(0.8),
+                          Colors.black.withValues(alpha: 0.8),
                           Colors.transparent,
                         ],
                       ),
@@ -381,10 +381,10 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.1),
+                                  color: Colors.white.withValues(alpha: 0.1),
                                 ),
                               ),
                               child: Text(

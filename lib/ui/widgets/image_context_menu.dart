@@ -1,9 +1,7 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../data/models/image_model.dart';
-import '../../services/image_service.dart';
 import '../../utils/image_actions_helper.dart';
 import '../styles/variables.dart';
 
@@ -44,7 +42,8 @@ class ImageContextMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       // Get exact touch position
-      onLongPressStart: (details) => _showRadialMenu(context, details.globalPosition),
+      onLongPressStart:
+          (details) => _showRadialMenu(context, details.globalPosition),
       child: child,
     );
   }
@@ -65,14 +64,15 @@ class _RadialMenuOverlay extends StatefulWidget {
   State<_RadialMenuOverlay> createState() => _RadialMenuOverlayState();
 }
 
-class _RadialMenuOverlayState extends State<_RadialMenuOverlay> with SingleTickerProviderStateMixin {
+class _RadialMenuOverlayState extends State<_RadialMenuOverlay>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
 
   // Configuration
-  final double radius = 120.0; 
-  final double buttonSize = 56.0; 
-  final double arcSpan = 150.0; 
+  final double radius = 120.0;
+  final double buttonSize = 56.0;
+  final double arcSpan = 150.0;
 
   @override
   void initState() {
@@ -81,12 +81,12 @@ class _RadialMenuOverlayState extends State<_RadialMenuOverlay> with SingleTicke
       duration: const Duration(milliseconds: 350),
       vsync: this,
     );
-    
+
     _scaleAnimation = CurvedAnimation(
       parent: _controller,
       curve: Curves.easeOutBack,
     );
-    
+
     _controller.forward();
   }
 
@@ -144,7 +144,10 @@ class _RadialMenuOverlayState extends State<_RadialMenuOverlay> with SingleTicke
   void _notImplemented() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text("Coming soon", style: TextStyle(fontFamily: 'GeneralSans')),
+        content: const Text(
+          "Coming soon",
+          style: TextStyle(fontFamily: 'GeneralSans'),
+        ),
         backgroundColor: Variables.textPrimary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -163,7 +166,7 @@ class _RadialMenuOverlayState extends State<_RadialMenuOverlay> with SingleTicke
     double baseAngle = isRightSide ? 180 : 0;
 
     // 2. Determine Vertical clipping adjustments
-    double topBoundary = 120; 
+    double topBoundary = 120;
     double bottomBoundary = screenSize.height - 120;
 
     double rotationOffset = 0;
@@ -181,21 +184,24 @@ class _RadialMenuOverlayState extends State<_RadialMenuOverlay> with SingleTicke
     final buttons = [
       _MenuButtonData(
         svgPath: 'assets/icons/share_icon.svg',
-        onTap: _shareImage
+        onTap: _shareImage,
       ),
       _MenuButtonData(
         svgPath: 'assets/icons/files_icon.svg',
-        onTap: _sendToFiles
+        onTap: _sendToFiles,
       ),
-      _MenuButtonData(icon: Icons.drive_file_rename_outline, onTap: _renameImage),
+      _MenuButtonData(
+        icon: Icons.drive_file_rename_outline,
+        onTap: _renameImage,
+      ),
       _MenuButtonData(
         svgPath: 'assets/icons/trash_icon.svg',
         onTap: _deleteImage,
-        isDestructive: true
+        isDestructive: true,
       ),
       _MenuButtonData(
         svgPath: 'assets/icons/ai-search.svg',
-        onTap: _notImplemented
+        onTap: _notImplemented,
       ),
     ];
 
@@ -215,11 +221,8 @@ class _RadialMenuOverlayState extends State<_RadialMenuOverlay> with SingleTicke
           final step = arcSpan / (buttons.length - 1);
           final startAngle = baseAngle - (arcSpan / 2);
           final angleDeg = startAngle + (step * index);
-          
-          return _buildAnimatedButton(
-            angleDeg: angleDeg,
-            data: buttons[index],
-          );
+
+          return _buildAnimatedButton(angleDeg: angleDeg, data: buttons[index]);
         }),
       ],
     );
@@ -243,10 +246,7 @@ class _RadialMenuOverlayState extends State<_RadialMenuOverlay> with SingleTicke
           top: dy,
           child: Transform.scale(
             scale: _scaleAnimation.value,
-            child: _FloatingCircleButton(
-              size: buttonSize,
-              data: data,
-            ),
+            child: _FloatingCircleButton(size: buttonSize, data: data),
           ),
         );
       },
@@ -273,10 +273,7 @@ class _FloatingCircleButton extends StatefulWidget {
   final double size;
   final _MenuButtonData data;
 
-  const _FloatingCircleButton({
-    required this.size,
-    required this.data,
-  });
+  const _FloatingCircleButton({required this.size, required this.data});
 
   @override
   State<_FloatingCircleButton> createState() => _FloatingCircleButtonState();
@@ -287,7 +284,8 @@ class _FloatingCircleButtonState extends State<_FloatingCircleButton> {
 
   @override
   Widget build(BuildContext context) {
-    final Color normalIconColor = widget.data.isDestructive ? Colors.red : Variables.textPrimary;
+    final Color normalIconColor =
+        widget.data.isDestructive ? Colors.red : Variables.textPrimary;
     final Color activeIconColor = Colors.white;
 
     final Color normalBgColor = Colors.white;
@@ -314,21 +312,22 @@ class _FloatingCircleButtonState extends State<_FloatingCircleButton> {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
+              color: Colors.black.withValues(alpha: 0.15),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
           ],
         ),
         padding: const EdgeInsets.all(14),
-        child: widget.data.svgPath != null
-            ? SvgPicture.asset(
-                widget.data.svgPath!,
-                width: 18,
-                height: 18,
-                colorFilter: ColorFilter.mode(currentColor, BlendMode.srcIn),
-              )
-            : Icon(widget.data.icon, color: currentColor, size: 24),
+        child:
+            widget.data.svgPath != null
+                ? SvgPicture.asset(
+                  widget.data.svgPath!,
+                  width: 18,
+                  height: 18,
+                  colorFilter: ColorFilter.mode(currentColor, BlendMode.srcIn),
+                )
+                : Icon(widget.data.icon, color: currentColor, size: 24),
       ),
     );
   }

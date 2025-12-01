@@ -28,43 +28,70 @@ class ImageActionsHelper {
     ImageModel image,
     VoidCallback onSuccess,
   ) async {
-    final TextEditingController nameController = TextEditingController(text: image.name);
+    final TextEditingController nameController = TextEditingController(
+      text: image.name,
+    );
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Rename Image", style: TextStyle(fontFamily: 'GeneralSans', fontWeight: FontWeight.w600)),
-        content: TextField(
-          controller: nameController,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: "Enter new name",
-            filled: true,
-            fillColor: Variables.surfaceSubtle,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
+            title: const Text(
+              "Rename Image",
+              style: TextStyle(
+                fontFamily: 'GeneralSans',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            content: TextField(
+              controller: nameController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: "Enter new name",
+                filled: true,
+                fillColor: Variables.surfaceSubtle,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(
+                    color: Variables.textSecondary,
+                    fontFamily: 'GeneralSans',
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  if (nameController.text.isNotEmpty) {
+                    await ImageService().renameImage(
+                      image.id,
+                      nameController.text.trim(),
+                    );
+                    onSuccess();
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  }
+                },
+                child: const Text(
+                  "Save",
+                  style: TextStyle(
+                    color: Variables.textPrimary,
+                    fontFamily: 'GeneralSans',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel", style: TextStyle(color: Variables.textSecondary, fontFamily: 'GeneralSans')),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (nameController.text.isNotEmpty) {
-                await ImageService().renameImage(image.id, nameController.text.trim());
-                onSuccess();
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text("Save", style: TextStyle(color: Variables.textPrimary, fontFamily: 'GeneralSans', fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
     );
   }
 
@@ -75,25 +102,50 @@ class ImageActionsHelper {
   ) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Delete Image?", style: TextStyle(fontFamily: 'GeneralSans', fontWeight: FontWeight.w600)),
-        content: const Text(
-          "This action cannot be undone.",
-          style: TextStyle(fontFamily: 'GeneralSans', color: Variables.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("Cancel", style: TextStyle(color: Variables.textSecondary, fontFamily: 'GeneralSans')),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text(
+              "Delete Image?",
+              style: TextStyle(
+                fontFamily: 'GeneralSans',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            content: const Text(
+              "This action cannot be undone.",
+              style: TextStyle(
+                fontFamily: 'GeneralSans',
+                color: Variables.textSecondary,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(
+                    color: Variables.textSecondary,
+                    fontFamily: 'GeneralSans',
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  "Delete",
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontFamily: 'GeneralSans',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.red, fontFamily: 'GeneralSans', fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
     );
 
     if (confirm == true) {

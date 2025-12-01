@@ -56,7 +56,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -134,7 +134,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                       border: Border.all(color: Colors.white, width: 2),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 4,
                         ),
                       ],
@@ -475,7 +475,7 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
                 data: SliderThemeData(
                   trackHeight: 36,
                   activeTrackColor: activeColor,
-                  inactiveTrackColor: activeColor.withOpacity(0.2),
+                  inactiveTrackColor: activeColor.withValues(alpha: 0.2),
                   thumbColor: Colors.transparent,
                   thumbShape: const RoundSliderThumbShape(
                     enabledThumbRadius: 0,
@@ -613,7 +613,7 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
                 ),
                 child: Icon(Icons.block, size: 16, color: Colors.red[300]),
               ),
-              ..._brandPalette.map((c) => _buildColorCircle(c)).toList(),
+              ..._brandPalette.map((c) => _buildColorCircle(c)),
               Container(
                 width: 32,
                 height: 32,
@@ -663,7 +663,7 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
       ),
     );
   }

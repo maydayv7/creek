@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:image/image.dart' as img; 
+import 'package:image/image.dart' as img;
 import '../data/models/image_model.dart';
 import '../data/models/note_model.dart';
 import '../data/repos/image_repo.dart';
@@ -66,9 +66,7 @@ class AnalysisQueueManager {
       // Run Analysis
       if (image.tags.isEmpty) {
         debugPrint("[Queue]: Analyzing Full Suite: ${image.name}");
-        result = await ImageAnalyzerService.analyzeFullSuite(
-          image.filePath,
-        );
+        result = await ImageAnalyzerService.analyzeFullSuite(image.filePath);
       } else {
         debugPrint(
           "[Queue]: Analyzing Selected: ${image.name} with tags: ${image.tags}",
@@ -101,14 +99,18 @@ class AnalysisQueueManager {
     try {
       // 1. Fetch Parent Info
       final parentImageModel = await _imageRepo.getById(imageId);
-      if (parentImageModel == null) throw Exception("Parent image not found: $imageId");
+      if (parentImageModel == null) {
+        throw Exception("Parent image not found: $imageId");
+      }
       final parentFile = File(parentImageModel.filePath);
       if (!parentFile.existsSync()) throw Exception("Parent file missing");
 
       // 2. Decode once for all notes in this group
       final bytes = await parentFile.readAsBytes();
       parentImageCache = img.decodeImage(bytes);
-      if (parentImageCache == null) throw Exception("Failed to decode parent image");
+      if (parentImageCache == null) {
+        throw Exception("Failed to decode parent image");
+      }
 
       final appDir = await getApplicationDocumentsDirectory();
       final cropDir = Directory('${appDir.path}/crops');
@@ -128,9 +130,9 @@ class AnalysisQueueManager {
   }
 
   Future<void> _processSingleNoteWithCache(
-    NoteModel note, 
-    img.Image parentImage, 
-    Directory cropDir
+    NoteModel note,
+    img.Image parentImage,
+    Directory cropDir,
   ) async {
     await _noteRepo.updateNote(note.id!, status: 'analyzing');
     try {
@@ -156,29 +158,34 @@ class AnalysisQueueManager {
         if (top + h > parentImage.height) h = parentImage.height - top;
 
         if (w <= 0 || h <= 0) {
-           debugPrint("[Queue]: Note ${note.id} has invalid dimensions");
-           await _noteRepo.updateNote(note.id!, status: 'failed');
-           return;
+          debugPrint("[Queue]: Note ${note.id} has invalid dimensions");
+          await _noteRepo.updateNote(note.id!, status: 'failed');
+          return;
         }
 
-        final croppedImg = img.copyCrop(parentImage, x: left, y: top, width: w, height: h);
+        final croppedImg = img.copyCrop(
+          parentImage,
+          x: left,
+          y: top,
+          width: w,
+          height: h,
+        );
         await cropFile.writeAsBytes(img.encodeJpg(croppedImg));
       }
 
       // 3. Analysis
       debugPrint("[Queue]: Analyzing Note ${note.id} tag: ${note.category}");
-      final result = await ImageAnalyzerService.analyzeSelected(
-        cropPath,
-        [note.category],
-      );
+      final result = await ImageAnalyzerService.analyzeSelected(cropPath, [
+        note.category,
+      ]);
 
       // 4. Update DB
       if (result['success'] == true && result['data'] != null) {
         final resultsMap = result['data']['results'] ?? {};
         final jsonString = jsonEncode(resultsMap);
         await _noteRepo.updateNote(
-          note.id!, 
-          analysisData: jsonString, 
+          note.id!,
+          analysisData: jsonString,
           status: 'completed',
           cropFilePath: cropPath,
         );

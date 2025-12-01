@@ -219,8 +219,8 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                           Text(
                             "${_files.length} items",
                             style: TextStyle(
-                              color: theme.colorScheme.onSurface.withOpacity(
-                                0.6,
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.6,
                               ),
                               fontFamily: 'GeneralSans',
                             ),
@@ -295,7 +295,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -312,7 +312,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -338,7 +338,9 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                       "Updated $dateStr",
                       style: TextStyle(
                         fontSize: 12,
-                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.5,
+                        ),
                         fontFamily: 'GeneralSans',
                       ),
                     ),
@@ -374,7 +376,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
               file.description!,
               style: TextStyle(
                 fontSize: 13,
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 fontFamily: 'GeneralSans',
               ),
               maxLines: 2,

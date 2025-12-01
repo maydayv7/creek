@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../data/models/project_model.dart';
 import '../../data/repos/project_repo.dart';
@@ -212,7 +211,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     _project!.description!,
                     style: TextStyle(
                       fontSize: 14,
-                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                       fontFamily: 'GeneralSans',
                     ),
                   ),
@@ -307,7 +306,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -339,7 +338,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               event.description!,
               style: TextStyle(
                 fontSize: 13,
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

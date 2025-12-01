@@ -56,7 +56,9 @@ class ProjectModel {
       lastAccessedAt: DateTime.parse(map['last_accessed_at']),
       createdAt: DateTime.parse(map['created_at']),
       assetsPath:
-        map['assets_path'] != null ? List<String>.from(jsonDecode(map['assets_path'])) : [],
+          map['assets_path'] != null
+              ? List<String>.from(jsonDecode(map['assets_path']))
+              : [],
     );
   }
 }

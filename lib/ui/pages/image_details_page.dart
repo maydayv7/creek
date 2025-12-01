@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../services/image_service.dart';
 import '../../services/note_service.dart';
@@ -56,11 +55,11 @@ class ImageDetailsPage extends StatefulWidget {
   final int projectId;
 
   const ImageDetailsPage({
-    Key? key,
+    super.key,
     required this.imagePath,
     required this.imageId,
     required this.projectId,
-  }) : super(key: key);
+  });
 
   @override
   State<ImageDetailsPage> createState() => _ImageDetailsPageState();
@@ -318,8 +317,9 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
   void _onResizeUpdate(DragUpdateDetails details) {
     if (!_isResizing ||
         _finalSelectionRect == null ||
-        _activeHandle == DragHandle.none)
+        _activeHandle == DragHandle.none) {
       return;
+    }
 
     final pos = _getLocalPosition(details.globalPosition);
     if (pos == null) return;
@@ -597,7 +597,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                                     });
                                   }
 
-                                  Navigator.pop(context);
+                                  if (context.mounted) Navigator.pop(context);
                                 }
                               },
                             ),
@@ -644,10 +644,11 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                         return GestureDetector(
                           onTap: () {
                             setState(() {
-                              if (isSelected)
+                              if (isSelected) {
                                 tempTags.remove(tag);
-                              else
+                              } else {
                                 tempTags.add(tag);
+                              }
                             });
                           },
                           child: Container(
@@ -713,7 +714,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                   onPressed: () async {
                     this.setState(() => _currentTags = tempTags);
                     await _imageService.updateTags(widget.imageId, tempTags);
-                    Navigator.pop(context);
+                    if (context.mounted) Navigator.pop(context);
                   },
                   child: const Text(
                     "Save",
@@ -757,9 +758,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                 ? Container(
                   height: 40,
                   decoration: BoxDecoration(
-                    color: const Color(
-                      0xFFF3F4F6,
-                    ),
+                    color: const Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: InkWell(
@@ -972,7 +971,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                                                 boxShadow: [
                                                   BoxShadow(
                                                     color: Colors.black
-                                                        .withOpacity(0.3),
+                                                        .withValues(alpha: 0.3),
                                                     blurRadius: 4,
                                                     offset: const Offset(0, 1),
                                                   ),
@@ -990,7 +989,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                                             ),
                                           ),
                                         );
-                                      }).toList(),
+                                      }),
 
                                       // Notes Button (Show only when not in selection mode)
                                       if (!isSelectionModeActive)
@@ -1235,11 +1234,10 @@ class _NotesListSheet extends StatefulWidget {
   final VoidCallback onAddNotePressed;
 
   const _NotesListSheet({
-    Key? key,
     required this.notes,
     this.highlightId,
     required this.onAddNotePressed,
-  }) : super(key: key);
+  });
 
   @override
   State<_NotesListSheet> createState() => __NotesListSheetState();
@@ -1407,10 +1405,10 @@ class NoteModalOverlay extends StatelessWidget {
   final Size screenSize;
 
   const NoteModalOverlay({
-    Key? key,
+    super.key,
     required this.modalContent,
     required this.screenSize,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1532,7 +1530,7 @@ class ResizingSelectionOverlayPainter extends CustomPainter {
       const double handleRadius = 8;
       final Paint handleShadow =
           Paint()
-            ..color = Colors.black.withOpacity(0.3)
+            ..color = Colors.black.withValues(alpha: 0.3)
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
       final Paint handleFill = Paint()..color = Colors.white;
       final Paint handleBorder =

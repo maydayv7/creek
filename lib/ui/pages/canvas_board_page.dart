@@ -1,12 +1,9 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:undo/undo.dart';
 import './canvas_toolbar/magic_draw_overlay.dart';
 import './canvas_toolbar/text_tools_overlay.dart';
@@ -357,7 +354,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                             color: Colors.white,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
+                                color: Colors.black.withValues(alpha: 0.15),
                                 blurRadius: 40,
                                 offset: const Offset(0, 10),
                               ),
@@ -387,12 +384,14 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                                     .getMaxScaleOnAxis(),
                             onTap: () {
                               if (!_isMagicDrawActive) {
-                                if (_isEditingText && selectedId != e['id'])
+                                if (_isEditingText && selectedId != e['id']) {
                                   _exitEditMode();
+                                }
                                 setState(() {
                                   selectedId = e['id'];
-                                  if (e['type'] == 'text')
+                                  if (e['type'] == 'text') {
                                     _isTextToolsActive = true;
+                                  }
                                 });
                                 setState(() {
                                   elements.remove(e);
@@ -674,16 +673,18 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   ) {
     return source.map((e) {
       final copy = Map<String, dynamic>.from(e);
-      if (e['position'] is Offset)
+      if (e['position'] is Offset) {
         copy['position'] = Offset(
           (e['position'] as Offset).dx,
           (e['position'] as Offset).dy,
         );
-      if (e['size'] is Size)
+      }
+      if (e['size'] is Size) {
         copy['size'] = Size(
           (e['size'] as Size).width,
           (e['size'] as Size).height,
         );
+      }
       return copy;
     }).toList();
   }
@@ -724,7 +725,7 @@ class _ManipulatingBox extends StatefulWidget {
   final FocusNode? focusNode;
 
   const _ManipulatingBox({
-    Key? key,
+    super.key,
     required this.id,
     required this.position,
     required this.size,
@@ -743,7 +744,7 @@ class _ManipulatingBox extends StatefulWidget {
     required this.onDragEnd,
     this.textController,
     this.focusNode,
-  }) : super(key: key);
+  });
 
   @override
   State<_ManipulatingBox> createState() => _ManipulatingBoxState();
@@ -823,7 +824,7 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                               )
                               : widget.type == 'text'
                               ? Border.all(
-                                color: Colors.grey.withOpacity(0.3),
+                                color: Colors.grey.withValues(alpha: 0.3),
                                 width: 1.0 * handleScale,
                               )
                               : null,
@@ -1011,8 +1012,9 @@ class CanvasPainter extends CustomPainter {
       if (path.points.length > 1) {
         final Path p = Path();
         p.moveTo(path.points.first.offset.dx, path.points.first.offset.dy);
-        for (int i = 1; i < path.points.length; i++)
+        for (int i = 1; i < path.points.length; i++) {
           p.lineTo(path.points[i].offset.dx, path.points[i].offset.dy);
+        }
         canvas.drawPath(p, paint);
       } else if (path.points.isNotEmpty) {
         canvas.drawPoints(ui.PointMode.points, [
@@ -1031,8 +1033,9 @@ class CanvasPainter extends CustomPainter {
             ..style = PaintingStyle.stroke;
       final Path p = Path();
       p.moveTo(currentPoints.first.offset.dx, currentPoints.first.offset.dy);
-      for (int i = 1; i < currentPoints.length; i++)
+      for (int i = 1; i < currentPoints.length; i++) {
         p.lineTo(currentPoints[i].offset.dx, currentPoints[i].offset.dy);
+      }
       canvas.drawPath(p, paint);
     }
     canvas.restore();
@@ -1070,7 +1073,7 @@ class CanvasBottomBar extends StatelessWidget {
         border: Border(top: BorderSide(color: Colors.grey[200]!)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),

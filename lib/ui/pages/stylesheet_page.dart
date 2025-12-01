@@ -15,10 +15,7 @@ import 'package:path_provider/path_provider.dart';
 class StylesheetPage extends StatefulWidget {
   final int projectId;
 
-  const StylesheetPage({
-    super.key,
-    required this.projectId,
-  });
+  const StylesheetPage({super.key, required this.projectId});
 
   @override
   State<StylesheetPage> createState() => _StylesheetPageState();
@@ -27,10 +24,10 @@ class StylesheetPage extends StatefulWidget {
 class _StylesheetPageState extends State<StylesheetPage> {
   late int _currentProjectId;
   bool _isLoading = false;
-  
+
   Map<String, dynamic>? _stylesheetMap;
   String? _rawJsonString;
-  
+
   // New state variable to hold assets from ProjectRepo
   List<String> _projectAssets = [];
 
@@ -48,18 +45,21 @@ class _StylesheetPageState extends State<StylesheetPage> {
   String _cleanJsonString(String raw) {
     String cleaned = raw;
     cleaned = cleaned.replaceAllMapped(
-      RegExp(r'([{,]\s*)([a-zA-Z0-9_\s/]+)(\s*:)'), 
-      (match) => '${match[1]}"${match[2]?.trim()}"${match[3]}'
+      RegExp(r'([{,]\s*)([a-zA-Z0-9_\s/]+)(\s*:)'),
+      (match) => '${match[1]}"${match[2]?.trim()}"${match[3]}',
     );
     cleaned = cleaned.replaceAllMapped(
       RegExp(r'(:\s*)([a-zA-Z0-9_\-\.\/\s]+)(?=\s*[,}])'),
       (match) {
         String val = match[2]!.trim();
-        if (val == 'true' || val == 'false' || val == 'null' || double.tryParse(val) != null) {
+        if (val == 'true' ||
+            val == 'false' ||
+            val == 'null' ||
+            double.tryParse(val) != null) {
           return match[0]!;
         }
         return '${match[1]}"$val"';
-      }
+      },
     );
     return cleaned;
   }
@@ -69,20 +69,24 @@ class _StylesheetPageState extends State<StylesheetPage> {
       return _fontNameCache[dirtyName]!;
     }
 
-    String cleanInput = dirtyName.toLowerCase()
+    String cleanInput = dirtyName
+        .toLowerCase()
         .replaceAll(RegExp(r'[-_]regular$'), '')
         .replaceAll(RegExp(r'[^a-z0-9]'), '');
 
     final allFonts = GoogleFonts.asMap().keys;
-    
+
     for (String officialName in allFonts) {
-      String cleanOfficial = officialName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      String cleanOfficial = officialName.toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]'),
+        '',
+      );
       if (cleanOfficial == cleanInput) {
         _fontNameCache[dirtyName] = officialName;
         return officialName;
       }
     }
-    return dirtyName; 
+    return dirtyName;
   }
 
   Future<File?> _resolveFile(String path) async {
@@ -92,12 +96,14 @@ class _StylesheetPageState extends State<StylesheetPage> {
 
     // 2. If that fails (iOS UUID change?), try to find it in the current docs dir
     try {
-      final filename = p.basename(path); // Get "image_123.png" from the long path
+      final filename = p.basename(
+        path,
+      ); // Get "image_123.png" from the long path
       final dir = await getApplicationDocumentsDirectory();
-      
+
       // Reconstruct path: CurrentDir + generated_images + filename
       final fixedPath = p.join(dir.path, 'generated_images', filename);
-      
+
       final fixedFile = File(fixedPath);
       if (await fixedFile.exists()) {
         return fixedFile;
@@ -111,7 +117,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
 
   Future<void> _loadSavedStylesheet() async {
     final project = await ProjectRepo().getProjectById(_currentProjectId);
-    
+
     if (project == null) return;
 
     // 1. Load Assets directly from Project Model
@@ -121,10 +127,11 @@ class _StylesheetPageState extends State<StylesheetPage> {
     Map<String, dynamic>? parsedMap;
     String? rawJson;
 
-    if (project.globalStylesheet != null && project.globalStylesheet!.isNotEmpty) {
+    if (project.globalStylesheet != null &&
+        project.globalStylesheet!.isNotEmpty) {
       rawJson = project.globalStylesheet!;
       dynamic parsed;
-      
+
       try {
         parsed = jsonDecode(rawJson);
       } catch (e) {
@@ -134,7 +141,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
       }
 
       if (parsed is String) {
-        try { parsed = jsonDecode(parsed); } catch (_) {}
+        try {
+          parsed = jsonDecode(parsed);
+        } catch (_) {}
       }
 
       if (parsed is Map<String, dynamic>) {
@@ -165,19 +174,21 @@ class _StylesheetPageState extends State<StylesheetPage> {
     try {
       // 1. Fetch Image Analysis Data
       final images = await ImageRepo().getImages(_currentProjectId);
-      final List<String> analysisData = images
-          .map((img) => img.analysisData)
-          .where((data) => data != null && data.isNotEmpty)
-          .cast<String>()
-          .toList();
+      final List<String> analysisData =
+          images
+              .map((img) => img.analysisData)
+              .where((data) => data != null && data.isNotEmpty)
+              .cast<String>()
+              .toList();
 
       // 2. Fetch Note Analysis Data
       final notes = await NoteRepo().getNotesByProjectId(_currentProjectId);
-      final List<String> noteAnalysisData = notes
-          .map((n) => n.analysisData)
-          .where((data) => data != null && data.isNotEmpty)
-          .cast<String>()
-          .toList();
+      final List<String> noteAnalysisData =
+          notes
+              .map((n) => n.analysisData)
+              .where((data) => data != null && data.isNotEmpty)
+              .cast<String>()
+              .toList();
 
       // 3. Combine both
       analysisData.addAll(noteAnalysisData);
@@ -196,7 +207,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
       if (mounted && result != null) {
         final jsonString = jsonEncode(result);
         await ProjectRepo().updateStylesheet(_currentProjectId, jsonString);
-        
+
         // Reload everything (assets + stylesheet) to keep sync
         await _loadSavedStylesheet();
       }
@@ -212,7 +223,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
     for (var k in keys) {
       if (_stylesheetMap!.containsKey(k)) return _stylesheetMap![k];
       for (var mapKey in _stylesheetMap!.keys) {
-        if (mapKey.toLowerCase() == k.toLowerCase()) return _stylesheetMap![mapKey];
+        if (mapKey.toLowerCase() == k.toLowerCase())
+          return _stylesheetMap![mapKey];
       }
     }
     return null;
@@ -225,16 +237,22 @@ class _StylesheetPageState extends State<StylesheetPage> {
       appBar: TopBar(
         currentProjectId: _currentProjectId,
         onBack: () => Navigator.of(context).pop(),
-        onProjectChanged: (p) => setState(() {
-          _currentProjectId = p.id!;
-          _stylesheetMap = null;
-          _projectAssets = [];
-          _loadSavedStylesheet();
-        }),
+        onProjectChanged:
+            (p) => setState(() {
+              _currentProjectId = p.id!;
+              _stylesheetMap = null;
+              _projectAssets = [];
+              _loadSavedStylesheet();
+            }),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Variables.textPrimary))
-          : (_stylesheetMap == null && _rawJsonString == null && _projectAssets.isEmpty)
+      body:
+          _isLoading
+              ? const Center(
+                child: CircularProgressIndicator(color: Variables.textPrimary),
+              )
+              : (_stylesheetMap == null &&
+                  _rawJsonString == null &&
+                  _projectAssets.isEmpty)
               ? _buildEmptyState()
               : _buildContent(),
       bottomNavigationBar: BottomBar(
@@ -249,7 +267,10 @@ class _StylesheetPageState extends State<StylesheetPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text("No stylesheet data.", style: Variables.headerStyle.copyWith(fontSize: 18)),
+          Text(
+            "No stylesheet data.",
+            style: Variables.headerStyle.copyWith(fontSize: 18),
+          ),
           const SizedBox(height: 24),
           _buildGenerateButton("Generate Stylesheet"),
         ],
@@ -264,11 +285,18 @@ class _StylesheetPageState extends State<StylesheetPage> {
     final emotions = _getData(['Emotions', 'emotions']);
     final era = _getData(['Era/Cultural Reference', 'era']);
     final typography = _getData(['Typography', 'fonts']);
-    
+
     // We check _projectAssets.isNotEmpty to determine if we show the section
     final hasAssets = _projectAssets.isNotEmpty;
-    
-    final foundAny = (style != null || lighting != null || colors != null || emotions != null || era != null || typography != null || hasAssets);
+
+    final foundAny =
+        (style != null ||
+            lighting != null ||
+            colors != null ||
+            emotions != null ||
+            era != null ||
+            typography != null ||
+            hasAssets);
 
     return RefreshIndicator(
       onRefresh: _generateStylesheet,
@@ -284,7 +312,11 @@ class _StylesheetPageState extends State<StylesheetPage> {
                 children: [
                   const Text(
                     "Visual Identity",
-                    style: TextStyle(fontFamily: 'GeneralSans', fontSize: 24, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontFamily: 'GeneralSans',
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.refresh),
@@ -297,12 +329,10 @@ class _StylesheetPageState extends State<StylesheetPage> {
 
             if (foundAny) ...[
               // 1. Assets / Subjects Section (From Project Repo)
-              if (hasAssets)
-                _buildAssetsSection(_projectAssets),
+              if (hasAssets) _buildAssetsSection(_projectAssets),
 
               // 2. Typography (Now a Slider)
-              if (typography != null) 
-                _buildTypographySection(typography),
+              if (typography != null) _buildTypographySection(typography),
 
               // 3. Color Palette
               if (colors != null) ...[
@@ -320,11 +350,12 @@ class _StylesheetPageState extends State<StylesheetPage> {
               ],
 
               // 4. Slider Sections
-              if (style != null) _buildSliderSection("Style & Aesthetic", style),
-              if (emotions != null) _buildSliderSection("Mood & Emotions", emotions),
+              if (style != null)
+                _buildSliderSection("Style & Aesthetic", style),
+              if (emotions != null)
+                _buildSliderSection("Mood & Emotions", emotions),
               if (lighting != null) _buildSliderSection("Lighting", lighting),
               if (era != null) _buildSliderSection("Era & Culture", era),
-
             ] else ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -338,7 +369,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
                 ),
               ),
             ],
-            
+
             const SizedBox(height: 40),
             Center(child: _buildGenerateButton("Regenerate")),
             const SizedBox(height: 40),
@@ -352,7 +383,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
     return GestureDetector(
       onTap: _generateStylesheet,
       child: Container(
-        width: 200, height: 44,
+        width: 200,
+        height: 44,
         decoration: BoxDecoration(
           color: Variables.textPrimary,
           borderRadius: BorderRadius.circular(112),
@@ -369,8 +401,11 @@ class _StylesheetPageState extends State<StylesheetPage> {
       child: Text(
         title.toUpperCase(),
         style: const TextStyle(
-          fontFamily: 'GeneralSans', fontSize: 12, fontWeight: FontWeight.bold,
-          letterSpacing: 1.2, color: Variables.textSecondary,
+          fontFamily: 'GeneralSans',
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+          color: Variables.textSecondary,
         ),
       ),
     );
@@ -415,11 +450,13 @@ class _StylesheetPageState extends State<StylesheetPage> {
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12), // Matching color card radius
+            borderRadius: BorderRadius.circular(
+              12,
+            ), // Matching color card radius
             border: Border.all(color: Variables.borderSubtle),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -430,14 +467,19 @@ class _StylesheetPageState extends State<StylesheetPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: exists
-                    ? Image.file(file, fit: BoxFit.cover)
-                    : Container(
-                        color: Colors.grey.shade100,
-                        child: const Center(
-                          child: Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                child:
+                    exists
+                        ? Image.file(file, fit: BoxFit.cover)
+                        : Container(
+                          color: Colors.grey.shade100,
+                          child: const Center(
+                            child: Icon(
+                              Icons.broken_image,
+                              color: Colors.grey,
+                              size: 20,
+                            ),
+                          ),
                         ),
-                      ),
               ),
               // Container(
               //   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -496,7 +538,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
             scrollDirection: Axis.horizontal,
             itemCount: fontNames.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) => _buildTypographyCard(fontNames[index]),
+            itemBuilder:
+                (context, index) => _buildTypographyCard(fontNames[index]),
           ),
         ),
         const SizedBox(height: 32),
@@ -507,7 +550,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
   Widget _buildTypographyCard(String rawFontName) {
     final String correctFontName = _resolveGoogleFontName(rawFontName);
     TextStyle sampleStyle;
-    
+
     try {
       sampleStyle = GoogleFonts.getFont(correctFontName);
     } catch (_) {
@@ -523,7 +566,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
         border: Border.all(color: Variables.borderSubtle),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -537,10 +580,10 @@ class _StylesheetPageState extends State<StylesheetPage> {
             child: Text(
               "Aa",
               style: sampleStyle.copyWith(
-                fontSize: 56, 
-                height: 1, 
-                fontWeight: FontWeight.w400, 
-                color: Colors.black
+                fontSize: 56,
+                height: 1,
+                fontWeight: FontWeight.w400,
+                color: Colors.black,
               ),
             ),
           ),
@@ -605,7 +648,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
 
   Widget _buildColorCard(String label) {
     Color color = _getColorFromLabel(label);
-    String hexCode = "#${color.value.toRadixString(16).substring(2).toUpperCase()}";
+    String hexCode =
+        "#${color.value.toRadixString(16).substring(2).toUpperCase()}";
 
     return Container(
       decoration: BoxDecoration(
@@ -617,10 +661,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 3,
-            child: Container(color: color),
-          ),
+          Expanded(flex: 3, child: Container(color: color)),
           Expanded(
             flex: 2,
             child: Padding(
@@ -675,7 +716,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
           child: _buildSectionHeader(title),
         ),
         SizedBox(
-          height: 120, 
+          height: 120,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             scrollDirection: Axis.horizontal,
@@ -684,7 +725,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
             itemBuilder: (context, index) {
               final item = items[index];
               final label = item['label']?.toString() ?? '';
-              
+
               return Container(
                 width: 120,
                 height: 120,
@@ -695,7 +736,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
                   border: Border.all(color: Variables.borderSubtle),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
+                      color: Colors.black.withValues(alpha: 0.03),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),

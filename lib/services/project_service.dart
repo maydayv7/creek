@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/rendering.dart';
+
 import '../data/repos/project_repo.dart';
 import '../data/repos/image_repo.dart';
 import '../data/repos/file_repo.dart';
@@ -68,7 +70,7 @@ class ProjectService {
         final file = File(path);
         if (await file.exists()) await file.delete();
       } catch (e) {
-        print("Error deleting file $path: $e");
+        debugPrint("Error deleting file $path: $e");
       }
     }
 

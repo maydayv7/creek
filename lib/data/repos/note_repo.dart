@@ -31,11 +31,14 @@ class NoteRepo {
 
   Future<List<NoteModel>> getNotesByProjectId(int projectId) async {
     final db = await AppDatabase.db;
-    final res = await db.rawQuery('''
+    final res = await db.rawQuery(
+      '''
       SELECT notes.* FROM notes
       INNER JOIN images ON notes.image_id = images.id
       WHERE images.project_id = ?
-    ''', [projectId]);
+    ''',
+      [projectId],
+    );
     return res.map((e) => NoteModel.fromMap(e)).toList();
   }
 

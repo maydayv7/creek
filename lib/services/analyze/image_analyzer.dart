@@ -319,13 +319,18 @@ class ImageAnalyzerService {
               runInIsolate: false,
               assetPaths: assetPaths,
               task: (path, _) async {
-                final String? location = await FlaskService().generateAsset(imagePath: path);
-                final res = {"success": true, "scores": {'image': location}, "error": null};
+                final String? location = await FlaskService().generateAsset(
+                  imagePath: path,
+                );
+                final res = {
+                  "success": true,
+                  "scores": {'image': location},
+                  "error": null,
+                };
                 return res;
               },
             )
             : skipTask(),
-
       ]);
 
       totalSw.stop();

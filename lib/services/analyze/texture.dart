@@ -50,11 +50,13 @@ class TextureAnalyzerService {
     String? modelPath,
     String? jsonPath,
   }) async {
-    if (modelPath == null || jsonPath == null)
+    if (modelPath == null || jsonPath == null) {
       return {'success': false, 'scores': {}, 'error': 'Paths missing'};
+    }
     await initialize(modelPath: modelPath, jsonPath: jsonPath);
-    if (_session == null || _centroids == null)
+    if (_session == null || _centroids == null) {
       return {'success': false, 'scores': {}, 'error': 'Init failed'};
+    }
 
     OrtValueTensor? inputOrt;
     OrtRunOptions? runOptions;
@@ -64,8 +66,9 @@ class TextureAnalyzerService {
       // 1. Preprocess (Standard ImageNet Normalization)
       final bytes = await File(path).readAsBytes();
       final image = img.decodeImage(bytes);
-      if (image == null)
+      if (image == null) {
         return {'success': false, 'scores': {}, 'error': 'Decode failed'};
+      }
 
       final resized = img.copyResize(
         image,
@@ -120,10 +123,13 @@ class TextureAnalyzerService {
       final rawOutput = outputs[0]?.value as List;
       final List<double> embedding = [];
       void flatten(dynamic data) {
-        if (data is num)
+        if (data is num) {
           embedding.add(data.toDouble());
-        else if (data is List)
-          for (var item in data) flatten(item);
+        } else if (data is List) {
+          for (var item in data) {
+            flatten(item);
+          }
+        }
       }
 
       flatten(rawOutput);

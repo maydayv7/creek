@@ -61,9 +61,9 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
   Future<void> _handleFinish() async {
     // 1. Basic Validation - only Project Name is required
     if (_projectNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Project name is required.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Project name is required.')),
+      );
       return;
     }
 
@@ -122,10 +122,7 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
     if (brandName.isNotEmpty) {
       final initial = brandName[0].toUpperCase();
       setState(() {
-        _competitorBrands.add({
-          'name': brandName,
-          'initial': initial,
-        });
+        _competitorBrands.add({'name': brandName, 'initial': initial});
         _competitorInputController.clear();
       });
     }
@@ -133,9 +130,6 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       body: SafeArea(
@@ -169,18 +163,18 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
-                    
+
                     // Icon
-                        Container(
+                    Container(
                       width: 52,
                       height: 52,
-                          decoration: BoxDecoration(
+                      decoration: BoxDecoration(
                         color: const Color(0xFFE0E7FF),
                         borderRadius: BorderRadius.circular(1000),
-                          ),
-                          child: Center(
-                            child: SvgPicture.asset(
-                              'assets/icons/painting-ai-line.svg',
+                      ),
+                      child: Center(
+                        child: SvgPicture.asset(
+                          'assets/icons/painting-ai-line.svg',
                           width: 24,
                           height: 24,
                           colorFilter: const ColorFilter.mode(
@@ -195,26 +189,26 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
 
                     // Title and Subtitle
                     Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                              Text(
-                                'Define Your Brand',
-                                style: TextStyle(
-                                  fontFamily: 'GeneralSans',
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w500,
-                                  color: Variables.textPrimary,
-                                  height: 24 / 20,
-                                ),
-                              ),
+                        Text(
+                          'Define Your Brand',
+                          style: TextStyle(
+                            fontFamily: 'GeneralSans',
+                            fontSize: 20,
+                            fontWeight: FontWeight.w500,
+                            color: Variables.textPrimary,
+                            height: 24 / 20,
+                          ),
+                        ),
                         const SizedBox(height: 4),
-                              Text(
-                                'Answer a few quick questions to help us craft your unique style guide.',
-                                style: TextStyle(
-                                  fontFamily: 'GeneralSans',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400,
-                                  color: Variables.textSecondary,
+                        Text(
+                          'Answer a few quick questions to help us craft your unique style guide.',
+                          style: TextStyle(
+                            fontFamily: 'GeneralSans',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: Variables.textSecondary,
                             height: 20 / 14,
                           ),
                         ),
@@ -231,7 +225,7 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                         _buildFormField(
                           label: 'Project Name',
                           hintText: 'Enter project name',
-                      controller: _projectNameController,
+                          controller: _projectNameController,
                           required: true,
                         ),
                         const SizedBox(height: 16),
@@ -240,7 +234,7 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                         _buildFormField(
                           label: 'What do you want & who is it for.',
                           hintText: 'Describe your work and your audience.',
-                      controller: _descriptionController,
+                          controller: _descriptionController,
                           maxLines: 3,
                           required: false,
                         ),
@@ -249,9 +243,10 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                         // What problem you solve
                         _buildFormField(
                           label: 'What problem you solve.',
-                          hintText: 'Explain the main issue your brand addresses.',
-                      controller: _problemController,
-                      maxLines: 3,
+                          hintText:
+                              'Explain the main issue your brand addresses.',
+                          controller: _problemController,
+                          maxLines: 3,
                           required: false,
                         ),
                         const SizedBox(height: 16),
@@ -260,7 +255,7 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                         _buildFormField(
                           label: 'Long-term goal for the brand.',
                           hintText: 'E.g. - Improving food availability...',
-                      controller: _goalController,
+                          controller: _goalController,
                           required: false,
                         ),
                         const SizedBox(height: 32),
@@ -291,71 +286,72 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
               ),
             ),
           ],
-              ),
-            ),
+        ),
+      ),
 
-            // Bottom Button
+      // Bottom Button
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         decoration: BoxDecoration(
           color: const Color(0xFFFAFAFA),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
           ],
         ),
         child: SafeArea(
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleFinish,
-                  style: ElevatedButton.styleFrom(
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _handleFinish,
+              style: ElevatedButton.styleFrom(
                 backgroundColor: Variables.textPrimary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(112),
-                    ),
-                    elevation: 0,
-                  ),
-              child: _isLoading
-                          ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                          : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                          'Create Project',
-                          style: TextStyle(
-                            fontFamily: 'GeneralSans',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                              SvgPicture.asset(
-                                'assets/icons/generate_icon.svg',
-                                width: 18,
-                                height: 18,
-                          colorFilter: const ColorFilter.mode(
-                            Colors.white,
-                            BlendMode.srcIn,
-                          ),
-                              ),
-                            ],
-                          ),
                 ),
+                elevation: 0,
               ),
+              child:
+                  _isLoading
+                      ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                      : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Create Project',
+                            style: TextStyle(
+                              fontFamily: 'GeneralSans',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          SvgPicture.asset(
+                            'assets/icons/generate_icon.svg',
+                            width: 18,
+                            height: 18,
+                            colorFilter: const ColorFilter.mode(
+                              Colors.white,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                        ],
+                      ),
+            ),
+          ),
         ),
       ),
     );
@@ -398,13 +394,13 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
         ),
         const SizedBox(height: 6),
         Container(
-      decoration: BoxDecoration(
+          decoration: BoxDecoration(
             color: const Color(0xFFE4E4E7),
             borderRadius: BorderRadius.circular(8),
-      ),
-      child: TextField(
-        controller: controller,
-        maxLines: maxLines,
+          ),
+          child: TextField(
+            controller: controller,
+            maxLines: maxLines,
             style: TextStyle(
               fontFamily: 'GeneralSans',
               fontSize: 14,
@@ -412,8 +408,8 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
               color: Variables.textPrimary,
               height: 20 / 14,
             ),
-        decoration: InputDecoration(
-          hintText: hintText,
+            decoration: InputDecoration(
+              hintText: hintText,
               hintStyle: TextStyle(
                 fontFamily: 'GeneralSans',
                 fontSize: 14,
@@ -470,7 +466,10 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
           children: [
             for (final keyword in _keywords)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE0E7FF),
                   borderRadius: BorderRadius.circular(48),
@@ -507,12 +506,12 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
             GestureDetector(
               onTap: _showAddKeywordDialog,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  border: Border.all(
-                    color: const Color(0xFFE4E4E7),
-                    width: 1,
-                  ),
+                  border: Border.all(color: const Color(0xFFE4E4E7), width: 1),
                   borderRadius: BorderRadius.circular(48),
                 ),
                 child: Row(
@@ -529,11 +528,7 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(
-                      Icons.add,
-                      size: 14,
-                      color: Variables.textPrimary,
-                    ),
+                    Icon(Icons.add, size: 14, color: Variables.textPrimary),
                   ],
                 ),
               ),
@@ -596,8 +591,8 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                 fontWeight: FontWeight.w400,
                 color: Variables.textSecondary,
                 height: 20 / 14,
-          ),
-          border: InputBorder.none,
+              ),
+              border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
@@ -618,7 +613,10 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                 final brand = _competitorBrands[index];
                 return Container(
                   margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFAFAFA),
                     border: Border.all(
@@ -688,7 +686,8 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
     final controller = TextEditingController();
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder:
+          (context) => AlertDialog(
             title: const Text('Add Keyword'),
             content: TextField(
               controller: controller,
@@ -704,9 +703,9 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                 onPressed: () {
                   final val = controller.text.trim();
                   if (val.isNotEmpty && !_keywords.contains(val)) {
-                setState(() {
-                  _keywords.add(val);
-                });
+                    setState(() {
+                      _keywords.add(val);
+                    });
                   }
                   Navigator.pop(context);
                 },
