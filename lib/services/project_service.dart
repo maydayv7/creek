@@ -76,4 +76,20 @@ class ProjectService {
 
     await _projectRepo.deleteProject(projectId);
   }
+
+  Future<List<ProjectModel>> getRecentProjectsAndEvents() async {
+    return await _projectRepo.getRecentProjectsAndEvents();
+  }
+
+  Future<List<ProjectModel>> getAllProjects() async {
+    return await _projectRepo.getAllProjects();
+  }
+
+  Future<List<ProjectModel>> getEvents(int projectId) async {
+    return await _projectRepo.getEvents(projectId);
+  }
+
+  Future<ProjectModel?> getProjectById(int id) async {
+    return await _projectRepo.getProjectById(id);
+  }
 }

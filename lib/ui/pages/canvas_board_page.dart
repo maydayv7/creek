@@ -7,6 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:undo/undo.dart';
 import './canvas_toolbar/magic_draw_overlay.dart';
 import './canvas_toolbar/text_tools_overlay.dart';
+import '../../data/repos/project_repo.dart';
+import '../../services/stylesheet_service.dart';
 
 // --- MODELS ---
 class DrawingPoint {
@@ -65,6 +67,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 
   String? selectedId;
   late Size _canvasSize;
+  List<Color> _brandColors = [];
 
   // --- TOOLS ---
   bool _isMagicDrawActive = false;
@@ -92,6 +95,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     super.initState();
     _canvasSize = Size(widget.width, widget.height);
 
+    _fetchBrandColors();
+
     if (widget.initialImage != null) {
       elements.add({
         'id': 'bg_${DateTime.now().millisecondsSinceEpoch}',
@@ -110,6 +115,25 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     _textFocusNode.dispose();
     _transformationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchBrandColors() async {
+    try {
+      final int? pId = int.tryParse(widget.projectId);
+      if (pId == null) return;
+
+      final project = await ProjectRepo().getProjectById(pId);
+      if (project != null && project.globalStylesheet != null) {
+        final styleData = StylesheetService().parse(project.globalStylesheet);
+        if (mounted && styleData.colors.isNotEmpty) {
+          setState(() {
+            _brandColors = styleData.colors;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading brand colors: $e");
+    }
   }
 
   // --- UNDO/REDO ---
@@ -354,7 +378,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                             color: Colors.white,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
+                                color: Colors.black.withOpacity(0.15),
                                 blurRadius: 40,
                                 offset: const Offset(0, 10),
                               ),
@@ -423,7 +447,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                             textController:
                                 isSelected ? _textEditingController : null,
                             focusNode: isSelected ? _textFocusNode : null,
-                            // Fix: pass the controller to listen for zooms
                             transformationController: _transformationController,
                           );
                         }),
@@ -435,7 +458,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                             key: _drawingKey,
                             child: GestureDetector(
                               onPanStart: (details) {
-                                // Save state before drawing stroke
                                 _gestureStartSnapshot = _getCurrentState();
                               },
                               onPanUpdate: _onPanUpdate,
@@ -473,6 +495,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                 selectedColor: _selectedColor,
                 strokeWidth: _strokeWidth,
                 isEraser: _isEraser,
+                brandColors: _brandColors,
+                onClose: _saveAndCloseMagicDraw,
                 onColorChanged: (c) => setState(() => _selectedColor = c),
                 onWidthChanged: (w) => setState(() => _strokeWidth = w),
                 onEraserToggle: (e) => setState(() => _isEraser = e),
@@ -736,7 +760,7 @@ class _ManipulatingBox extends StatefulWidget {
     required this.isSelected,
     required this.isEditing,
     required this.viewScale,
-    required this.transformationController, // Receive controller
+    required this.transformationController,
     required this.onTap,
     required this.onDoubleTap,
     required this.onDragStart,
@@ -779,12 +803,10 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to the transformation controller to get real-time zoom updates
     return ValueListenableBuilder(
       valueListenable: widget.transformationController,
       builder: (context, matrix, child) {
         final double currentZoom = matrix.getMaxScaleOnAxis();
-        // Calculate inverse scale to keep handles visually constant
         final double handleScale = (1.0 / currentZoom).clamp(0.1, 5.0);
         final double touchTargetSize = 40.0 * handleScale;
         final double visualSize = 24.0 * handleScale;
@@ -804,8 +826,8 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                   onPanStart: (_) => widget.onDragStart(),
                   onPanUpdate: (details) {
                     if (widget.isSelected && !widget.isEditing) {
-                      // Use real-time zoom to normalize drag delta
-                      final delta = details.delta / currentZoom;
+                      // FIX: Do not divide by currentZoom
+                      final delta = details.delta; 
                       final globalDelta = _rotateVector(delta, _rot);
                       setState(() => _pos += globalDelta);
                       widget.onUpdate(_pos, _size, _rot);
@@ -824,7 +846,7 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                               )
                               : widget.type == 'text'
                               ? Border.all(
-                                color: Colors.grey.withValues(alpha: 0.3),
+                                color: Colors.grey.withOpacity(0.3),
                                 width: 1.0 * handleScale,
                               )
                               : null,
@@ -849,21 +871,15 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                       icon: Icons.zoom_out_map,
                       color: Colors.blue,
                       onDrag: (delta) {
-                        final normalizedDelta = delta / currentZoom;
-                        final localDelta = _rotateVector(
-                          normalizedDelta,
-                          -_rot,
-                        );
+                        // FIX: Use delta directly, no un-rotation
                         setState(() {
                           _size = Size(
-                            (_size.width + localDelta.dx).clamp(50.0, 10000.0),
-                            (_size.height + localDelta.dy).clamp(30.0, 10000.0),
+                            (_size.width + delta.dx).clamp(50.0, 10000.0),
+                            (_size.height + delta.dy).clamp(30.0, 10000.0),
                           );
-                          final offset = Offset(
-                            localDelta.dx / 2,
-                            localDelta.dy / 2,
-                          );
-                          _pos += _rotateVector(offset, _rot);
+                          // Fix anchor point calculation
+                          final offset = Offset(delta.dx / 2, delta.dy / 2);
+                          _pos += _rotateVector(offset, _rot) - offset;
                         });
                         widget.onUpdate(_pos, _size, _rot);
                       },
@@ -1073,7 +1089,7 @@ class CanvasBottomBar extends StatelessWidget {
         border: Border(top: BorderSide(color: Colors.grey[200]!)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),

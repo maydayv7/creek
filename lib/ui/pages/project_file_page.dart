@@ -54,7 +54,22 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
       );
 
       if (pickedFile != null && mounted) {
-        _showAddFileDialog(File(pickedFile.path));
+        // Navigate to CreateFilePage with the selected image
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (_) => CreateFilePage(
+                  file: File(pickedFile.path),
+                  projectId: widget.projectId, // PASS PROJECT ID
+                ),
+          ),
+        );
+
+        // Refresh the list after returning from the creation flow
+        if (mounted) {
+          _loadData();
+        }
       }
     } catch (e) {
       debugPrint("Error picking file: $e");
@@ -169,7 +184,8 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
       context,
       MaterialPageRoute(
         // Passing no file implies a "Blank Canvas"
-        builder: (_) => const CreateFilePage(),
+        // Pass projectId so CreateFilePage knows we are in a specific project context
+        builder: (_) => CreateFilePage(projectId: widget.projectId),
       ),
     ).then((_) => _loadData());
   }

@@ -13,12 +13,8 @@ class FlaskService {
   // CONFIGURATION
   // ===========================================================================
 
-  // NOTE: REPLACE WITH YOUR WIFI IP ADDRESS
-  //       BOTH PC AND MOBILE SHOULD BE ON SAME WIFI
-  //       NO NEED FOR NGORK OR SMEE
-  //       PORT: 5000, http
-  static const String _serverUrl =
-      'http://172.16.114.193:5000'; // --> READ NOTE (REPLACE WITH IITG_CONNECT WIFI IP)
+  // NOTE: REPLACE WITH IP ADDRESS OF LOCAL SERVER
+  static const String _serverUrl = 'http://10.150.40.117:5000';
   static const Map<String, String> _headers = {
     'Content-Type': 'application/json',
   };
