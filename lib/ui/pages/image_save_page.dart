@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/image_service.dart';
 import '../../services/note_service.dart';
+import 'project_board_page.dart';
 
 // --- HELPER CLASS FOR TEMPORARY NOTES ---
 class TempNote {
@@ -428,44 +429,60 @@ class _ImageSavePageState extends State<ImageSavePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 20,
-                  ),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // --- ROW 1: Header ---
                       Row(
                         children: [
-                          const CircleAvatar(
-                            radius: 18,
-                            backgroundColor: Colors.grey,
-                            child: Icon(
-                              Icons.person,
-                              color: Colors.white,
-                              size: 20,
+                          // Avatar
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color(0xFFFAFAFA),
+                                width: 1.25,
+                              ),
+                            ),
+                            child: const CircleAvatar(
+                              radius: 15,
+                              backgroundColor: Colors.grey,
+                              child: Icon(
+                                Icons.person,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
 
+                          // User name
                           const Text(
-                            "User",
+                            "Alex",
                             style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.black87,
+                              fontFamily: 'GeneralSans',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black,
+                              letterSpacing: 0.4,
+                              height: 16 / 12,
                             ),
                           ),
 
                           const Spacer(),
 
-                          //  Dropdown ---
+                          // Dropdown
                           Container(
-                            height: 40,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE0E5FF),
-                              borderRadius: BorderRadius.circular(20),
+                              color: const Color(0xFFE0E7FF),
+                              borderRadius: BorderRadius.circular(1000),
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
@@ -473,17 +490,28 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                     _categories.contains(_selectedCategory)
                                         ? _selectedCategory
                                         : null,
-                                hint: const Text("Type"),
+                                hint: const Text(
+                                  "Type",
+                                  style: TextStyle(
+                                    fontFamily: 'GeneralSans',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.normal,
+                                    color: Color(0xFF27272A),
+                                    height: 16 / 12,
+                                  ),
+                                ),
                                 isDense: true,
                                 icon: const Icon(
-                                  Icons.keyboard_arrow_down,
+                                  Icons.arrow_drop_down,
                                   size: 20,
-                                  color: Colors.black54,
+                                  color: Color(0xFF27272A),
                                 ),
                                 style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
+                                  fontFamily: 'GeneralSans',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.normal,
+                                  color: Color(0xFF27272A),
+                                  height: 16 / 12,
                                 ),
                                 focusColor: Colors.transparent,
                                 dropdownColor: Colors.white,
@@ -492,11 +520,17 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                         .map(
                                           (c) => DropdownMenuItem(
                                             value: c,
-                                            child: Text(c),
+                                            child: Text(
+                                              c,
+                                              style: const TextStyle(
+                                                fontFamily: 'GeneralSans',
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.normal,
+                                              ),
+                                            ),
                                           ),
                                         )
                                         .toList(),
-
                                 onChanged: (v) {
                                   setModalState(() {
                                     _selectedCategory = v!;
@@ -508,47 +542,71 @@ class _ImageSavePageState extends State<ImageSavePage> {
                         ],
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
 
                       // --- ROW 2: Input & Send ---
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Expanded(
-                            child: TextField(
-                              controller: _commentController,
-                              autofocus: true,
-                              maxLines: 1,
-                              style: const TextStyle(fontSize: 14),
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: const Color(0xFFF3F4F6),
-                                hintText: "Enter details...",
-                                hintStyle: TextStyle(color: Colors.grey[600]),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 14,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF4F4F5),
+                                border: Border.all(
+                                  color: const Color(0xFFE4E4E7),
+                                  width: 1,
                                 ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: TextField(
+                                controller: _commentController,
+                                autofocus: true,
+                                maxLines: null,
+                                style: const TextStyle(
+                                  fontFamily: 'GeneralSans',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.normal,
+                                  color: Color(0xFF27272A),
+                                  height: 16 / 12,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: "I love the serif font and how it is used...",
+                                  hintStyle: const TextStyle(
+                                    fontFamily: 'GeneralSans',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.normal,
+                                    color: Color(0xFF27272A),
+                                    height: 16 / 12,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
                                 ),
                               ),
                             ),
                           ),
 
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
 
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 2),
-                            child: IconButton(
-                              icon: const Icon(Icons.send_outlined),
-                              color: Colors.black87,
-                              iconSize: 28,
-                              onPressed: () {
-                                _addTempNote();
-                                Navigator.pop(context);
-                              },
+                          // Send button
+                          IconButton(
+                            icon: const Icon(
+                              Icons.send,
+                              color: Color(0xFF27272A),
+                              size: 24,
+                            ),
+                            onPressed: () {
+                              _addTempNote();
+                              Navigator.pop(context);
+                            },
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 24,
+                              minHeight: 24,
                             ),
                           ),
                         ],
@@ -645,7 +703,17 @@ class _ImageSavePageState extends State<ImageSavePage> {
         if (widget.isFromShare) {
           SystemNavigator.pop();
         } else {
-          Navigator.pop(context);
+          // Navigate to project board page in grid view (alternate view)
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProjectBoardPage(
+                projectId: widget.projectId,
+                initialShowAlternateView: true, // Show grid view
+              ),
+            ),
+            (route) => false, // Remove all previous routes
+          );
         }
       }
     } catch (e) {
@@ -689,9 +757,12 @@ class _ImageSavePageState extends State<ImageSavePage> {
         title: Text(
           titleText,
           style: const TextStyle(
+            fontFamily: 'GeneralSans',
             color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+            height: 24 / 20,
+            letterSpacing: 0,
           ),
         ),
         actions: [
@@ -699,15 +770,20 @@ class _ImageSavePageState extends State<ImageSavePage> {
           if (_isResizing && _finalSelectionRect != null)
             IconButton(
               icon: const Icon(
-                Icons.check_circle_outline,
-                color: Color(0xFF7C4DFF),
+                Icons.check,
+                color: Color(0xFF7C86FF),
+                size: 24,
               ),
               onPressed: _confirmSelectionAndShowModal,
             ),
           // CANCEL SELECTION BUTTON (Visible only in drawing/resizing mode)
           if (_isDrawMode || _isResizing)
             IconButton(
-              icon: const Icon(Icons.close, color: Colors.black),
+              icon: const Icon(
+                Icons.close,
+                color: Colors.black87,
+                size: 24,
+              ),
               onPressed: _resetSelectionMode,
             ),
         ],
@@ -909,7 +985,11 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                       label: const Text(
                                         "Notes",
                                         style: TextStyle(
-                                          fontWeight: FontWeight.w600,
+                                          fontFamily: 'GeneralSans',
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          height: 20 / 14,
+                                          letterSpacing: 0.25,
                                         ),
                                       ),
                                     ),
@@ -935,8 +1015,10 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                         child: const Text(
                                           "Drag on image to select area",
                                           style: TextStyle(
+                                            fontFamily: 'GeneralSans',
                                             color: Colors.white,
                                             fontSize: 12,
+                                            fontWeight: FontWeight.normal,
                                           ),
                                         ),
                                       ),
@@ -965,8 +1047,10 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                         child: const Text(
                                           "Adjust area or tap checkmark to confirm",
                                           style: TextStyle(
+                                            fontFamily: 'GeneralSans',
                                             color: Colors.white,
                                             fontSize: 12,
+                                            fontWeight: FontWeight.normal,
                                           ),
                                         ),
                                       ),
@@ -984,86 +1068,114 @@ class _ImageSavePageState extends State<ImageSavePage> {
             ),
           ),
           // --- BOTTOM FORM (TAGS & SAVE) ---
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Tags',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                // Tags box matching Figma design
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEFEFE),
+                    border: Border.all(
+                      color: const Color(0xFFE4E4E7),
+                      width: 1,
                     ),
-                    if (widget.imagePaths.length > 1)
-                      Text(
-                        "Image ${_currentImageIndex + 1}/${widget.imagePaths.length}",
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                      _availableTags.map((tag) {
-                        final isSelected = currentTags.contains(tag);
-                        return GestureDetector(
-                          onTap: () => _toggleTag(tag),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  isSelected
-                                      ? const Color(0xFFEEF0FF)
-                                      : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color:
-                                    isSelected
-                                        ? const Color(0xFF7C4DFF)
-                                        : Colors.grey[300]!,
-                              ),
-                            ),
-                            child: Text(
-                              tag,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header section
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'What did you like about this image?',
                               style: TextStyle(
-                                fontSize: 13,
-                                fontWeight:
-                                    isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                color:
-                                    isSelected
-                                        ? const Color(0xFF7C4DFF)
-                                        : Colors.black87,
+                                fontFamily: 'GeneralSans',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black,
+                                letterSpacing: 0.25,
+                                height: 20 / 14,
                               ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                            if (widget.imagePaths.length > 1)
+                              Text(
+                                "Image ${_currentImageIndex + 1}/${widget.imagePaths.length}",
+                                style: const TextStyle(
+                                  fontFamily: 'GeneralSans',
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.normal,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      // Divider
+                      const Divider(
+                        height: 0,
+                        thickness: 1,
+                        color: Color(0xFFE4E4E7),
+                      ),
+                      // Content section with tags
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children:
+                              _availableTags.map((tag) {
+                                final isSelected = currentTags.contains(tag);
+                                return GestureDetector(
+                                  onTap: () => _toggleTag(tag),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          isSelected
+                                              ? const Color(0xFFE0E7FF)
+                                              : Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color:
+                                            isSelected
+                                                ? const Color(0xFF7C86FF)
+                                                : Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      tag,
+                                      style: TextStyle(
+                                        fontFamily: 'GeneralSans',
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.normal,
+                                        height: 20 / 14,
+                                        letterSpacing: 0,
+                                        color:
+                                            isSelected
+                                                ? const Color(0xFF27272A)
+                                                : Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -1091,8 +1203,11 @@ class _ImageSavePageState extends State<ImageSavePage> {
                             : Text(
                               'Save ${widget.imagePaths.length > 1 ? "All" : ""} to Moodboard',
                               style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                                fontFamily: 'GeneralSans',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                height: 20 / 14,
+                                letterSpacing: 0.25,
                               ),
                             ),
                   ),

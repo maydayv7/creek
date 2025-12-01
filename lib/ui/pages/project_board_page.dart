@@ -13,12 +13,18 @@ import 'project_tag_page.dart';
 import 'project_board_page_alternate.dart';
 import 'image_save_page.dart';
 import 'image_details_page.dart';
+import 'stylesheet_page.dart';
 import '../widgets/image_context_menu.dart';
 
 class ProjectBoardPage extends StatefulWidget {
   final int projectId;
+  final bool? initialShowAlternateView;
 
-  const ProjectBoardPage({super.key, required this.projectId});
+  const ProjectBoardPage({
+    super.key,
+    required this.projectId,
+    this.initialShowAlternateView,
+  });
 
   @override
   State<ProjectBoardPage> createState() => _ProjectBoardPageState();
@@ -41,6 +47,8 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
   @override
   void initState() {
     super.initState();
+    // Set initial view based on parameter, default to true (grid view)
+    _showAlternateView = widget.initialShowAlternateView ?? true;
     _initData();
   }
 
@@ -168,6 +176,17 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
             if (!_showAlternateView) _loadImagesForSelected();
           });
         },
+        onAIPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => StylesheetPage(
+                projectId: _currentProject!.id!,
+                autoGenerate: true,
+              ),
+            ),
+          );
+        },
       ),
       bottomNavigationBar: BottomBar(
         currentTab: BottomBarItem.moodboard,
@@ -181,6 +200,7 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
       ),
       body: Column(
         children: [
+          const SizedBox(height: 16),
           Expanded(
             child:
                 _showAlternateView

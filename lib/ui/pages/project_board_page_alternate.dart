@@ -365,31 +365,57 @@ class ProjectBoardPageAlternateState extends State<ProjectBoardPageAlternate> {
                     child: Wrap(
                       spacing: 4,
                       runSpacing: 4,
-                      children:
-                          image.tags.take(3).map((tag) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
+                      children: [
+                        // Show first 2 tags
+                        ...image.tags.take(2).map((tag) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.1),
-                                ),
+                            ),
+                            child: Text(
+                              tag.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontFamily: 'GeneralSans',
+                                fontWeight: FontWeight.w600,
                               ),
-                              child: Text(
-                                tag.toUpperCase(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontFamily: 'GeneralSans',
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            ),
+                          );
+                        }),
+                        // Show "+x" tag if there are more than 2 tags
+                        if (image.tags.length > 2)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
                               ),
-                            );
-                          }).toList(),
+                            ),
+                            child: Text(
+                              '+${image.tags.length - 2}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontFamily: 'GeneralSans',
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

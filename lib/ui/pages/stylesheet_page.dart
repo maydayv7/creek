@@ -15,8 +15,9 @@ import 'package:path_provider/path_provider.dart';
 
 class StylesheetPage extends StatefulWidget {
   final int projectId;
+  final bool autoGenerate;
 
-  const StylesheetPage({super.key, required this.projectId});
+  const StylesheetPage({super.key, required this.projectId, this.autoGenerate = false});
 
   @override
   State<StylesheetPage> createState() => _StylesheetPageState();
@@ -36,7 +37,14 @@ class _StylesheetPageState extends State<StylesheetPage> {
   void initState() {
     super.initState();
     _currentProjectId = widget.projectId;
-    _loadSavedStylesheet();
+    if (widget.autoGenerate) {
+      // Generate stylesheet automatically after a short delay to ensure page is built
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _generateStylesheet();
+      });
+    } else {
+      _loadSavedStylesheet();
+    }
   }
 
   // --- PARSING LOGIC ---
@@ -260,13 +268,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Visual Identity", style: TextStyle(fontFamily: 'GeneralSans', fontSize: 24, fontWeight: FontWeight.w600)),
-                  IconButton(icon: const Icon(Icons.refresh), onPressed: _generateStylesheet),
-                ],
-              ),
+              child: const Text("Visual Identity", style: TextStyle(fontFamily: 'GeneralSans', fontSize: 24, fontWeight: FontWeight.w600)),
             ),
             const SizedBox(height: 32),
 

@@ -126,6 +126,7 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
         currentProjectId: widget.projectId,
         titleOverride: widget.tag.toUpperCase(),
         onBack: () => Navigator.pop(context),
+        hideSecondRow: true,
       ),
 
       bottomNavigationBar: BottomBar(

@@ -15,6 +15,7 @@ class TopBar extends StatefulWidget implements PreferredSizeWidget {
   final VoidCallback? onAIPressed;
   final bool? isAlternateView; // For toggle state
   final VoidCallback? onLayoutToggle; // For toggle callback
+  final bool hideSecondRow; // Hide the second row (dropdown, buttons, etc.)
 
   const TopBar({
     super.key,
@@ -28,13 +29,16 @@ class TopBar extends StatefulWidget implements PreferredSizeWidget {
     this.onAIPressed,
     this.isAlternateView,
     this.onLayoutToggle,
+    this.hideSecondRow = false,
   });
 
   @override
   State<TopBar> createState() => _TopBarState();
 
   @override
-  Size get preferredSize => const Size.fromHeight(88.0); // Height for two rows
+  Size get preferredSize => hideSecondRow 
+      ? const Size.fromHeight(48.0) // Height for single row
+      : const Size.fromHeight(88.0); // Height for two rows
 }
 
 class _TopBarState extends State<TopBar> {
@@ -160,24 +164,26 @@ class _TopBarState extends State<TopBar> {
                               )
                             : const SizedBox(),
                   ),
-                  // Settings Icon
-                  GestureDetector(
-                    onTap: widget.onSettingsPressed,
-                    child: SvgPicture.asset(
-                      'assets/icons/settings-line.svg',
-                      width: 24,
-                      height: 24,
-                      colorFilter: const ColorFilter.mode(
-                        Variables.textPrimary,
-                        BlendMode.srcIn,
+                  // Settings Icon (only show if second row is visible)
+                  if (!widget.hideSecondRow)
+                    GestureDetector(
+                      onTap: widget.onSettingsPressed,
+                      child: SvgPicture.asset(
+                        'assets/icons/settings-line.svg',
+                        width: 24,
+                        height: 24,
+                        colorFilter: const ColorFilter.mode(
+                          Variables.textPrimary,
+                          BlendMode.srcIn,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
             // Second Row: Global Dropdown and Action Buttons
-            Container(
+            if (!widget.hideSecondRow)
+              Container(
               height: 40.0, // py-[8px] = 16px + 24px content
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
@@ -201,11 +207,11 @@ class _TopBarState extends State<TopBar> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
-                              vertical: 8,
+                              vertical: 10,
                             ),
                             decoration: BoxDecoration(
                               color: Variables.borderSubtle, // #e4e4e7
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(1000),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -216,9 +222,9 @@ class _TopBarState extends State<TopBar> {
                                       : _currentProject!.title,
                                   style: const TextStyle(
                                     fontFamily: 'GeneralSans',
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w500,
-                                    height: 24 / 16,
+                                    height: 20 / 14,
                                     color: Variables.textPrimary,
                                   ),
                                 ),
@@ -253,75 +259,81 @@ class _TopBarState extends State<TopBar> {
                             }).toList();
                           },
                         ),
-                      const SizedBox(width: 8),
                       // Layout Icon Button (Toggle between All Images/Categorized)
-                      GestureDetector(
-                        onTap: widget.onLayoutToggle ?? widget.onLayoutPressed,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Variables.borderSubtle,
-                            borderRadius: BorderRadius.circular(1000),
-                          ),
-                          child: Icon(
-                            widget.isAlternateView == true
-                                ? Icons.dashboard
-                                : Icons.view_agenda_outlined,
-                            size: 20,
-                            color: Variables.textPrimary,
+                      if (widget.onLayoutToggle != null || widget.onLayoutPressed != null) ...[
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: widget.onLayoutToggle ?? widget.onLayoutPressed,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Variables.borderSubtle,
+                              borderRadius: BorderRadius.circular(1000),
+                            ),
+                            child: Icon(
+                              widget.isAlternateView == true
+                                  ? Icons.dashboard
+                                  : Icons.view_agenda_outlined,
+                              size: 20,
+                              color: Variables.textPrimary,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   const Spacer(),
                   // Right group: Filter and AI/Sparkle Buttons
-                  Row(
-                    children: [
-                      // Filter Icon Button
-                      GestureDetector(
-                        onTap: widget.onFilterPressed,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
+                  if (widget.onFilterPressed != null || widget.onAIPressed != null)
+                    Row(
+                      children: [
+                        // Filter Icon Button
+                        if (widget.onFilterPressed != null)
+                          GestureDetector(
+                            onTap: widget.onFilterPressed,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Variables.borderSubtle,
+                                borderRadius: BorderRadius.circular(1000),
+                              ),
+                              child: const Icon(
+                                Icons.tune,
+                                size: 20,
+                                color: Variables.textPrimary,
+                              ),
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: Variables.borderSubtle,
-                            borderRadius: BorderRadius.circular(1000),
+                        if (widget.onFilterPressed != null && widget.onAIPressed != null)
+                          const SizedBox(width: 8),
+                        // AI/Sparkle Icon Button
+                        if (widget.onAIPressed != null)
+                          GestureDetector(
+                            onTap: widget.onAIPressed,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Variables.borderSubtle,
+                                borderRadius: BorderRadius.circular(1000),
+                              ),
+                              child: const Icon(
+                                Icons.auto_awesome,
+                                size: 20,
+                                color: Variables.textPrimary,
+                              ),
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.tune,
-                            size: 20,
-                            color: Variables.textPrimary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // AI/Sparkle Icon Button
-                      GestureDetector(
-                        onTap: widget.onAIPressed,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Variables.borderSubtle,
-                            borderRadius: BorderRadius.circular(1000),
-                          ),
-                          child: const Icon(
-                            Icons.auto_awesome,
-                            size: 20,
-                            color: Variables.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ),
             ),
