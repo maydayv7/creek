@@ -44,6 +44,9 @@ flutter:
   assets:
     - assets/fonts/
     - assets/icons/
+    - assets/moodboard_blob.png
+    - assets/stylesheet_blob.png
+    - assets/files_blob.png
     - assets/dinov2.onnx
     - assets/dinov2.onnx.data
     - assets/texture_centroids.json
