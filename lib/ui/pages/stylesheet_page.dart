@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:adobe/ui/styles/variables.dart';
 import 'package:adobe/ui/widgets/bottom_bar.dart';
 import 'package:adobe/ui/widgets/top_bar.dart';
@@ -31,7 +32,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
   String? _rawJsonString;
 
   List<String> _projectAssets = [];
+  List<String> _logoPaths = [];
   final Map<String, String> _fontNameCache = {};
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -195,14 +198,20 @@ class _StylesheetPageState extends State<StylesheetPage> {
           _currentProjectId = p.id!;
           _stylesheetMap = null;
           _projectAssets = [];
+          _logoPaths = [];
           _loadSavedStylesheet();
         }),
+        onSettingsPressed: () {
+          // Handle settings action
+        },
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Variables.textPrimary))
-          : (_stylesheetMap == null && _rawJsonString == null && _projectAssets.isEmpty)
+          : (_stylesheetMap == null && _rawJsonString == null && _projectAssets.isEmpty && _logoPaths.isEmpty)
               ? _buildEmptyState()
               : _buildContent(),
+      floatingActionButton: _buildFAB(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: BottomBar(currentTab: BottomBarItem.stylesheet, projectId: _currentProjectId),
     );
   }
@@ -225,86 +234,90 @@ class _StylesheetPageState extends State<StylesheetPage> {
   }
 
   Widget _buildContent() {
-    // Added 'Composition' to style lookup to match your screenshot
-    final style = _getData(['Style', 'style', 'Composition', 'composition']);
+    // Extract data in order matching Figma design
+    final graphics = _getData(['Graphics', 'graphics']);
+    final colors = _getData(['Colour Palette', 'Color Palette', 'colors', 'Colors']);
+    final typography = _getData(['Typography', 'fonts', 'Fonts']);
+    final compositions = _getData(['Compositions', 'compositions']);
+    final materialLook = _getData(['Material look', 'Material Look', 'material_look']);
+    final textures = _getData(['Textures', 'textures']);
     final lighting = _getData(['Lighting', 'lighting']);
-    final colors = _getData(['Colour Palette', 'Color Palette', 'colors']);
+    final style = _getData(['Style', 'style']);
+    final era = _getData(['Era/Cultural Reference', 'era', 'Era']);
     final emotions = _getData(['Emotions', 'emotions']);
-    final era = _getData(['Era/Cultural Reference', 'era']);
-    final typography = _getData(['Typography', 'fonts']);
-
-    final hasAssets = _projectAssets.isNotEmpty;
-
-    // --- DYNAMIC SECTION GENERATOR ---
-    // If the map contains keys we haven't hardcoded above, generate sliders for them.
-    // This prevents the "Parsing Error" when valid data exists but the key is new.
-    List<Widget> dynamicSections = [];
-    List<String> handledKeys = [
-      'Style', 'style', 'Composition', 'composition',
-      'Lighting', 'lighting',
-      'Colour Palette', 'Color Palette', 'colors',
-      'Emotions', 'emotions',
-      'Era/Cultural Reference', 'era',
-      'Typography', 'fonts'
-    ];
-
-    if (_stylesheetMap != null) {
-      for (var key in _stylesheetMap!.keys) {
-        // If we haven't handled this key yet and it looks like a list (slider data)
-        if (!handledKeys.any((k) => k.toLowerCase() == key.toLowerCase()) && _stylesheetMap![key] is List) {
-           dynamicSections.add(_buildSliderSection(key, _stylesheetMap![key]));
-        }
-      }
-    }
-
-    final foundAny = (style != null || lighting != null || colors != null || emotions != null || era != null || typography != null || hasAssets || dynamicSections.isNotEmpty);
 
     return RefreshIndicator(
       onRefresh: _generateStylesheet,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 24),
+        padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 104),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            if (foundAny) ...[
-              if (hasAssets) _buildAssetsSection(_projectAssets),
-              if (typography != null) _buildTypographySection(typography),
-              if (colors != null) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSectionHeader("Color Palette"),
-                      _buildColorSection(colors),
+            // Logos Section - always show for manual upload
+            _buildLogosSection(null),
+            
+            // Graphics Section - includes project assets
+            if (graphics != null || _projectAssets.isNotEmpty) _buildGraphicsSection(graphics),
+            
+            // Colors Section
+            if (colors != null) _buildColorsSection(colors),
+            
+            // Fonts Section
+            if (typography != null) _buildFontsSection(typography),
+            
+            // Compositions Section
+            if (compositions != null) _buildCompositionsSection(compositions),
+            
+            // Material look Section
+            if (materialLook != null) _buildMaterialLookSection(materialLook),
+            
+            // Textures Section
+            if (textures != null) _buildTexturesSection(textures),
+            
+            // Lighting Section
+            if (lighting != null) _buildLightingSection(lighting),
+            
+            // Style Section
+            if (style != null) _buildStyleSection(style),
+            
+            // Era Section
+            if (era != null) _buildEraSection(era),
+            
+            // Emotions Section
+            if (emotions != null) _buildEmotionsSection(emotions),
+            
+            const SizedBox(height: 24),
                     ],
                   ),
                 ),
-                const SizedBox(height: 32),
-              ],
-              if (style != null) _buildSliderSection("Style & Aesthetic", style),
-              if (emotions != null) _buildSliderSection("Mood & Emotions", emotions),
-              if (lighting != null) _buildSliderSection("Lighting", lighting),
-              if (era != null) _buildSliderSection("Era & Culture", era),
-              
-              // Render any extra data found in the JSON
-              ...dynamicSections,
-              
-            ] else ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12)),
-                  child: Text("Parsing Error. Raw Data:\n\n$_rawJsonString"),
-                ),
+    );
+  }
+
+  Widget _buildFAB() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 104),
+      child: FloatingActionButton.extended(
+        onPressed: () {
+          // Handle visualize action
+        },
+        backgroundColor: Variables.textPrimary,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(1000),
+        ),
+        label: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.visibility, size: 20, color: Variables.textWhite),
+              const SizedBox(width: 8),
+              Text(
+                'Visualize',
+                style: Variables.buttonTextStyle,
               ),
             ],
-            const SizedBox(height: 40),
-            Center(child: _buildGenerateButton("Regenerate")),
-            const SizedBox(height: 40),
-          ],
+          ),
         ),
       ),
     );
@@ -334,59 +347,217 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(String title, {bool showArrow = true}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
       child: Text(
-        title.toUpperCase(),
-        style: const TextStyle(fontFamily: 'GeneralSans', fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Variables.textSecondary),
+              title,
+              style: const TextStyle(
+                fontFamily: 'GeneralSans',
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                height: 24 / 16,
+                color: Variables.textPrimary,
+              ),
+            ),
+          ),
+          if (showArrow)
+            Transform.rotate(
+              angle: 3.14159, // 180 degrees
+              child: SvgPicture.asset(
+                'assets/icons/arrow-left-s-line.svg',
+                width: 24,
+                height: 24,
+                colorFilter: const ColorFilter.mode(
+                  Variables.textPrimary,
+                  BlendMode.srcIn,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildAssetsSection(List<String> imagePaths) {
+  Future<void> _pickLogo() async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          _logoPaths.add(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error picking logo: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking logo: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildLogosSection(dynamic data) {
+    // Use manually uploaded logos
+    List<String> logoPaths = List.from(_logoPaths);
+    
+    // Also add any logos from data if present
+    if (data is List) {
+      for (var item in data) {
+        if (item is Map && item.containsKey('path')) {
+          logoPaths.add(item['path'].toString());
+        } else if (item is String) {
+          logoPaths.add(item);
+        }
+      }
+    } else if (data is String) {
+      logoPaths.add(data);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _buildSectionHeader("Subjects & Assets"),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.8),
-            itemCount: imagePaths.length,
-            itemBuilder: (context, index) => _buildAssetCard(imagePaths[index]),
+        _buildSectionHeader("Logos"),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 76,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: logoPaths.length + 1, // +1 for add button
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              if (index == logoPaths.length) {
+                // Add button
+                return GestureDetector(
+                  onTap: _pickLogo,
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Variables.borderSubtle),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: SvgPicture.asset(
+                        'assets/icons/add-line.svg',
+                        width: 20,
+                        height: 20,
+                        colorFilter: const ColorFilter.mode(
+                          Variables.textSecondary,
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return _buildLogoCard(logoPaths[index]);
+            },
           ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 16),
       ],
     );
   }
 
-  Widget _buildAssetCard(String savedPath) {
+  Widget _buildLogoCard(String savedPath) {
     return FutureBuilder<File?>(
       future: _resolveFile(savedPath),
       builder: (context, snapshot) {
         final File? file = snapshot.data;
         return Container(
+          width: 76,
+          height: 76,
           decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Variables.borderSubtle),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2))],
           ),
           clipBehavior: Clip.antiAlias,
-          child: file != null ? Image.file(file, fit: BoxFit.cover) : Container(color: Colors.grey.shade100, child: const Center(child: Icon(Icons.broken_image, color: Colors.grey, size: 20))),
+          child: file != null
+              ? Image.file(file, fit: BoxFit.cover)
+              : Container(
+                  color: Variables.surfaceSubtle,
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                  ),
+                ),
         );
       },
     );
   }
 
-  Widget _buildTypographyCard(String rawFontName) {
+  Widget _buildGraphicsSection(dynamic data) {
+    List<String> graphicPaths = [];
+    
+    // Add project assets (subjects and assets) to graphics
+    graphicPaths.addAll(_projectAssets);
+    
+    // Add graphics from data if present
+    if (data is List) {
+      for (var item in data) {
+        if (item is Map && item.containsKey('path')) {
+          graphicPaths.add(item['path'].toString());
+        } else if (item is String) {
+          graphicPaths.add(item);
+        }
+      }
+    } else if (data is String) {
+      graphicPaths.add(data);
+    }
+
+    if (graphicPaths.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader("Graphics"),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 106,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: graphicPaths.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) => _buildGraphicCard(graphicPaths[index]),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildGraphicCard(String savedPath) {
+    return FutureBuilder<File?>(
+      future: _resolveFile(savedPath),
+      builder: (context, snapshot) {
+        final File? file = snapshot.data;
+        return Container(
+          width: 104,
+          height: 106,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Variables.surfaceSubtle,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: file != null
+              ? Image.file(file, fit: BoxFit.cover)
+              : Container(
+                  color: Variables.surfaceSubtle,
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                  ),
+                ),
+        );
+      },
+    );
+  }
+
+
+  Widget _buildFontCard(String rawFontName) {
     final String correctFontName = _resolveGoogleFontName(rawFontName);
     TextStyle sampleStyle;
     try {
@@ -395,26 +566,48 @@ class _StylesheetPageState extends State<StylesheetPage> {
       sampleStyle = const TextStyle(fontFamily: 'GeneralSans');
     }
 
-    return Container(
-      width: 160, padding: const EdgeInsets.all(20),
+    // Get font info (styles count) - simplified for now
+    String fontInfo = "16 styles + variable cut";
+
+    return Builder(
+      builder: (context) => Container(
+        width: (MediaQuery.of(context).size.width - 32 - 16) / 3, // 3 cards with spacing
+        height: 120,
+        padding: const EdgeInsets.all(9),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Variables.borderSubtle),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2))],
+          borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(child: Text("Aa", style: sampleStyle.copyWith(fontSize: 56, height: 1, fontWeight: FontWeight.w400, color: Colors.black))),
-          Text(correctFontName, style: const TextStyle(fontFamily: 'GeneralSans', fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 4),
-          const Text("Primary Typeface", style: TextStyle(fontFamily: 'GeneralSans', fontSize: 11, color: Variables.textSecondary, fontWeight: FontWeight.w500)),
-        ],
+            Text(
+              "Aa",
+              style: sampleStyle.copyWith(
+                fontSize: 28,
+                height: 1.2,
+                fontWeight: FontWeight.w400,
+                color: Variables.textPrimary,
+              ),
+            ),
+            Text(
+              fontInfo,
+              style: const TextStyle(
+                fontFamily: 'GeneralSans',
+                fontSize: 12,
+                height: 16 / 12,
+                color: Variables.textSecondary,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildTypographySection(dynamic data) {
+  Widget _buildFontsSection(dynamic data) {
     List<String> fontNames = [];
     if (data is List) {
       for (var item in data) {
@@ -431,107 +624,413 @@ class _StylesheetPageState extends State<StylesheetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _buildSectionHeader("Typography")),
+        _buildSectionHeader("Fonts"),
+        const SizedBox(height: 12),
         SizedBox(
-          height: 150,
+          height: 120,
           child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
             scrollDirection: Axis.horizontal,
             itemCount: fontNames.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) => _buildTypographyCard(fontNames[index]),
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) => _buildFontCard(fontNames[index]),
           ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 16),
       ],
     );
   }
 
-  Widget _buildColorSection(dynamic data) {
-    List<Map<String, dynamic>> palette = [];
+  Widget _buildColorsSection(dynamic data) {
+    List<String> colorList = [];
     if (data is List) {
       for (var item in data) {
-        if (item is Map) palette.add({'label': item['label']?.toString() ?? '', 'score': item['score'] ?? 0});
+        if (item is Map && item.containsKey('label')) {
+          colorList.add(item['label'].toString());
+        } else if (item is String) {
+          colorList.add(item);
+        }
       }
+    } else if (data is String) {
+      colorList.add(data);
     }
-    if (palette.isEmpty) return const SizedBox();
 
-    return GridView.builder(
-      shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.8),
-      itemCount: palette.length,
-      itemBuilder: (context, index) => _buildColorCard(palette[index]['label']),
-    );
-  }
-
-  Widget _buildColorCard(String label) {
-    Color color = _getColorFromLabel(label);
-    String hexCode = label.toUpperCase(); 
-
-    return Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Variables.borderSubtle)),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(flex: 3, child: Container(color: color)),
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(hexCode, style: const TextStyle(fontFamily: 'GeneralSans', fontSize: 12, fontWeight: FontWeight.bold, color: Variables.textPrimary)),
-                  const SizedBox(height: 2),
-                  const Text("HEX", style: TextStyle(fontFamily: 'GeneralSans', fontSize: 10, color: Variables.textSecondary, overflow: TextOverflow.ellipsis), maxLines: 1),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSliderSection(String title, dynamic data) {
-    if (data is! List) return const SizedBox();
-    List<Map> items = [];
-    for (var i in data) {
-      if (i is Map) items.add(i);
-    }
-    items.sort((a, b) => (b['score'] ?? 0).compareTo(a['score'] ?? 0));
+    if (colorList.isEmpty) return const SizedBox();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _buildSectionHeader(title)),
+        _buildSectionHeader("Colors", showArrow: false),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: colorList.take(5).map((color) => _buildColorSwatch(color)).toList(),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildColorSwatch(String label) {
+    Color color = _getColorFromLabel(label);
+    return Container(
+      width: 104,
+      height: 52,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+
+  Widget _buildCompositionsSection(dynamic data) {
+    List<String> compositionPaths = [];
+    if (data is List) {
+      for (var item in data) {
+        if (item is Map && item.containsKey('path')) {
+          compositionPaths.add(item['path'].toString());
+        } else if (item is String) {
+          compositionPaths.add(item);
+        }
+      }
+    } else if (data is String) {
+      compositionPaths.add(data);
+    }
+
+    if (compositionPaths.isEmpty) return const SizedBox();
+
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+        _buildSectionHeader("Compositions"),
+        const SizedBox(height: 12),
         SizedBox(
-          height: 120,
+          height: 106,
           child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
             scrollDirection: Axis.horizontal,
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return Container(
-                width: 120, height: 120, padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Variables.borderSubtle),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2))],
+            itemCount: compositionPaths.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) => _buildCompositionCard(compositionPaths[index]),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildCompositionCard(String savedPath) {
+    return FutureBuilder<File?>(
+      future: _resolveFile(savedPath),
+      builder: (context, snapshot) {
+        final File? file = snapshot.data;
+        return Container(
+          width: 104,
+          height: 106,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Variables.surfaceSubtle,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: file != null
+              ? Image.file(file, fit: BoxFit.cover)
+              : Container(
+                  color: Variables.surfaceSubtle,
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                  ),
                 ),
-                child: Center(
-                  child: Text(item['label']?.toString().toUpperCase() ?? '', textAlign: TextAlign.center, style: const TextStyle(fontFamily: 'GeneralSans', fontSize: 13, fontWeight: FontWeight.w600, color: Variables.textPrimary, height: 1.2), maxLines: 3, overflow: TextOverflow.ellipsis),
+        );
+      },
+    );
+  }
+
+  Widget _buildMaterialLookSection(dynamic data) {
+    List<String> materialPaths = [];
+    if (data is List) {
+      for (var item in data) {
+        if (item is Map && item.containsKey('path')) {
+          materialPaths.add(item['path'].toString());
+        } else if (item is String) {
+          materialPaths.add(item);
+        }
+      }
+    } else if (data is String) {
+      materialPaths.add(data);
+    }
+
+    if (materialPaths.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader("Material look"),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: materialPaths.take(2).map((path) => _buildMaterialCard(path)).toList(),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildMaterialCard(String savedPath) {
+    return FutureBuilder<File?>(
+      future: _resolveFile(savedPath),
+      builder: (context, snapshot) {
+        final File? file = snapshot.data;
+        return Container(
+          width: 106,
+          height: 106,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Variables.surfaceSubtle,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: file != null
+              ? Image.file(file, fit: BoxFit.cover)
+              : Container(
+                  color: Variables.surfaceSubtle,
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                  ),
+                ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTexturesSection(dynamic data) {
+    List<String> texturePaths = [];
+    if (data is List) {
+      for (var item in data) {
+        if (item is Map && item.containsKey('path')) {
+          texturePaths.add(item['path'].toString());
+        } else if (item is String) {
+          texturePaths.add(item);
+        }
+      }
+    } else if (data is String) {
+      texturePaths.add(data);
+    }
+
+    if (texturePaths.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader("Textures"),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 106,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: texturePaths.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) => _buildTextureCard(texturePaths[index]),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildTextureCard(String savedPath) {
+    return FutureBuilder<File?>(
+      future: _resolveFile(savedPath),
+      builder: (context, snapshot) {
+        final File? file = snapshot.data;
+              return Container(
+          width: 104,
+          height: 106,
+                decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Variables.surfaceSubtle,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: file != null
+              ? Image.file(file, fit: BoxFit.cover)
+              : Container(
+                  color: Variables.surfaceSubtle,
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                  ),
+                ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLightingSection(dynamic data) {
+    List<String> lightingPaths = [];
+    if (data is List) {
+      for (var item in data) {
+        if (item is Map && item.containsKey('path')) {
+          lightingPaths.add(item['path'].toString());
+        } else if (item is String) {
+          lightingPaths.add(item);
+        }
+      }
+    } else if (data is String) {
+      lightingPaths.add(data);
+    }
+
+    if (lightingPaths.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader("Lighting"),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: lightingPaths.take(3).map((path) => _buildLightingCard(path)).toList(),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildLightingCard(String savedPath) {
+    return FutureBuilder<File?>(
+      future: _resolveFile(savedPath),
+      builder: (context, snapshot) {
+        final File? file = snapshot.data;
+        return Container(
+          width: 106,
+          height: 106,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Variables.surfaceSubtle,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: file != null
+              ? Image.file(file, fit: BoxFit.cover)
+              : Container(
+                  color: Variables.surfaceSubtle,
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                  ),
                 ),
               );
             },
-          ),
+    );
+  }
+
+  Widget _buildStyleSection(dynamic data) {
+    List<String> styleTags = [];
+    if (data is List) {
+      for (var item in data) {
+        if (item is Map && item.containsKey('label')) {
+          styleTags.add(item['label'].toString());
+        } else if (item is String) {
+          styleTags.add(item);
+        }
+      }
+    } else if (data is String) {
+      styleTags.add(data);
+    }
+
+    if (styleTags.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader("Style"),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: styleTags.take(4).map((tag) => _buildTagCard(tag)).toList(),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 16),
       ],
+    );
+  }
+
+  Widget _buildEraSection(dynamic data) {
+    List<String> eraTags = [];
+    if (data is List) {
+      for (var item in data) {
+        if (item is Map && item.containsKey('label')) {
+          eraTags.add(item['label'].toString());
+        } else if (item is String) {
+          eraTags.add(item);
+        }
+      }
+    } else if (data is String) {
+      eraTags.add(data);
+    }
+
+    if (eraTags.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader("Era"),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: eraTags.take(4).map((tag) => _buildTagCard(tag)).toList(),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildEmotionsSection(dynamic data) {
+    List<String> emotionTags = [];
+    if (data is List) {
+      for (var item in data) {
+        if (item is Map && item.containsKey('label')) {
+          emotionTags.add(item['label'].toString());
+        } else if (item is String) {
+          emotionTags.add(item);
+        }
+      }
+    } else if (data is String) {
+      emotionTags.add(data);
+    }
+
+    if (emotionTags.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader("Emotions"),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: emotionTags.take(4).map((tag) => _buildTagCard(tag)).toList(),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildTagCard(String label) {
+    return Container(
+      width: 160,
+      height: 54,
+      decoration: BoxDecoration(
+        color: Variables.surfaceSubtle,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontFamily: 'GeneralSans',
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          height: 24 / 16,
+          color: Variables.textPrimary,
+        ),
+      ),
     );
   }
 

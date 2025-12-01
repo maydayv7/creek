@@ -259,7 +259,7 @@ class _TopBarState extends State<TopBar> {
                             }).toList();
                           },
                         ),
-                      // Layout Icon Button (Toggle between All Images/Categorized)
+                      // Layout Icon Button (Toggle between All Images/Categorized) or Edit Icon
                       if (widget.onLayoutToggle != null || widget.onLayoutPressed != null) ...[
                         const SizedBox(width: 8),
                         GestureDetector(
@@ -274,9 +274,11 @@ class _TopBarState extends State<TopBar> {
                               borderRadius: BorderRadius.circular(1000),
                             ),
                             child: Icon(
-                              widget.isAlternateView == true
-                                  ? Icons.dashboard
-                                  : Icons.view_agenda_outlined,
+                              widget.onLayoutToggle != null
+                                  ? (widget.isAlternateView == true
+                                      ? Icons.dashboard
+                                      : Icons.view_agenda_outlined)
+                                  : Icons.edit, // Use edit icon when only onLayoutPressed is provided
                               size: 20,
                               color: Variables.textPrimary,
                             ),
