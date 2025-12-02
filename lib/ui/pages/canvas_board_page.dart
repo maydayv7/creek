@@ -169,12 +169,19 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     if (widget.existingFile != null) {
       _loadCanvasFromFile();
     } else if (widget.initialImage != null) {
+      final double imageWidth = _canvasSize.width * 0.4; // 40% of canvas width
+      final double imageHeight =
+          _canvasSize.height * 0.4; // 40% of canvas height
+      final Offset centeredPosition = Offset(
+        (_canvasSize.width - imageWidth) / 2,
+        (_canvasSize.height - imageHeight) / 2,
+      );
       elements.add({
         'id': 'bg_${DateTime.now().millisecondsSinceEpoch}',
         'type': 'file_image',
         'content': widget.initialImage!.path,
-        'position': const Offset(0, 0),
-        'size': Size(widget.width, widget.height),
+        'position': centeredPosition,
+        'size': Size(imageWidth, imageHeight),
         'rotation': 0.0,
       });
       _hasUnsavedChanges = true;
@@ -820,12 +827,20 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         if (widget.injectedMedia != null) {
           final oldState = _getCurrentState();
           setState(() {
+            final double imageWidth =
+                _canvasSize.width * 0.4; // 40% of canvas width
+            final double imageHeight =
+                _canvasSize.height * 0.4; // 40% of canvas height
+            final Offset centeredPosition = Offset(
+              (_canvasSize.width - imageWidth) / 2,
+              (_canvasSize.height - imageHeight) / 2,
+            );
             elements.add({
               'id': 'shared_${DateTime.now().millisecondsSinceEpoch}',
               'type': 'file_image',
               'content': widget.injectedMedia!.path,
-              'position': const Offset(50, 50),
-              'size': const Size(150, 150),
+              'position': centeredPosition,
+              'size': Size(imageWidth, imageHeight),
               'rotation': 0.0,
             });
           });
@@ -928,13 +943,21 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     final oldState = _getCurrentState();
     setState(() {
       for (var path in paths) {
+        final double imageWidth =
+            _canvasSize.width * 0.4; // 40% of canvas width
+        final double imageHeight =
+            _canvasSize.height * 0.4; // 40% of canvas height
+        final Offset centeredPosition = Offset(
+          (_canvasSize.width - imageWidth) / 2,
+          (_canvasSize.height - imageHeight) / 2,
+        );
         elements.add({
           'id':
               'asset_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(1000)}',
           'type': 'file_image',
           'content': path,
-          'position': const Offset(50, 50),
-          'size': const Size(150, 150),
+          'position': centeredPosition,
+          'size': Size(imageWidth, imageHeight),
           'rotation': 0.0,
         });
       }
@@ -1709,12 +1732,20 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       final oldState = _getCurrentState();
       setState(() {
         for (int i = 0; i < images.length; i++) {
+          final double imageWidth =
+              _canvasSize.width * 0.4; // 40% of canvas width
+          final double imageHeight =
+              _canvasSize.height * 0.4; // 40% of canvas height
+          final Offset centeredPosition = Offset(
+            (_canvasSize.width - imageWidth) / 2,
+            (_canvasSize.height - imageHeight) / 2,
+          );
           elements.add({
             'id': '${DateTime.now().millisecondsSinceEpoch}_$i',
             'type': 'file_image',
             'content': images[i].path,
-            'position': const Offset(50, 50),
-            'size': const Size(150, 150),
+            'position': centeredPosition,
+            'size': Size(imageWidth, imageHeight),
             'rotation': 0.0,
           });
         }
