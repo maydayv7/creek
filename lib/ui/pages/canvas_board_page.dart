@@ -1500,12 +1500,35 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       else {
         // Currently all sketch IDs map to the main sketch endpoint,
         // but you can pass the ID if your backend supports different sketch models.
-        newImageUrl = await FlaskService().sketchToImage(
-          sketchPath: _tempBaseImage!.path,
-          userPrompt: prompt,
-          stylePrompt:
-              "high quality, realistic", // You could vary this based on modelId
-        );
+        if(modelId == 'sketch_fusion'){
+          newImageUrl = await FlaskService().sketchToImage(
+            sketchPath: _tempBaseImage!.path,
+            userPrompt: prompt,
+            stylePrompt:
+                "high quality, realistic", // You could vary this based on modelId
+          );
+        }
+        else if(modelId == 'sketch_advanced'){
+          newImageUrl = await FlaskService().sketchToImageAPI(
+            sketchPath: _tempBaseImage!.path,
+            userPrompt: prompt,
+            stylePrompt:
+                "high quality, realistic", // You could vary this based on modelId
+            option:1 ,
+          );
+
+        }
+        else if (modelId == 'sketch_creative') {
+          newImageUrl = await FlaskService().sketchToImageAPI(
+            sketchPath: _tempBaseImage!.path,
+            userPrompt: prompt,
+            stylePrompt:
+                "high quality, realistic", // You could vary this based on modelId
+            option: 2,
+          );
+        }
+        
+        
       }
 
       if (newImageUrl != null) {

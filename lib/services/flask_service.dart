@@ -18,8 +18,10 @@ class FlaskService {
   static String get _urlGenerate => dotenv.env['URL_GENERATE'] ?? '';
   static String get _urlInpainting => dotenv.env['URL_INPAINTING'] ?? '';
   static String get _urlInpaintingApi => dotenv.env['URL_INPAINTING_API'] ?? '';
+  static String get _urlSketchApi => dotenv.env['URL_SKETCH_API'] ?? '';
   static String get _urlAsset => dotenv.env['URL_ASSET'] ?? '';
   static String get _urlDescribe => dotenv.env['URL_DESCRIBE'] ?? '';
+
 
   static const Map<String, String> _headers = {
     'Content-Type': 'application/json',
@@ -372,8 +374,8 @@ class FlaskService {
       filenamePrefix: 'inpaint_$prompt',
     );
   }
-  
-  /// [Inpainting with Custom API Endpoint] (Restored from Old Code)
+
+  /// [Inpainting-API]
   Future<String?> inpaintApiImage({
     required String imagePath,
     required String maskPath,
@@ -393,9 +395,64 @@ class FlaskService {
         'image': base64Image,
         'mask_image': base64Mask,
       },
-      filenamePrefix: 'inpaint_api_$prompt',
+      filenamePrefix: 'inpaint_api$prompt',
     );
   }
+
+  /// [Sketch-to-Image-API]
+  Future<String?> sketchToImageAPI({
+    required String sketchPath,
+    required String userPrompt,
+    required String stylePrompt,
+    required int option,
+  }) async {
+    debugPrint("🔗 [Pipeline] Starting Sketch-to-Image-API...");
+
+    // 1. Analyze Sketch
+    final String? sketchDescription = await describeImage(
+      imagePath: sketchPath,
+      prompt: '<MORE_DETAILED_CAPTION>',
+    );
+
+    if (sketchDescription == null) {
+      debugPrint("❌ [Pipeline] Failed: Could not analyze sketch.");
+      return null;
+    }
+
+    // 2. Construct Prompt & Generate
+    final String globalPrompt =
+        " $userPrompt.$stylePrompt. The image features: $sketchDescription";
+
+    debugPrint("🔗 [Pipeline] Generating base image...");
+
+    final String? generatedImagePath = await _performImageOperation(
+      fullUrl: _urlSketchApi,
+      logPrefix: '🖌️ Inpainting',
+      body: {
+        'prompt': globalPrompt,
+        'option': option,
+      },
+      filenamePrefix: 'sketch-to-image-api_$globalPrompt',
+    );
+
+    if (generatedImagePath == null) {
+      debugPrint("❌ [Pipeline] Failed: Image generation returned null.");
+      return null;
+    }
+
+    // 3. Remove Background (Pipeline Extension)
+    debugPrint("🔗 [Pipeline] Removing background from generated result...");
+
+    // This returns the path to the no-background version
+    return generateAsset(imagePath: generatedImagePath);
+
+
+
+    
+
+  }
+
+
 
   /// [Background Removal]
   Future<String?> generateAsset({required String imagePath}) async {
