@@ -9,6 +9,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:adobe/services/python_service.dart';
 
 class FlaskService {
   // ===========================================================================
@@ -31,19 +32,18 @@ class FlaskService {
   final _noteRepo = NoteRepo();
   final _projectRepo = ProjectRepo();
   final _fileRepo = FileRepo();
+  final _pythonService = PythonService();
 
   // ===========================================================================
   // 1. PIPELINES (Complex workflows)
   // ===========================================================================
 
   /// [Sketch-to-Image Pipeline]
-  /// 1. Analyzes the sketch to get a text description.
-  /// 2. Combines User Prompt + Sketch Description + Style Prompt.
-  /// 3. Generates a new image based on this global prompt.
   Future<String?> sketchToImage({
+    required int projectId,
     required String sketchPath,
     required String userPrompt,
-    required String stylePrompt,
+    String? stylePrompt,
   }) async {
     debugPrint("🔗 [Pipeline] Starting Sketch-to-Image...");
 
@@ -58,9 +58,31 @@ class FlaskService {
       return null;
     }
 
-    // 2. Construct Prompt & Generate
-    final String globalPrompt =
-        "$stylePrompt. $userPrompt. The image features: $sketchDescription";
+    // 2. Fetch Stylesheet & Construct Prompt
+    final project = await _projectRepo.getProjectById(projectId);
+    final String stylesheetJson = project?.globalStylesheet ?? "{}";
+
+    // --- DEBUG LOGS ---
+    debugPrint("🐛 [DEBUG] 1. User Prompt: $userPrompt");
+    debugPrint("🐛 [DEBUG] 2. Image Caption: $sketchDescription");
+    await _logToFile("debug_stylesheet.json", stylesheetJson);
+
+    debugPrint("🔗 [Pipeline] Generating magic prompt from stylesheet...");
+
+    final String? magicPrompt = await _pythonService.generateMagicPrompt(
+      stylesheetJson: stylesheetJson,
+      caption: sketchDescription,
+      userPrompt: userPrompt,
+    );
+
+    if (magicPrompt != null) {
+        await _logToFile("debug_magic_prompt.txt", magicPrompt);
+        debugPrint("🐛 [DEBUG] 4. Magic Prompt: $magicPrompt");
+    } else {
+        debugPrint("🐛 [DEBUG] 4. Magic Prompt: null");
+    }
+
+    final String globalPrompt = magicPrompt ?? "$userPrompt. The image features: $sketchDescription";
 
     debugPrint("🔗 [Pipeline] Generating base image...");
 
@@ -71,10 +93,9 @@ class FlaskService {
       return null;
     }
 
-    // 3. Remove Background (Pipeline Extension)
+    // 3. Remove Background
     debugPrint("🔗 [Pipeline] Removing background from generated result...");
 
-    // This returns the path to the no-background version
     return generateAsset(imagePath: generatedImagePath);
   }
 
@@ -88,7 +109,7 @@ class FlaskService {
       fullUrl: _urlGenerate,
       logPrefix: '🎨 Text-to-Image',
       body: {'prompt': prompt},
-      filenamePrefix: prompt,
+      filenamePrefix: 'gen',
     );
   }
 
@@ -142,9 +163,10 @@ class FlaskService {
 
   /// [Sketch-to-Image-API]
   Future<String?> sketchToImageAPI({
+    required int projectId,
     required String sketchPath,
     required String userPrompt,
-    required String stylePrompt,
+    String? stylePrompt,
     required int option,
   }) async {
     debugPrint("🔗 [Pipeline] Starting Sketch-to-Image-API...");
@@ -160,9 +182,27 @@ class FlaskService {
       return null;
     }
 
-    // 2. Construct Prompt & Generate
-    final String globalPrompt =
-        " $userPrompt.$stylePrompt. The image features: $sketchDescription";
+    // 2. Fetch Stylesheet & Construct Prompt
+    final project = await _projectRepo.getProjectById(projectId);
+    final String stylesheetJson = project?.globalStylesheet ?? "{}";
+
+    // --- DEBUG LOGS ---
+    debugPrint("🐛 [DEBUG] 1. User Prompt: $userPrompt");
+    debugPrint("🐛 [DEBUG] 2. Image Caption: $sketchDescription");
+    await _logToFile("debug_stylesheet.json", stylesheetJson);
+
+    debugPrint("🔗 [Pipeline] Generating magic prompt from stylesheet...");
+
+    final String? magicPrompt = await _pythonService.generateMagicPrompt(
+      stylesheetJson: stylesheetJson,
+      caption: sketchDescription,
+      userPrompt: userPrompt,
+    );
+
+    debugPrint("🐛 [DEBUG] 4. Magic Prompt: ${magicPrompt != null ? '(See debug_magic_prompt.txt)' : 'null'}");
+    if(magicPrompt != null) await _logToFile("debug_magic_prompt.txt", magicPrompt);
+
+    final String globalPrompt = magicPrompt ?? "$userPrompt. The image features: $sketchDescription";
 
     debugPrint("🔗 [Pipeline] Generating base image...");
 
@@ -184,7 +224,6 @@ class FlaskService {
     // 3. Remove Background (Pipeline Extension)
     debugPrint("🔗 [Pipeline] Removing background from generated result...");
 
-    // This returns the path to the no-background version
     return generateAsset(imagePath: generatedImagePath);
   }
 
@@ -251,7 +290,7 @@ class FlaskService {
   }
 
   // ===========================================================================
-  // 3. ANALYSIS SERVICES (Returns String)
+  // 3. ANALYSIS SERVICES
   // ===========================================================================
 
   /// [Image Captioning]
@@ -284,6 +323,20 @@ class FlaskService {
   // ===========================================================================
   // PRIVATE HELPERS
   // ===========================================================================
+
+  // LOG TO FILE HELPER
+  // Use following command to see logs:
+  // adb -d shell "run-as com.example.adobe cat /data/user/0/com.example.adobe/app_flutter/debug_magic_prompt.txt"
+  Future<void> _logToFile(String filename, String content) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/$filename');
+      await file.writeAsString(content);
+      debugPrint("📄 [LOG] Saved full content to: ${file.path}");
+    } catch (e) {
+      debugPrint("❌ Failed to log to file: $e");
+    }
+  }
 
   Future<String?> _performImageOperation({
     required String fullUrl,
@@ -345,7 +398,6 @@ class FlaskService {
       final Uint8List imageBytes = base64Decode(data['image']);
 
       final directory = await getApplicationDocumentsDirectory();
-      // Use join for safe path construction
       final imagesDirPath = p.join(directory.path, 'generated_images');
       final imagesDir = Directory(imagesDirPath);
 
@@ -359,7 +411,6 @@ class FlaskService {
       final shortPrefix =
           safePrefix.length > 20 ? safePrefix.substring(0, 20) : safePrefix;
 
-      // Use join here too
       final String filePath = p.join(
         imagesDir.path,
         '${shortPrefix}_$timestamp.png',

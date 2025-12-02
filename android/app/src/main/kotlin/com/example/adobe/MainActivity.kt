@@ -48,6 +48,12 @@ class MainActivity : FlutterActivity() {
                             val jsonList = call.argument<List<String>>("jsonList")!!
                             ImageAnalyzer.generateStylesheet(jsonList)
                         }
+                        "generateMagicPrompt" -> {
+                            val stylesheetJson = call.argument<String>("stylesheetJson") ?: "{}"
+                            val caption = call.argument<String>("caption") ?: ""
+                            val userPrompt = call.argument<String>("userPrompt") ?: ""
+                            ImageAnalyzer.generateMagicPrompt(stylesheetJson, caption, userPrompt)
+                        }
                         "getShareSource" -> {
                             val componentName = intent.component?.className
                             when {

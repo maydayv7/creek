@@ -66,4 +66,23 @@ class PythonService {
       return null;
     }
   }
+
+  // 5. Magic Prompt Generation
+  Future<String?> generateMagicPrompt({
+    required String stylesheetJson,
+    required String caption,
+    required String userPrompt,
+  }) async {
+    try {
+      final String? result = await _channel.invokeMethod('generateMagicPrompt', {
+        'stylesheetJson': stylesheetJson,
+        'caption': caption,
+        'userPrompt': userPrompt,
+      });
+      return result;
+    } catch (e) {
+      debugPrint("Magic Prompt Generation Error: $e");
+      return null;
+    }
+  }
 }

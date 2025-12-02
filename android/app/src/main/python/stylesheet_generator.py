@@ -1,8 +1,9 @@
 import json
 import math
+import re
 import numpy as np
 from collections import defaultdict
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 from sklearn.cluster import KMeans
 
 # ==========================================
@@ -521,3 +522,217 @@ def generate_stylesheet(json_strings_list: Any) -> str:
 
     final_output = engine.compute_final_stylesheet()
     return json.dumps(final_output)
+
+# ==========================================
+#  PROMPT GENERATION LOGIC
+# ==========================================
+
+DEFAULT_OPTIONS = {
+    "width": 1024,
+    "height": 1024,
+    "steps": 30,
+    "guidance_scale": 7.5,
+    "sampler": "k_lms",
+    "seed": "random",
+}
+
+# ---- normalize sheet ----
+def normalize_sheet(sheet: Dict[str, Any]) -> Dict[str, Dict[str, List[str]]]:
+    results = sheet.get("results", sheet)
+    norm: Dict[str, Dict[str, List[str]]] = {}
+
+    for cat, val in results.items():
+        if cat in ("filename", "meta"):
+            continue
+
+        items = []
+        if isinstance(val, list):
+            items = val
+        elif isinstance(val, dict) and "scores" in val:
+            items = val["scores"]
+
+        try:
+            items_sorted = sorted(
+                items, key=lambda x: float(x.get("score", 0)), reverse=True
+            )
+        except Exception:
+            items_sorted = items
+
+        labels = [
+            str(it.get("label")).strip() for it in items_sorted if it.get("label")
+        ]
+        if labels:
+            norm[cat] = {"Primary": labels[0], "Secondary": labels[1:]}
+
+    return norm
+
+# ---- extract top colors ----
+def top_color_list(sheet: Dict[str, Any], max_colors: int = 5) -> List[str]:
+    palette = sheet.get("results", {}).get("Color Palette", [])
+    if isinstance(palette, dict) and "scores" in palette:
+        palette = palette["scores"]
+
+    try:
+        palette_sorted = sorted(
+            palette, key=lambda x: float(x.get("score", 0)), reverse=True
+        )
+    except Exception:
+        palette_sorted = palette
+
+    out: List[str] = []
+    for it in palette_sorted:
+        lab = it.get("label")
+        if lab:
+            out.append(lab.strip())
+        if len(out) >= max_colors:
+            break
+
+    return out
+
+# ---- remove style/color words helpers ----
+STYLE_WORDS = [
+    "hand-drawn", "hand drawn", "sketch", "thin lines", "curves", "minimalistic",
+    "minimal", "flat", "cartoon", "comic", "pop-art", "surreal", "photorealistic",
+    "realistic", "painting", "oil painting", "pastel", "artistic", "illustration",
+    "line drawing", "line art", "3d effect", "texture", "pattern", "soft light",
+    "studio light", "dramatic", "cinematic", "moody", "vintage", "retro", "poster",
+]
+
+style_words_regex = re.compile(
+    r"\b(" + "|".join(re.escape(w) for w in STYLE_WORDS) + r")\b",
+    flags=re.IGNORECASE,
+)
+
+def remove_style_words(caption: str) -> str:
+    if not caption: return caption
+    clean = style_words_regex.sub(" ", caption)
+    clean = re.sub(r"\s{2,}", " ", clean).strip()
+    return clean
+
+COMMON_COLOR_WORDS = {
+    "black", "white", "red", "green", "blue", "yellow", "orange", "purple",
+    "pink", "brown", "gray", "grey", "monochrome", "vibrant", "pastel",
+    "tinted", "sepia", "muted", "desaturated",
+}
+
+_COLOR_PATTERN = re.compile(
+    r"\b(" + "|".join(re.escape(w) for w in COMMON_COLOR_WORDS) + r")\b",
+    flags=re.IGNORECASE,
+)
+
+def remove_color_phrases_from_caption(caption: str) -> str:
+    if not caption: return caption
+    c = _COLOR_PATTERN.sub(" ", caption)
+    c = re.sub(r"\s{2,}", " ", c).strip()
+    if len(c) < 3: return caption
+    return c
+
+def extract_subject(caption_text: str) -> str:
+    txt = caption_text.strip()
+    if not txt: return "subject"
+    first_clause = re.split(r"[.?!]\s*", txt)[0]
+    return " ".join(first_clause.split()[:12])
+
+def pick_style_phrases(norm: Dict[str, Dict[str, List[str]]], max_secondaries=3) -> List[str]:
+    cats = [
+        "Style", "Background/Texture", "Lighting", "Composition",
+        "Era/Cultural Reference", "Material Look", "Typography",
+    ]
+    key_map = {
+        "Style": "style", "Background/Texture": "background/texture",
+        "Lighting": "lighting", "Composition": "composition",
+        "Era/Cultural Reference": "era / reference",
+        "Material Look": "material look", "Typography": "typography",
+    }
+
+    out: List[str] = []
+    for cat in cats:
+        entry = norm.get(cat)
+        if not entry: continue
+
+        prim = entry.get("Primary")
+        secs = entry.get("Secondary", [])
+        chosen: List[str] = []
+        if prim: chosen.append(prim)
+        for s in secs:
+            if s and len(chosen) < (1 + max_secondaries):
+                chosen.append(s)
+        if chosen:
+            out.append(f"{key_map.get(cat, cat)}: {', '.join(chosen)}")
+    return out
+
+def style_to_tone(primary: str) -> str:
+    s = (primary or "").lower()
+    if any(k in s for k in ["retro", "collage", "poster", "pop-art", "surreal"]):
+        return "illustrative, textured, poster-like"
+    if any(k in s for k in ["photoreal", "realistic", "film"]):
+        return "photorealistic, high-detail"
+    return "high detail, sharp focus"
+
+# ==========================================
+#  ENTRY POINT FOR PROMPT GENERATION
+# ==========================================
+def generate_magic_prompt(stylesheet_json_str: str, caption: str, user_prompt: str) -> str:
+    try:
+        sheet = json.loads(stylesheet_json_str)
+    except Exception as e:
+        # Fallback if parsing fails
+        return f"{user_prompt}. The image features: {caption}"
+
+    # CLEAN caption
+    caption_no_style = remove_style_words(caption)
+    cleaned_caption = remove_color_phrases_from_caption(caption_no_style)
+
+    norm = normalize_sheet(sheet)
+    subject = extract_subject(cleaned_caption)
+
+    # Style cues
+    style_phrases = pick_style_phrases(norm)
+    style_primary = (norm.get("Style") or {}).get("Primary", "")
+    tone_hint = style_to_tone(style_primary)
+
+    # Color palette
+    top_colors = top_color_list(sheet)
+
+    # Build style instruction
+    style_instruction = ""
+    if style_phrases:
+        style_instruction = (
+            "User prefers these style cues (use as inspiration): " + "; ".join(style_phrases)
+        )
+    if top_colors:
+        color_str = ", ".join(top_colors)
+        style_instruction += f"; color palette: {color_str}"
+
+    # Construct final prompt parts
+    combined_parts: List[str] = []
+    if cleaned_caption: combined_parts.append(cleaned_caption)
+    if style_phrases: combined_parts.append("; ".join(style_phrases))
+    if user_prompt: combined_parts.append(user_prompt)
+
+    combined_description = " | ".join(combined_parts)
+
+    prompt_lines: List[str] = [
+        f"Main subject: {subject}.",
+        f"Description: {combined_description}.",
+        "NOTE: Ignore any style words in the caption; style comes only from the stylesheet.",
+    ]
+    if style_instruction:
+        prompt_lines.append(style_instruction + ".")
+    prompt_lines += [
+        f"Tone: {tone_hint}.",
+        "Avoid: blurry, deformed, text, watermark, extra limbs, artifacts.",
+    ]
+
+    prompt = "\n".join(prompt_lines)
+
+    payload = {
+        "prompt": prompt,
+        "negative_prompt": "blurry, low resolution, deformed, text, watermark, extra limbs, artifacts",
+        "options": DEFAULT_OPTIONS,
+        "provenance": {"generated_from": "final_output"},
+        "weights": {"caption": 0.6, "style_sheet": 0.3, "user": 0.1},
+    }
+
+    # Return concatenated prompt and payload as string
+    return prompt + " " + json.dumps(payload)

@@ -13,17 +13,15 @@ import 'package:image_picker/image_picker.dart';
 import 'package:undo/undo.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:image/image.dart' as img;
+import 'package:path/path.dart' as p;
 import './canvas_toolbar/magic_draw_overlay.dart';
 import './canvas_toolbar/text_tools_overlay.dart';
 import '../../data/repos/project_repo.dart';
-import '../../services/stylesheet_service.dart';
-import 'project_file_page.dart';
-import 'package:path/path.dart' as p;
-
-import '../../services/file_service.dart';
 import '../../data/models/file_model.dart';
-
+import '../../services/stylesheet_service.dart';
+import '../../services/file_service.dart';
 import '../../services/flask_service.dart';
+import 'project_file_page.dart';
 
 // --- MODELS WITH JSON SUPPORT ---
 
@@ -1409,7 +1407,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       );
     });
 
-    // NEW: Throttle Analysis: Trigger "Describe" every 2.5s while actively drawing
+    // Throttle Analysis: Trigger "Describe" every 2.5s while actively drawing
     if (_isMagicDrawActive &&
         !_isAnalyzing &&
         !_isInpainting &&
@@ -1498,37 +1496,33 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       }
       // CASE 2: SKETCH TO IMAGE (When hasImageLayers is FALSE)
       else {
-        // Currently all sketch IDs map to the main sketch endpoint,
-        // but you can pass the ID if your backend supports different sketch models.
         if(modelId == 'sketch_fusion'){
           newImageUrl = await FlaskService().sketchToImage(
+            projectId: widget.projectId,
             sketchPath: _tempBaseImage!.path,
             userPrompt: prompt,
-            stylePrompt:
-                "high quality, realistic", // You could vary this based on modelId
+            stylePrompt: "high quality, realistic", 
           );
         }
         else if(modelId == 'sketch_advanced'){
           newImageUrl = await FlaskService().sketchToImageAPI(
+            projectId: widget.projectId,
             sketchPath: _tempBaseImage!.path,
             userPrompt: prompt,
-            stylePrompt:
-                "high quality, realistic", // You could vary this based on modelId
+            stylePrompt: "high quality, realistic",
             option:1 ,
           );
 
         }
         else if (modelId == 'sketch_creative') {
           newImageUrl = await FlaskService().sketchToImageAPI(
+            projectId: widget.projectId,
             sketchPath: _tempBaseImage!.path,
             userPrompt: prompt,
-            stylePrompt:
-                "high quality, realistic", // You could vary this based on modelId
+            stylePrompt: "high quality, realistic",
             option: 2,
           );
         }
-        
-        
       }
 
       if (newImageUrl != null) {

@@ -78,4 +78,17 @@ object ImageAnalyzer {
             null
         }
     }
+
+    fun generateMagicPrompt(stylesheetJson: String, caption: String, userPrompt: String): String? {
+        waitForPython()
+        return try {
+            val py = Python.getInstance()
+            val module = py.getModule("stylesheet_generator")
+            val result = module.callAttr("generate_magic_prompt", stylesheetJson, caption, userPrompt)
+            result.toString()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 }
