@@ -109,6 +109,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   final FileService _fileService = FileService();
   final ChangeStack _changeStack = ChangeStack();
   final ImagePicker _picker = ImagePicker();
+  final ChangeStack _magicDrawChangeStack = ChangeStack();
 
   // --- STATE ---
   bool _hasUnsavedChanges = false;
@@ -138,6 +139,9 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   // --- TOOLS ---
   bool _isMagicDrawActive = false;
   bool _isTextToolsActive = false;
+
+  bool _isMagicPanelDisabled = false;
+  bool _isViewMode = false;
 
   // --- EDITING ---
   bool _isEditingText = false;
@@ -175,7 +179,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       });
       _hasUnsavedChanges = true;
     }
-    
+
     // Note: injectedMedia handling is done inside _loadCanvasFromFile to ensure
     // it happens after file content is loaded, avoiding race conditions.
   }
@@ -195,6 +199,33 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     _inactivityTimer = Timer(const Duration(seconds: 2), () {
       _analyzeCanvas();
     });
+  }
+
+  Future<bool> _confirmDiscardMagicDraw() async {
+    if (_magicPaths.isEmpty) return true; // nothing drawn – no popup
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("Discard Magic Draw?"),
+            content: const Text(
+              "Leaving Magic Draw will remove your sketch. Continue?",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Stay"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text("Discard"),
+              ),
+            ],
+          ),
+    );
+
+    return result == true;
   }
 
   Future<void> _analyzeCanvas() async {
@@ -217,7 +248,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       if (description != null && mounted) {
         setState(() {
           _aiDescription = description;
-          _isDescriptionExpanded = false; // Reset to collapsed on new description
+          _isDescriptionExpanded =
+              false; // Reset to collapsed on new description
         });
       }
     } catch (e) {
@@ -273,6 +305,17 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   }
 
   // --- UNDO/REDO ---
+  // --- MAGIC DRAW UNDO/REDO (NEW) ---
+  void _recordMagicChange(List<DrawingPath> oldMagicPaths) {
+    final newMagicPaths = List<DrawingPath>.from(_magicPaths);
+    _magicDrawChangeStack.add(
+      Change(
+        oldMagicPaths,
+        () => setState(() => _magicPaths = List.from(newMagicPaths)), // Redo
+        (val) => setState(() => _magicPaths = List.from(val)), // Undo
+      ),
+    );
+  }
 
   void _recordChange(CanvasState oldState) {
     _resetInactivityTimer(); // Reset timer on undoable actions
@@ -431,10 +474,10 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     if (_tempBaseImage != null) return;
 
     debugPrint("📸 [Magic Draw] Hiding strokes to capture clean base...");
-    
+
     // 1. Hide strokes by updating state
     setState(() => _isCapturingBase = true);
-    
+
     // 2. Wait for frame to render
     await Future.delayed(const Duration(milliseconds: 50));
 
@@ -534,6 +577,18 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   // ===========================================================================
   //  SAVE & LOAD LOGIC
   // ===========================================================================
+  Future<void> _handleMagicDrawExit() async {
+    // Use the helper method you already wrote: _confirmDiscardMagicDraw
+    if (_magicPaths.isNotEmpty && !_isInpainting) {
+      final confirm = await _confirmDiscardMagicDraw();
+      if (confirm) {
+        _saveAndCloseMagicDraw();
+      }
+      // If false, do nothing (stay)
+    } else {
+      _saveAndCloseMagicDraw();
+    }
+  }
 
   void _handleBackNavigation() {
     // If in magic draw mode, just close tool first
@@ -757,9 +812,9 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
           }
           _hasUnsavedChanges = false;
         });
-        
+
         // Handle Injected Media (e.g. from Share)
-         if (widget.injectedMedia != null) {
+        if (widget.injectedMedia != null) {
           final oldState = _getCurrentState();
           setState(() {
             elements.add({
@@ -840,7 +895,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   void _showComingSoon([dynamic feature]) => ScaffoldMessenger.of(
     context,
   ).showSnackBar(const SnackBar(content: Text('Coming soon')));
-  
+
   // [UPDATED] New Bottom Sheet for Assets
   void _openStylesheet() {
     showModalBottomSheet(
@@ -939,7 +994,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
               children: [
                 GestureDetector(
                   onTap: () {
-                    if (!_isMagicDrawActive) {
+                    // <--- CHANGED: Allow deselecting if MagicDraw is OFF OR if Hand Mode (PanelDisabled) is ON
+                    if (!_isMagicDrawActive || _isMagicPanelDisabled) {
                       _exitEditMode();
                       setState(() => selectedId = null);
                     }
@@ -951,10 +1007,10 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                     boundaryMargin: const EdgeInsets.all(double.infinity),
                     minScale: 0.01,
                     maxScale: 10.0,
-                    scaleEnabled: !_isMagicDrawActive,
-                    panEnabled: !_isMagicDrawActive,
+                    // <--- CHANGED: Enable Zoom/Pan if MagicDraw is OFF OR if Hand Mode (PanelDisabled) is ON
+                    scaleEnabled: !_isMagicDrawActive || _isMagicPanelDisabled,
+                    panEnabled: !_isMagicDrawActive || _isMagicPanelDisabled,
                     child: RepaintBoundary(
-                      // WRAPPED CANVAS IN REPAINT BOUNDARY
                       key: _canvasGlobalKey,
                       child: SizedBox(
                         width: _canvasSize.width,
@@ -986,6 +1042,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                                 type: e['type'],
                                 content: e['content'],
                                 styleData: e,
+                                // <--- OPTIONAL: If you want to move elements while Hand is active, change this line too:
+                                // isSelected: isSelected && (!_isMagicDrawActive || _isMagicPanelDisabled),
                                 isSelected: isSelected && !_isMagicDrawActive,
                                 isEditing:
                                     isSelected &&
@@ -1004,7 +1062,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                                         _isTextToolsActive = true;
                                     });
                                     setState(() {
-                                      // Bring to front
                                       elements.remove(e);
                                       elements.add(e);
                                     });
@@ -1040,7 +1097,9 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                             }),
                             // Drawing Layer
                             IgnorePointer(
-                              ignoring: !_isMagicDrawActive,
+                              // <--- CHANGED: Ignore touches (disable drawing) if MagicDraw is OFF OR if Hand Mode (PanelDisabled) is ON
+                              ignoring:
+                                  !_isMagicDrawActive || _isMagicPanelDisabled,
                               child: RepaintBoundary(
                                 key: _drawingKey,
                                 child: GestureDetector(
@@ -1054,10 +1113,12 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                                     size: Size.infinite,
                                     painter: CanvasPainter(
                                       paths: _paths,
-                                      // CONDITIONALLY HIDE MAGIC PATHS DURING CAPTURE
-                                      magicPaths: _isCapturingBase ? [] : _magicPaths,
-                                      // CONDITIONALLY HIDE CURRENT POINTS DURING CAPTURE
-                                      currentPoints: _isCapturingBase ? [] : _currentPoints,
+                                      magicPaths:
+                                          _isCapturingBase ? [] : _magicPaths,
+                                      currentPoints:
+                                          _isCapturingBase
+                                              ? []
+                                              : _currentPoints,
                                       currentColor:
                                           _isEraser
                                               ? Colors.transparent
@@ -1076,7 +1137,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                   ),
                 ),
 
-                // AI Description Banner
+                // ... (Rest of your UI: AI Description, MagicDrawTools, etc.) ...
+                // I have truncated the bottom part as it remains unchanged.
                 if (_aiDescription != null && !_isMagicDrawActive)
                   Positioned(
                     top: 10,
@@ -1152,13 +1214,18 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                   strokeWidth: _strokeWidth,
                   isEraser: _isEraser,
                   brandColors: _brandColors,
-                  onClose: _saveAndCloseMagicDraw,
+                  onClose: _handleMagicDrawExit,
                   onColorChanged: (c) => setState(() => _selectedColor = c),
                   onWidthChanged: (w) => setState(() => _strokeWidth = w),
                   onEraserToggle: (e) => setState(() => _isEraser = e),
-                  // CONNECTED CALLBACKS:
                   onPromptSubmit: (prompt) => _processInpainting(prompt),
                   isProcessing: _isInpainting,
+                  onMagicPanelActivityToggle:
+                      (disabled) =>
+                          setState(() => _isMagicPanelDisabled = disabled),
+                  isMagicPanelDisabled: _isMagicPanelDisabled,
+                  onViewModeToggle:
+                      (enabled) => setState(() => _isViewMode = enabled),
                 ),
 
                 TextToolsOverlay(
@@ -1177,7 +1244,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                     });
                   },
                   onAddText: _addTextElement,
-                  // onDelete: _deleteSelectedElement, // REMOVED
                   onColorChanged:
                       (c) =>
                           _updateSelectedTextProperty('style_color', c.value),
@@ -1194,20 +1260,105 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                         _isMagicDrawActive
                             ? "Magic Draw"
                             : (_isTextToolsActive ? "Text" : null),
-                    onMagicDraw:
-                        () => setState(() {
-                          _isMagicDrawActive = !_isMagicDrawActive;
-                          _isTextToolsActive = false;
-                          _exitEditMode();
-                          _magicPaths.clear(); // Clear old magic paths
-                          _tempBaseImage = null; // Force recapture next time
-                        }),
-                    onMedia: _pickImageFromGallery,
-                    onStylesheet: _openStylesheet,
-                    onTools: () => _showComingSoon('Tools'),
-                    onText: _toggleTextTools,
-                    onSelect: () => _showComingSoon('Select'),
-                    onPlugins: () => _showComingSoon('Plugins'),
+                    onMagicDraw: () async {
+                      if (_isMagicDrawActive) {
+                        final confirm = await _confirmDiscardMagicDraw();
+                        if (!confirm) return;
+                        setState(() {
+                          _magicPaths.clear();
+                          _magicDrawChangeStack.clear();
+                          _tempBaseImage = null;
+                          _isMagicDrawActive = false;
+                        });
+                        return;
+                      }
+                      setState(() {
+                        _isMagicDrawActive = true;
+                        _isTextToolsActive = false;
+                        _exitEditMode();
+                        _magicPaths.clear();
+                        _magicDrawChangeStack.clear();
+                        _tempBaseImage = null;
+                      });
+                    },
+                    onMedia: () async {
+                      if (_isMagicDrawActive) {
+                        final confirm = await _confirmDiscardMagicDraw();
+                        if (!confirm) return;
+                        setState(() {
+                          _magicPaths.clear();
+                          _magicDrawChangeStack.clear();
+                          _tempBaseImage = null;
+                          _isMagicDrawActive = false;
+                        });
+                      }
+                      _pickImageFromGallery();
+                    },
+                    onStylesheet: () async {
+                      if (_isMagicDrawActive) {
+                        final confirm = await _confirmDiscardMagicDraw();
+                        if (!confirm) return;
+                        setState(() {
+                          _magicPaths.clear();
+                          _magicDrawChangeStack.clear();
+                          _tempBaseImage = null;
+                          _isMagicDrawActive = false;
+                        });
+                      }
+                      _openStylesheet();
+                    },
+                    onTools: () async {
+                      if (_isMagicDrawActive) {
+                        final confirm = await _confirmDiscardMagicDraw();
+                        if (!confirm) return;
+                        setState(() {
+                          _magicPaths.clear();
+                          _magicDrawChangeStack.clear();
+                          _tempBaseImage = null;
+                          _isMagicDrawActive = false;
+                        });
+                      }
+                      _showComingSoon('Tools');
+                    },
+                    onText: () async {
+                      if (_isMagicDrawActive) {
+                        final confirm = await _confirmDiscardMagicDraw();
+                        if (!confirm) return;
+                        setState(() {
+                          _magicPaths.clear();
+                          _magicDrawChangeStack.clear();
+                          _tempBaseImage = null;
+                          _isMagicDrawActive = false;
+                        });
+                      }
+                      _toggleTextTools();
+                    },
+                    onSelect: () async {
+                      if (_isMagicDrawActive) {
+                        final confirm = await _confirmDiscardMagicDraw();
+                        if (!confirm) return;
+                        setState(() {
+                          _magicPaths.clear();
+                          _magicDrawChangeStack.clear();
+                          _tempBaseImage = null;
+                          _isMagicDrawActive = false;
+                        });
+                      }
+                      _showComingSoon('Select');
+                    },
+                    onPlugins: () async {
+                      if (_isMagicDrawActive) {
+                        final confirm = await _confirmDiscardMagicDraw();
+                        if (!confirm) return;
+                        setState(() {
+                          _magicPaths.clear();
+                          _magicDrawChangeStack.clear();
+                          _tempBaseImage = null;
+                          _isMagicDrawActive = false;
+                        });
+                      }
+                      _showComingSoon('Plugins');
+                    },
                   ),
                 ),
               ],
@@ -1217,7 +1368,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       ),
     );
   }
-
   // --- DRAWING HELPERS ---
 
   void _onPanUpdate(DragUpdateDetails details) {
@@ -1233,6 +1383,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       if (_currentPoints.isNotEmpty) {
         if (_isMagicDrawActive) {
           // ADD TO MAGIC PATHS (Temporary mask)
+          final oldMagicPaths = List<DrawingPath>.from(_magicPaths);
           _magicPaths.add(
             DrawingPath(
               points: List.from(_currentPoints),
@@ -1241,6 +1392,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
               isEraser: _isEraser,
             ),
           );
+          _recordMagicChange(oldMagicPaths);
           _currentPoints = [];
         } else {
           // NORMAL DRAWING
@@ -1286,7 +1438,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         File? maskFile = await _generateMaskImageFromPaths(
           _magicPaths,
           _canvasSize,
-          _tempBaseImage, 
+          _tempBaseImage,
         );
 
         if (maskFile == null) throw Exception("Failed to generate mask");
@@ -1298,7 +1450,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         );
 
         _addGeneratedImage(newImageUrl);
-
       } else {
         // --- SKETCH-TO-IMAGE FLOW (New) ---
         // Capture the entire canvas (strokes only since no images exist)
@@ -1313,7 +1464,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 
         _addGeneratedImage(newImageUrl);
       }
-
     } catch (e) {
       debugPrint("Generation Error: $e");
       ScaffoldMessenger.of(
@@ -1322,28 +1472,29 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     } finally {
       setState(() {
         _isInpainting = false;
-        _tempBaseImage = null; // Reset base image
-        _magicPaths.clear(); // Always clear magic paths on end
+        _tempBaseImage = null;
+        _magicPaths.clear();
+        _magicDrawChangeStack.clear(); // <--- ADD THIS
       });
     }
   }
 
   void _addGeneratedImage(String? newImageUrl) {
-      if (newImageUrl != null) {
-        debugPrint("✅ Adding generated image to canvas: $newImageUrl");
-        setState(() {
-          elements.add({
-            'id': 'gen_${DateTime.now().millisecondsSinceEpoch}',
-            'type': 'file_image',
-            'content': newImageUrl,
-            'position': const Offset(0, 0),
-            'size': _canvasSize,
-            'rotation': 0.0,
-          });
-          // Clear magic paths now that operation is done
-          _magicPaths.clear(); 
+    if (newImageUrl != null) {
+      debugPrint("✅ Adding generated image to canvas: $newImageUrl");
+      setState(() {
+        elements.add({
+          'id': 'gen_${DateTime.now().millisecondsSinceEpoch}',
+          'type': 'file_image',
+          'content': newImageUrl,
+          'position': const Offset(0, 0),
+          'size': _canvasSize,
+          'rotation': 0.0,
         });
-      }
+        // Clear magic paths now that operation is done
+        _magicPaths.clear();
+      });
+    }
   }
 
   // Updated to generate mask as: Base Image + Drawing Strokes
@@ -1365,9 +1516,9 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         final codec = await ui.instantiateImageCodec(data);
         final frameInfo = await codec.getNextFrame();
         final baseImage = frameInfo.image;
-        
+
         paintImage(
-          canvas: canvas, 
+          canvas: canvas,
           rect: Rect.fromLTWH(0, 0, size.width, size.height),
           image: baseImage,
           fit: BoxFit.cover, // Or contain, depending on your logic
@@ -1384,7 +1535,9 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       for (final path in paths) {
         final paint =
             Paint()
-              ..color = path.color // Use the drawing color (e.g. Blue)
+              ..color =
+                  path
+                      .color // Use the drawing color (e.g. Blue)
               ..strokeWidth = path.strokeWidth
               ..strokeCap = StrokeCap.round
               ..strokeJoin = StrokeJoin.round
@@ -1398,11 +1551,9 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
           }
           canvas.drawPath(p, paint);
         } else if (path.points.isNotEmpty) {
-          canvas.drawPoints(
-            ui.PointMode.points,
-            [path.points.first.offset],
-            paint,
-          );
+          canvas.drawPoints(ui.PointMode.points, [
+            path.points.first.offset,
+          ], paint);
         }
       }
 
@@ -1426,16 +1577,24 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     }
   }
 
-  // Just toggles state; drawing data stays in _paths and is saved via _saveCanvas
   Future<void> _saveAndCloseMagicDraw() async {
     setState(() {
       _isMagicDrawActive = false;
-      _magicPaths.clear(); // Clear magic strokes if canceled
+      _magicPaths.clear();
+      _magicDrawChangeStack.clear();
       _tempBaseImage = null;
     });
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final bool canUndo =
+        _isMagicDrawActive
+            ? _magicDrawChangeStack.canUndo
+            : _changeStack.canUndo;
+    final bool canRedo =
+        _isMagicDrawActive
+            ? _magicDrawChangeStack.canRedo
+            : _changeStack.canRedo;
     return AppBar(
       leadingWidth: 160,
       leading: SafeArea(
@@ -1452,7 +1611,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
               ),
               onPressed: () {
                 if (_isMagicDrawActive) {
-                  _saveAndCloseMagicDraw();
+                  _handleMagicDrawExit();
                 } else {
                   _handleBackNavigation();
                 }
@@ -1468,8 +1627,13 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                 ),
               ),
               onPressed:
-                  _changeStack.canUndo
-                      ? () => setState(() => _changeStack.undo())
+                  canUndo
+                      ? () => setState(
+                        () =>
+                            _isMagicDrawActive
+                                ? _magicDrawChangeStack.undo()
+                                : _changeStack.undo(),
+                      )
                       : null,
             ),
             IconButton(
@@ -1482,8 +1646,13 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                 ),
               ),
               onPressed:
-                  _changeStack.canRedo
-                      ? () => setState(() => _changeStack.redo())
+                  canRedo
+                      ? () => setState(
+                        () =>
+                            _isMagicDrawActive
+                                ? _magicDrawChangeStack.redo()
+                                : _changeStack.redo(),
+                      )
                       : null,
             ),
           ],
@@ -1849,12 +2018,12 @@ class CanvasPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
-    
+
     // Draw normal paths
     for (final path in paths) {
       _drawPath(canvas, path);
     }
-    
+
     // Draw magic paths (unless hidden by empty list passed in)
     for (final path in magicPaths) {
       _drawPath(canvas, path);
@@ -1880,26 +2049,24 @@ class CanvasPainter extends CustomPainter {
   }
 
   void _drawPath(Canvas canvas, DrawingPath path) {
-      final paint =
-          Paint()
-            ..color = path.isEraser ? Colors.transparent : path.color
-            ..blendMode = path.isEraser ? BlendMode.clear : BlendMode.srcOver
-            ..strokeWidth = path.strokeWidth
-            ..strokeCap = StrokeCap.round
-            ..strokeJoin = StrokeJoin.round
-            ..style = PaintingStyle.stroke;
+    final paint =
+        Paint()
+          ..color = path.isEraser ? Colors.transparent : path.color
+          ..blendMode = path.isEraser ? BlendMode.clear : BlendMode.srcOver
+          ..strokeWidth = path.strokeWidth
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke;
 
-      if (path.points.length > 1) {
-        final Path p = Path();
-        p.moveTo(path.points.first.offset.dx, path.points.first.offset.dy);
-        for (int i = 1; i < path.points.length; i++)
-          p.lineTo(path.points[i].offset.dx, path.points[i].offset.dy);
-        canvas.drawPath(p, paint);
-      } else if (path.points.isNotEmpty) {
-        canvas.drawPoints(ui.PointMode.points, [
-          path.points.first.offset,
-        ], paint);
-      }
+    if (path.points.length > 1) {
+      final Path p = Path();
+      p.moveTo(path.points.first.offset.dx, path.points.first.offset.dy);
+      for (int i = 1; i < path.points.length; i++)
+        p.lineTo(path.points[i].offset.dx, path.points[i].offset.dy);
+      canvas.drawPath(p, paint);
+    } else if (path.points.isNotEmpty) {
+      canvas.drawPoints(ui.PointMode.points, [path.points.first.offset], paint);
+    }
   }
 
   @override

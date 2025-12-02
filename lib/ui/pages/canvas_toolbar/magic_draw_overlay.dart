@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+// Note: You must ensure flutter_svg is imported in this file and installed in pubspec.yaml
+import 'package:flutter_svg/flutter_svg.dart';
 
 class MagicDrawTools extends StatefulWidget {
   final bool isActive;
@@ -10,9 +12,12 @@ class MagicDrawTools extends StatefulWidget {
   final Function(double) onWidthChanged;
   final Function(bool) onEraserToggle;
   final VoidCallback onClose;
-  final Function(String) onPromptSubmit; // Callback for prompt submission
-  final bool isProcessing; // Loading state
+  final Function(String) onPromptSubmit;
+  final bool isProcessing;
   final List<Color> brandColors;
+  final Function(bool) onViewModeToggle;
+  final Function(bool) onMagicPanelActivityToggle;
+  final bool isMagicPanelDisabled;
 
   const MagicDrawTools({
     super.key,
@@ -27,6 +32,9 @@ class MagicDrawTools extends StatefulWidget {
     required this.onPromptSubmit,
     required this.isProcessing,
     required this.brandColors,
+    required this.onViewModeToggle,
+    required this.onMagicPanelActivityToggle,
+    required this.isMagicPanelDisabled,
   });
 
   @override
@@ -37,7 +45,6 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
   bool _showStrokeSlider = false;
   final TextEditingController _promptController = TextEditingController();
 
-  // Initialize recent colors here so they persist
   final List<Color> _recentColors = [
     Colors.blue,
     Colors.purple,
@@ -46,19 +53,31 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
     Colors.amber,
   ];
 
+  bool _isViewMode = false;
+
   @override
   void dispose() {
+    if (_isViewMode) {
+      widget.onViewModeToggle(false);
+    }
     _promptController.dispose();
     super.dispose();
   }
 
   void _handleSubmit() {
-    if (_promptController.text.trim().isNotEmpty && !widget.isProcessing) {
+    if (_promptController.text.trim().isNotEmpty &&
+        !widget.isProcessing &&
+        !widget.isMagicPanelDisabled) {
       widget.onPromptSubmit(_promptController.text.trim());
-      // Optional: Clear text after submit or keep it? 
-      // Usually keeping it is better for iterations, clearing if successful.
-      // We'll let the parent decide or just keep it for now.
     }
+  }
+
+  void _toggleViewMode() {
+    final newViewMode = !_isViewMode;
+    setState(() {
+      _isViewMode = newViewMode;
+    });
+    widget.onViewModeToggle(newViewMode);
   }
 
   @override
@@ -80,23 +99,50 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
     );
   }
 
+  Widget _buildToolIcon(dynamic icon, bool isActive, VoidCallback onTap) {
+    final Color activeColor = Colors.black;
+    final Color inactiveColor = Colors.grey;
+    final Color iconColor = isActive ? activeColor : inactiveColor;
+
+    final Widget iconWidget =
+        (icon is IconData)
+            ? Icon(icon, size: 20, color: iconColor)
+            : SvgPicture.asset(
+              icon,
+              width: 20,
+              height: 20,
+              colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+            );
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.grey.shade200 : Colors.transparent,
+          shape: BoxShape.circle,
+        ),
+        child: iconWidget,
+      ),
+    );
+  }
+
   Widget _buildMagicDrawPanel() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+            color: Colors.black12,
+            blurRadius: 12,
+            offset: Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Prompt Bar
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
@@ -136,49 +182,99 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                       color: Color(0xFF2B2B2B),
                       shape: BoxShape.circle,
                     ),
-                    child: widget.isProcessing
-                        ? const Padding(
-                            padding: EdgeInsets.all(12.0),
-                            child: CircularProgressIndicator(
+                    child:
+                        widget.isProcessing
+                            ? const Padding(
+                              padding: EdgeInsets.all(12.0),
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                            : const Icon(
+                              Icons.auto_awesome,
                               color: Colors.white,
-                              strokeWidth: 2,
+                              size: 20,
                             ),
-                          )
-                        : const Icon(
-                            Icons.auto_awesome,
-                            color: Colors.white,
-                            size: 20,
-                          ),
                   ),
                 ),
               ],
             ),
           ),
           Divider(height: 1, color: Colors.grey.shade200),
-          // Tools Row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildToolIcon(Icons.crop_free, false, () {}),
-                _buildToolIcon(Icons.brush, !widget.isEraser, () {
-                  widget.onEraserToggle(false);
-                }),
+                _buildToolIcon(Icons.pan_tool, widget.isMagicPanelDisabled, () {
+                  setState(() => _showStrokeSlider = false);
 
-                // Color Picker Trigger
+                  // Deactivate drawing tools when hand icon is activated
+
+                  if (!widget.isMagicPanelDisabled) {
+                    widget.onEraserToggle(false);
+                  }
+
+                  widget.onMagicPanelActivityToggle(
+                    !widget.isMagicPanelDisabled,
+                  );
+                }),
+                _buildToolIcon(
+                  'assets/icons/brush-line.svg',
+
+                  !widget.isEraser &&
+                      !_isViewMode &&
+                      !widget.isMagicPanelDisabled,
+
+                  () {
+                    setState(() => _showStrokeSlider = false);
+
+                    if (_isViewMode) {
+                      setState(() => _isViewMode = false);
+
+                      widget.onViewModeToggle(false);
+                    }
+
+                    // Deactivate hand icon when brush is activated
+
+                    if (widget.isMagicPanelDisabled) {
+                      widget.onMagicPanelActivityToggle(false);
+                    }
+
+                    widget.onEraserToggle(false);
+                  },
+                ),
+
                 GestureDetector(
-                  onTap: () => _showAdvancedColorPicker(context),
+                  onTap: () {
+                    setState(() => _showStrokeSlider = false);
+
+                    if (_isViewMode) {
+                      setState(() => _isViewMode = false);
+
+                      widget.onViewModeToggle(false);
+                    }
+
+                    _showAdvancedColorPicker(context);
+                  },
+
                   child: Container(
                     width: 28,
+
                     height: 28,
+
                     decoration: BoxDecoration(
                       color: widget.selectedColor,
+
                       shape: BoxShape.circle,
+
                       border: Border.all(color: Colors.white, width: 2),
+
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.1),
+
                           blurRadius: 4,
                         ),
                       ],
@@ -187,31 +283,64 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                 ),
 
                 GestureDetector(
-                  onTap: () => setState(
-                    () => _showStrokeSlider = !_showStrokeSlider,
-                  ),
+                  onTap: () {
+                    if (_isViewMode) {
+                      setState(() => _isViewMode = false);
+
+                      widget.onViewModeToggle(false);
+                    }
+
+                    setState(() => _showStrokeSlider = !_showStrokeSlider);
+                  },
+
                   child: Container(
                     padding: const EdgeInsets.all(8),
+
                     decoration: BoxDecoration(
-                      color: _showStrokeSlider
-                          ? Colors.grey.shade200
-                          : Colors.transparent,
+                      color:
+                          _showStrokeSlider
+                              ? Colors.grey.shade200
+                              : Colors.transparent,
+
                       shape: BoxShape.circle,
                     ),
+
                     child: Container(
                       width: 10,
+
                       height: 10,
+
                       decoration: const BoxDecoration(
                         color: Colors.black87,
+
                         shape: BoxShape.circle,
                       ),
                     ),
                   ),
                 ),
+
                 _buildToolIcon(
-                  Icons.cleaning_services_outlined,
-                  widget.isEraser,
+                  'assets/icons/eraser-line.svg',
+
+                  widget.isEraser &&
+                      !_isViewMode &&
+                      !widget.isMagicPanelDisabled,
+
                   () {
+                    setState(() => _showStrokeSlider = false);
+
+                    if (_isViewMode) {
+                      setState(() => _isViewMode = false);
+
+                      widget.onViewModeToggle(false);
+                    }
+
+                    // Deactivate hand icon when eraser is activated
+
+                    if (widget.isMagicPanelDisabled) {
+                      widget.onMagicPanelActivityToggle(false);
+                    }
+
                     widget.onEraserToggle(true);
                   },
                 ),
@@ -219,20 +348,6 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildToolIcon(IconData icon, bool isActive, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: isActive ? Colors.grey.shade200 : Colors.transparent,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, size: 20, color: Colors.black54),
       ),
     );
   }
@@ -269,8 +384,8 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
               width: 210,
               child: Slider(
                 value: widget.strokeWidth,
-                min: 2.0,
-                max: 30.0,
+                min: 5.0,
+                max: 60.0,
                 onChanged: widget.onWidthChanged,
               ),
             ),
@@ -300,9 +415,10 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
 class _TaperedSliderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF2B2B2B)
-      ..style = PaintingStyle.fill;
+    final paint =
+        Paint()
+          ..color = const Color(0xFF2B2B2B)
+          ..style = PaintingStyle.fill;
     final path = Path();
     path.moveTo(10, size.height / 2 - 2);
     path.lineTo(size.width - 10, size.height / 2 - 10);
@@ -340,7 +456,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
   late Color _currentColor;
   late List<Color> _brandPalette;
 
-  // Controllers for RGB Sliders (Integrated from other branch)
   final TextEditingController _rController = TextEditingController();
   final TextEditingController _gController = TextEditingController();
   final TextEditingController _bController = TextEditingController();
@@ -350,7 +465,7 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
     super.initState();
     _currentColor = widget.initialColor;
     _tabController = TabController(length: 3, vsync: this);
-    _brandPalette = widget.brandColors; // Integrate real brand colors
+    _brandPalette = widget.brandColors;
     _updateControllers();
   }
 
@@ -372,14 +487,11 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
   void _updateColor(Color color) {
     setState(() {
       _currentColor = color;
-
-      // Update recent colors list
       widget.recentColors.removeWhere((c) => c.value == color.value);
       widget.recentColors.insert(0, color);
       if (widget.recentColors.length > 5) {
         widget.recentColors.removeLast();
       }
-
       _updateControllers();
     });
     widget.onColorChanged(color);
@@ -396,7 +508,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // --- HEADER HANDLE ---
           const SizedBox(height: 12),
           Center(
             child: Container(
@@ -409,8 +520,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
             ),
           ),
           const SizedBox(height: 16),
-
-          // --- TABS ---
           TabBar(
             controller: _tabController,
             labelColor: Colors.black,
@@ -427,10 +536,7 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
               Tab(text: 'Sliders'),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // --- HEX / HEADER ROW ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -499,11 +605,8 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
               ],
             ),
           ),
-
           const SizedBox(height: 16),
           const Divider(height: 1),
-
-          // --- MAIN CONTENT AREA ---
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -515,34 +618,25 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
               ],
             ),
           ),
-
-          // --- FOOTER ---
           _buildSharedFooter(),
         ],
       ),
     );
   }
 
-  // --- HELPER: Generate colors (Integrated from other branch) ---
   List<Color> _generateColorGrid() {
     List<Color> colors = [];
-
-    // 1. Top Row: Grayscale (White -> Black)
     for (int i = 0; i < 9; i++) {
-      double lightness = 1.0 - (i / 8); // 1.0 to 0.0
+      double lightness = 1.0 - (i / 8);
       colors.add(HSLColor.fromAHSL(1.0, 0.0, 0.0, lightness).toColor());
     }
-
-    // 2. Main Grid: Hues (Columns) x Shades (Rows)
-    final int hueSteps = 9; // Columns
-    final int shadeSteps = 7; // Rows excluding grayscale
-
+    final int hueSteps = 9;
+    final int shadeSteps = 7;
     for (int shade = 0; shade < shadeSteps; shade++) {
       for (int hueStep = 0; hueStep < hueSteps; hueStep++) {
         double hue = (hueStep / hueSteps) * 360;
         double saturation = 0.5 + (shade / shadeSteps) * 0.5;
         double lightness = 0.8 - (shade / shadeSteps) * 0.5;
-
         colors.add(
           HSLColor.fromAHSL(1.0, hue, saturation, lightness).toColor(),
         );
@@ -657,14 +751,11 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
               _updateColor(_currentColor.withRed(v.toInt()));
             }),
             const SizedBox(height: 24),
-            _buildSingleRGBSlider(
-              "Green",
-              Colors.green,
-              _currentColor.green,
-              (v) {
-                _updateColor(_currentColor.withGreen(v.toInt()));
-              },
-            ),
+            _buildSingleRGBSlider("Green", Colors.green, _currentColor.green, (
+              v,
+            ) {
+              _updateColor(_currentColor.withGreen(v.toInt()));
+            }),
             const SizedBox(height: 24),
             _buildSingleRGBSlider("Blue", Colors.blue, _currentColor.blue, (v) {
               _updateColor(_currentColor.withBlue(v.toInt()));
