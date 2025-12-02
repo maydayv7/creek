@@ -1,5 +1,3 @@
-// lib/services/analyze/texture.dart
-
 import 'dart:io';
 import 'dart:convert';
 import 'package:adobe/utils/image_utils.dart';

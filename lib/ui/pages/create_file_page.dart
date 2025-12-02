@@ -67,7 +67,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
       width: 336,
       height: 192,
       displaySize: '3.5 x 2 in',
-      svgPath: 'assets/icons/Group.svg',
+      svgPath: 'assets/icons/group.svg',
     ),
     CanvasPreset(
       name: 'Photo Collage',
@@ -754,4 +754,3 @@ class _ProjectSelectionModalState extends State<ProjectSelectionModal> {
     );
   }
 }
-

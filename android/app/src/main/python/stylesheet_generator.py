@@ -258,7 +258,7 @@ class FontClusterEngine:
         clean = raw_name.lower().split('-')[0].strip()
         if clean in self.full_font_map:
             return self.full_font_map[clean]
-        return "Unknown/Other"
+        return "Display/Other" # Default fallback
 
 # ==========================================
 #  UNIFIED CONSENSUS ENGINE
@@ -272,6 +272,12 @@ class UnifiedStyleEngine:
         self.font_members = defaultdict(list)
         self.color_pool = []
         self.doc_counter = 0
+
+        self.material_filter = {
+            "glossy", "matte", "metallic", "organic",
+            "wood", "laminated", "porcelain", "wet-look",
+            "denim", "fabric", "leather"
+        }
 
         self.aliases = {
             "Colour Palette": "Color Palette",
@@ -314,10 +320,8 @@ class UnifiedStyleEngine:
                 # PATH A: COLOR PALETTE
                 # NOTE: We intentionally SKIP processing 'scores' (moods) here
                 if std_category == "Color Palette":
-                    if isinstance(payload, dict):
-                        # Extract "palette" list (Actual Hex Codes)
-                        if "palette" in payload and isinstance(payload["palette"], list):
-                            for hex_code in payload["palette"]:
+                    if isinstance(payload, dict) and "palette" in payload:
+                         for hex_code in payload["palette"]:
                                 if isinstance(hex_code, str) and hex_code.startswith('#'):
                                     self.color_pool.append(hex_to_rgb(hex_code))
                     # Fallback: if payload is just a list of hex strings
@@ -406,7 +410,45 @@ class UnifiedStyleEngine:
                     candidates.append({"label": tag, "score": round(score, 2)})
 
             candidates.sort(key=lambda x: x['score'], reverse=True)
-            if candidates: final_json["results"][category] = candidates[:5]
+            if candidates: 
+                final_json["results"][category] = candidates[:5]
+
+        # 1.5 Split Texture into 'Background/Texture' and 'Material Look'
+        if "Background/Texture" in final_json["results"]:
+            textures = []
+            materials = []
+
+            for item in final_json["results"]["Background/Texture"]:
+                label = item["label"].lower().replace("_", " ").replace("-", " ")
+                # Check if label or parts of it match material keywords
+                is_material = False
+                if item["label"] in self.material_filter:
+                    is_material = True
+                else:
+                     # Partial matching (e.g. "wood grain" -> wood)
+                     for mat in self.material_filter:
+                         if mat in label:
+                             is_material = True
+                             break
+
+                if is_material:
+                    materials.append(item)
+                else:
+                    textures.append(item)
+
+            if textures:
+                final_json["results"]["Background/Texture"] = textures
+            else:
+                # Remove empty key if all moved to material
+                del final_json["results"]["Background/Texture"]
+
+            if materials:
+                # Merge with existing Material Look if present
+                if "Material Look" in final_json["results"]:
+                    final_json["results"]["Material Look"].extend(materials)
+                    final_json["results"]["Material Look"].sort(key=lambda x: x['score'], reverse=True)
+                else:
+                    final_json["results"]["Material Look"] = materials
 
         # 2. Process Typography
         if self.font_family_scores:
@@ -475,9 +517,7 @@ def generate_stylesheet(json_strings_list: Any) -> str:
             try:
                 data = json.loads(json_str)
                 engine.ingest_data(data)
-            except Exception as e:
-                print(f"Error parsing JSON chunk: {e}")
-                continue
+            except: continue
 
     final_output = engine.compute_final_stylesheet()
     return json.dumps(final_output)

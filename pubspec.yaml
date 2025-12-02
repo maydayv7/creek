@@ -47,6 +47,9 @@ flutter:
     - assets/fonts/
     - assets/icons/
     - assets/templates/
+    - assets/stylesheet/lighting/
+    - assets/stylesheet/material-look/
+    - assets/stylesheet/texture/
     - assets/moodboard_blob.png
     - assets/stylesheet_blob.png
     - assets/files_blob.png
