@@ -1930,7 +1930,7 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                         // Rotate delta to account for element rotation
                         final rotated = _rotateVector(scaledDelta, -_rot);
                         setState(() {
-                          _pos += rotated;
+                          _pos += scaledDelta;
                           _previousFocalPoint =
                               currentFocalPoint; // Update for next frame
                         });
