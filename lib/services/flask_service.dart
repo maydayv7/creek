@@ -17,6 +17,7 @@ class FlaskService {
 
   static String get _urlGenerate => dotenv.env['URL_GENERATE'] ?? '';
   static String get _urlInpainting => dotenv.env['URL_INPAINTING'] ?? '';
+  static String get _urlInpaintingApi => dotenv.env['URL_INPAINTING_API'] ?? '';
   static String get _urlAsset => dotenv.env['URL_ASSET'] ?? '';
   static String get _urlDescribe => dotenv.env['URL_DESCRIBE'] ?? '';
 
@@ -126,7 +127,7 @@ class FlaskService {
     if (base64Image == null || base64Mask == null) return null;
 
     return _performImageOperation(
-      endpoint: '/inpainting-api',
+      fullUrl: _urlInpaintingApi,
       logPrefix: '🖌️ Inpainting',
       body: {
         'prompt': prompt,
