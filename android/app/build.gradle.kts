@@ -89,13 +89,13 @@ chaquopy {
         val pythonFile = if (isWindows) file("../../python_env/Scripts/python.exe") else file("../../python_env/bin/python")
 
         if (pythonFile.exists()) {
+            println("Using local python environment: ${pythonFile.absolutePath}")
             buildPython(pythonFile.absolutePath)
         } else {
-            println("Local python env not found. Using system 'python'.")
+            println("Local python env not found. Using system 'python' from PATH.")
             buildPython("python")
         }
 
-        buildPython(pythonFile.absolutePath)
         pip {
             install("pillow")
             install("numpy")

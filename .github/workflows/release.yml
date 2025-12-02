@@ -5,6 +5,9 @@ on:
     tags:
       - "v*" # Triggers the workflow on tags like v1.0.0, v1.0.1, etc.
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build APK and Release
@@ -67,4 +70,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: build/app/outputs/flutter-apk/app-release.apk
-          generate_release_notes: true
+          generate_release_notes: false
+          body: "Inter IIT Adobe P.S. by IITG."
