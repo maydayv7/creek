@@ -1165,7 +1165,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 
                 // ... (Rest of your UI: AI Description, MagicDrawTools, etc.) ...
                 // I have truncated the bottom part as it remains unchanged.
-                if (_aiDescription != null && !_isMagicDrawActive)
+                if (_aiDescription != null && _isMagicDrawActive)
                   Positioned(
                     top: 10,
                     left: 16,
@@ -1254,6 +1254,9 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                   isMagicPanelDisabled: _isMagicPanelDisabled,
                   onViewModeToggle:
                       (enabled) => setState(() => _isViewMode = enabled),
+                  hasImageLayers: elements.any(
+                    (e) => e['type'] == 'file_image',
+                  ),
                 ),
 
                 TextToolsOverlay(
@@ -1440,18 +1443,12 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     });
   }
 
-  Future<void> _processInpainting(String prompt, String serviceId) async {
-    if (prompt.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Please enter a prompt!")));
-      return;
-    }
-
+  Future<void> _processInpainting(String prompt, String modelId) async {
     setState(() => _isInpainting = true);
     _resetInactivityTimer();
 
     try {
+      // Check if there are image layers (which dictates the context)
       bool hasImageLayers = elements.any((e) => e['type'] == 'file_image');
 
       if (_tempBaseImage == null) {
@@ -1464,33 +1461,41 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         _canvasSize,
         _tempBaseImage,
       );
+
       if (maskFile == null) throw Exception("Failed to generate mask");
 
       String? newImageUrl;
 
-      // --- SWITCH SERVICE ---
-      if (serviceId == 'api') {
-        // Call the dedicated API endpoint
-        newImageUrl = await FlaskService().inpaintApiImage(
-          imagePath: _tempBaseImage!.path,
-          maskPath: maskFile.path,
-          prompt: prompt,
-        );
-      } else {
-        // Default 'flask' service logic
-        if (hasImageLayers) {
-          newImageUrl = await FlaskService().inpaintImage(
+      // --- LOGIC SWITCHING BASED ON MODEL ID ---
+
+      // CASE 1: INPAINTING (When hasImageLayers is TRUE)
+      if (hasImageLayers) {
+        if (modelId == 'inpaint_api') {
+          // Call API Inpainting
+          newImageUrl = await FlaskService().inpaintApiImage(
             imagePath: _tempBaseImage!.path,
             maskPath: maskFile.path,
             prompt: prompt,
           );
         } else {
-          newImageUrl = await FlaskService().sketchToImage(
-            sketchPath: _tempBaseImage!.path,
-            userPrompt: prompt,
-            stylePrompt: "high quality, realistic",
+          // Default: Standard Flask Inpainting ('inpaint_standard')
+          newImageUrl = await FlaskService().inpaintImage(
+            imagePath: _tempBaseImage!.path,
+            maskPath: maskFile.path,
+            prompt: prompt,
           );
         }
+      }
+      // CASE 2: SKETCH TO IMAGE (When hasImageLayers is FALSE)
+      else {
+        // Currently all sketch IDs map to the main sketch endpoint,
+        // but you can pass the ID if your backend supports different sketch models.
+        newImageUrl = await FlaskService().sketchToImage(
+          sketchPath: _tempBaseImage!.path,
+          userPrompt: prompt,
+          stylePrompt:
+              "high quality, realistic", // You could vary this based on modelId
+        );
       }
 
       if (newImageUrl != null) {
@@ -1816,7 +1821,7 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
   late Offset _pos;
   late Size _size;
   late double _rot;
-  
+
   // Gesture state
   double _initialRotation = 0.0;
   double _initialScale = 1.0;
@@ -1853,8 +1858,6 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
         final double zoom = matrix.getMaxScaleOnAxis();
         final double handleScale = (1 / zoom).clamp(0.2, 5.0);
         final double edgeThickness = 18 * handleScale;
-        final double buttonSize = 32 * handleScale;
-        final double iconSize = 14 * handleScale;
 
         return Positioned(
           left: _pos.dx,
@@ -1889,21 +1892,25 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                       if (_isTwoFingerGesture && details.pointerCount == 2) {
                         // Two-finger: handle rotation and zoom
                         final newRotation = _initialRotation + details.rotation;
-                        
+
                         // Handle scale (zoom) - maintain aspect ratio
                         final scaleFactor = details.scale;
-                        final newArea = _initialScale * scaleFactor * scaleFactor;
+                        final newArea =
+                            _initialScale * scaleFactor * scaleFactor;
                         final aspectRatio = _size.width / _size.height;
-                        final newWidth = math.sqrt(newArea * aspectRatio).clamp(20.0, 5000.0);
+                        final newWidth = math
+                            .sqrt(newArea * aspectRatio)
+                            .clamp(20.0, 5000.0);
                         final newHeight = newWidth / aspectRatio;
-                        
+
                         setState(() {
                           _rot = newRotation % (2 * math.pi);
                           _size = Size(newWidth, newHeight);
                         });
-                        
+
                         widget.onUpdate(_pos, _size, _rot);
-                      } else if (!_isTwoFingerGesture && details.pointerCount == 1) {
+                      } else if (!_isTwoFingerGesture &&
+                          details.pointerCount == 1) {
                         // Single-finger: handle drag using incremental focal point delta
                         final currentFocalPoint = details.focalPoint;
                         final delta = currentFocalPoint - _previousFocalPoint;
@@ -1914,7 +1921,8 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                         final rotated = _rotateVector(scaledDelta, -_rot);
                         setState(() {
                           _pos += rotated;
-                          _previousFocalPoint = currentFocalPoint; // Update for next frame
+                          _previousFocalPoint =
+                              currentFocalPoint; // Update for next frame
                         });
                         widget.onUpdate(_pos, _size, _rot);
                       }
@@ -2045,124 +2053,11 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                       ),
                     ),
                   ),
-
-                // ======================
-                //  CORNER RESIZE HANDLES
-                // ======================
-                if (widget.isSelected && !widget.isEditing) ...[
-                  // TOP-LEFT corner
-                  Positioned(
-                    top: -10 * handleScale,
-                    left: -10 * handleScale,
-                    child: _cornerHandle(
-                      size: 20 * handleScale,
-                      onDrag: (d) {
-                        final local = _rotateVector(d.delta, -_rot);
-                        setState(() {
-                          _pos += Offset(local.dx, local.dy);
-                          _size = Size(
-                            (_size.width - local.dx).clamp(20, 5000),
-                            (_size.height - local.dy).clamp(20, 5000),
-                          );
-                        });
-                        widget.onUpdate(_pos, _size, _rot);
-                      },
-                    ),
-                  ),
-
-                  // TOP-RIGHT corner
-                  Positioned(
-                    top: -10 * handleScale,
-                    right: -10 * handleScale,
-                    child: _cornerHandle(
-                      size: 20 * handleScale,
-                      onDrag: (d) {
-                        final local = _rotateVector(d.delta, -_rot);
-                        setState(() {
-                          _pos += Offset(0, local.dy);
-                          _size = Size(
-                            (_size.width + local.dx).clamp(20, 5000),
-                            (_size.height - local.dy).clamp(20, 5000),
-                          );
-                        });
-                        widget.onUpdate(_pos, _size, _rot);
-                      },
-                    ),
-                  ),
-
-                  // BOTTOM-LEFT corner
-                  Positioned(
-                    bottom: -10 * handleScale,
-                    left: -10 * handleScale,
-                    child: _cornerHandle(
-                      size: 20 * handleScale,
-                      onDrag: (d) {
-                        final local = _rotateVector(d.delta, -_rot);
-                        setState(() {
-                          _pos += Offset(local.dx, 0);
-                          _size = Size(
-                            (_size.width - local.dx).clamp(20, 5000),
-                            (_size.height + local.dy).clamp(20, 5000),
-                          );
-                        });
-                        widget.onUpdate(_pos, _size, _rot);
-                      },
-                    ),
-                  ),
-
-                  // BOTTOM-RIGHT corner
-                  Positioned(
-                    bottom: -10 * handleScale,
-                    right: -10 * handleScale,
-                    child: _cornerHandle(
-                      size: 20 * handleScale,
-                      onDrag: (d) {
-                        final local = _rotateVector(d.delta, -_rot);
-                        setState(() {
-                          _size = Size(
-                            (_size.width + local.dx).clamp(20, 5000),
-                            (_size.height + local.dy).clamp(20, 5000),
-                          );
-                        });
-                        widget.onUpdate(_pos, _size, _rot);
-                      },
-                    ),
-                  ),
-                ],
-
-
               ],
             ),
           ),
         );
       },
-    );
-  }
-
-  Widget _cornerHandle({
-    required double size,
-    required Function(DragUpdateDetails) onDrag,
-  }) {
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onPanStart: (_) => widget.onDragStart(),
-      onPanUpdate: onDrag,
-      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
-      child: Container(
-        width: size, // large invisible touch area
-        height: size,
-        alignment: Alignment.center,
-        color: Colors.transparent,
-        child: Container(
-          width: 6 * (1 / widget.viewScale), // <<< tiny visual square
-          height: 6 * (1 / widget.viewScale), // <<< tiny visual square
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.white, width: 1),
-            shape: BoxShape.rectangle,
-          ),
-        ),
-      ),
     );
   }
 

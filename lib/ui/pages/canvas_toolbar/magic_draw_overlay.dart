@@ -4,9 +4,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 // --- HELPER CLASS FOR DROPDOWN ---
 class AIModelOption {
-  final String id; // 'flask' or 'api'
-  final String name; // Display Name
-  final String? badge; // Optional badge
+  final String id;
+  final String name;
+  final String? badge;
 
   AIModelOption({required this.id, required this.name, this.badge});
 }
@@ -20,15 +20,15 @@ class MagicDrawTools extends StatefulWidget {
   final Function(double) onWidthChanged;
   final Function(bool) onEraserToggle;
   final VoidCallback onClose;
-
-  // CHANGED: Accepts Prompt AND Model ID
   final Function(String prompt, String modelId) onPromptSubmit;
-
   final bool isProcessing;
   final List<Color> brandColors;
   final Function(bool) onViewModeToggle;
   final Function(bool) onMagicPanelActivityToggle;
   final bool isMagicPanelDisabled;
+
+  // NEW: To decide which dropdown list to show
+  final bool hasImageLayers;
 
   const MagicDrawTools({
     super.key,
@@ -46,6 +46,7 @@ class MagicDrawTools extends StatefulWidget {
     required this.onViewModeToggle,
     required this.onMagicPanelActivityToggle,
     required this.isMagicPanelDisabled,
+    required this.hasImageLayers, // <-- Added
   });
 
   @override
@@ -65,21 +66,55 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
   ];
 
   bool _isViewMode = false;
-
-  // --- DROPDOWN STATE ---
   bool _showModelMenu = false;
   late AIModelOption _selectedModel;
 
-  // --- DEFINE YOUR SERVICES HERE ---
-  final List<AIModelOption> _aiModels = [
-    AIModelOption(id: 'flask', name: 'Inpainting', badge: null),
-    AIModelOption(id: 'api', name: 'Inpainting API', badge: null),
+  // --- 1. LIST FOR INPAINTING (When Image Exists) ---
+  final List<AIModelOption> _inpaintingModels = [
+    AIModelOption(
+      id: 'inpaint_standard',
+      name: 'Standard Inpainting',
+      badge: null,
+    ),
+    AIModelOption(id: 'inpaint_api', name: 'Inpainting API', badge: 'Pro'),
+  ];
+
+  // --- 2. LIST FOR SKETCH TO IMAGE (When No Image Exists) ---
+  final List<AIModelOption> _sketchModels = [
+    AIModelOption(id: 'sketch_fusion', name: 'Slider Fusion', badge: null),
+    AIModelOption(
+      id: 'sketch_advanced',
+      name: 'Advanced Fusion',
+      badge: 'Fastest',
+    ),
+    AIModelOption(id: 'sketch_creative', name: 'Creative Flow', badge: 'New'),
   ];
 
   @override
   void initState() {
     super.initState();
-    _selectedModel = _aiModels.first; // Default to first option
+    _updateSelectedModelGroup();
+  }
+
+  @override
+  void didUpdateWidget(MagicDrawTools oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If the layer state changes (image added/removed), reset selection to correct group
+    if (oldWidget.hasImageLayers != widget.hasImageLayers) {
+      _updateSelectedModelGroup();
+    }
+  }
+
+  void _updateSelectedModelGroup() {
+    if (widget.hasImageLayers) {
+      _selectedModel = _inpaintingModels.first;
+    } else {
+      _selectedModel = _sketchModels.first;
+    }
+  }
+
+  List<AIModelOption> get _currentModelList {
+    return widget.hasImageLayers ? _inpaintingModels : _sketchModels;
   }
 
   @override
@@ -92,10 +127,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
   }
 
   void _handleSubmit() {
-    if (_promptController.text.trim().isNotEmpty &&
-        !widget.isProcessing &&
-        !widget.isMagicPanelDisabled) {
-      // PASS SELECTED MODEL ID
+    if (!widget.isProcessing && !widget.isMagicPanelDisabled) {
       widget.onPromptSubmit(_promptController.text.trim(), _selectedModel.id);
     }
   }
@@ -105,16 +137,14 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
     setState(() {
       _isViewMode = newViewMode;
       _showStrokeSlider = false;
-      _showModelMenu = false; // Close menu if view mode toggled
+      _showModelMenu = false;
     });
     widget.onViewModeToggle(newViewMode);
   }
 
-  // NEW: Toggle Dropdown Visibility
   void _toggleModelMenu() {
     setState(() {
-      if (!_showModelMenu)
-        _showStrokeSlider = false; // Close slider if menu opens
+      if (!_showModelMenu) _showStrokeSlider = false;
       _showModelMenu = !_showModelMenu;
     });
   }
@@ -122,7 +152,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
   void _handleToolTap(VoidCallback toolAction) {
     setState(() {
       _showStrokeSlider = false;
-      _showModelMenu = false; // Close menu on tool tap
+      _showModelMenu = false;
       if (_isViewMode) {
         _isViewMode = false;
         widget.onViewModeToggle(false);
@@ -148,7 +178,6 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
           if (_showStrokeSlider) _buildTaperedStrokeSlider(),
           const SizedBox(height: 8),
 
-          // WRAPPER CONTAINER FOR MENU + PANEL
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -164,9 +193,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // RENDER DROPDOWN ON TOP
                 if (_showModelMenu) _buildModelDropdown(),
-
                 _buildMagicDrawPanel(),
               ],
             ),
@@ -204,20 +231,19 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
     );
   }
 
-  // --- NEW: DROPDOWN MENU UI ---
   Widget _buildModelDropdown() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Local',
-            style: TextStyle(color: Colors.grey, fontSize: 12),
+          Text(
+            widget.hasImageLayers ? 'Inpainting Models' : 'Sketch Models',
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
           ),
           const SizedBox(height: 4),
 
-          ..._aiModels.map((model) {
+          ..._currentModelList.map((model) {
             final isSelected = model.id == _selectedModel.id;
             return GestureDetector(
               onTap: () {
@@ -283,7 +309,6 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
           padding: const EdgeInsets.all(8.0),
           child: Row(
             children: [
-              // --- TRIGGER ICON FOR DROPDOWN ---
               GestureDetector(
                 onTap: _toggleModelMenu,
                 child: Container(
@@ -294,7 +319,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
-                    Icons.star_half, // Using star icon as requested
+                    Icons.star_half,
                     color: Color(0xFFD8705D),
                     size: 20,
                   ),
@@ -350,7 +375,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
             children: [
               _buildToolIcon(Icons.pan_tool, widget.isMagicPanelDisabled, () {
                 setState(() => _showStrokeSlider = false);
-                _showModelMenu = false; // Close menu
+                _showModelMenu = false;
 
                 if (!widget.isMagicPanelDisabled) {
                   widget.onEraserToggle(false);
@@ -366,7 +391,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                 () {
                   setState(() {
                     _showStrokeSlider = false;
-                    _showModelMenu = false; // Close menu
+                    _showModelMenu = false;
                   });
 
                   if (_isViewMode) {
@@ -421,7 +446,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
 
                   setState(() {
                     _showStrokeSlider = !_showStrokeSlider;
-                    _showModelMenu = false; // Close menu
+                    _showModelMenu = false;
                   });
                 },
                 child: Container(
@@ -1002,7 +1027,6 @@ class _AdvancedColorPickerSheetState extends State<_AdvancedColorPickerSheet>
                 ],
               ),
             ),
-            // EXCLUDED: Gradient feature as requested.
           ],
         ),
       ),
