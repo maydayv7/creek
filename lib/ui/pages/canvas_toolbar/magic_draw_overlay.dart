@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-// Note: You must ensure flutter_svg is imported in this file and installed in pubspec.yaml
 import 'package:flutter_svg/flutter_svg.dart';
+
+// --- HELPER CLASS FOR DROPDOWN ---
+class AIModelOption {
+  final String id; // 'flask' or 'api'
+  final String name; // Display Name
+  final String? badge; // Optional badge
+
+  AIModelOption({required this.id, required this.name, this.badge});
+}
 
 class MagicDrawTools extends StatefulWidget {
   final bool isActive;
@@ -12,7 +20,10 @@ class MagicDrawTools extends StatefulWidget {
   final Function(double) onWidthChanged;
   final Function(bool) onEraserToggle;
   final VoidCallback onClose;
-  final Function(String) onPromptSubmit;
+
+  // CHANGED: Accepts Prompt AND Model ID
+  final Function(String prompt, String modelId) onPromptSubmit;
+
   final bool isProcessing;
   final List<Color> brandColors;
   final Function(bool) onViewModeToggle;
@@ -55,6 +66,22 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
 
   bool _isViewMode = false;
 
+  // --- DROPDOWN STATE ---
+  bool _showModelMenu = false;
+  late AIModelOption _selectedModel;
+
+  // --- DEFINE YOUR SERVICES HERE ---
+  final List<AIModelOption> _aiModels = [
+    AIModelOption(id: 'flask', name: 'Inpainting', badge: null),
+    AIModelOption(id: 'api', name: 'Inpainting API', badge: null),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedModel = _aiModels.first; // Default to first option
+  }
+
   @override
   void dispose() {
     if (_isViewMode) {
@@ -68,7 +95,8 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
     if (_promptController.text.trim().isNotEmpty &&
         !widget.isProcessing &&
         !widget.isMagicPanelDisabled) {
-      widget.onPromptSubmit(_promptController.text.trim());
+      // PASS SELECTED MODEL ID
+      widget.onPromptSubmit(_promptController.text.trim(), _selectedModel.id);
     }
   }
 
@@ -76,8 +104,34 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
     final newViewMode = !_isViewMode;
     setState(() {
       _isViewMode = newViewMode;
+      _showStrokeSlider = false;
+      _showModelMenu = false; // Close menu if view mode toggled
     });
     widget.onViewModeToggle(newViewMode);
+  }
+
+  // NEW: Toggle Dropdown Visibility
+  void _toggleModelMenu() {
+    setState(() {
+      if (!_showModelMenu)
+        _showStrokeSlider = false; // Close slider if menu opens
+      _showModelMenu = !_showModelMenu;
+    });
+  }
+
+  void _handleToolTap(VoidCallback toolAction) {
+    setState(() {
+      _showStrokeSlider = false;
+      _showModelMenu = false; // Close menu on tool tap
+      if (_isViewMode) {
+        _isViewMode = false;
+        widget.onViewModeToggle(false);
+      }
+      if (widget.isMagicPanelDisabled) {
+        widget.onMagicPanelActivityToggle(false);
+      }
+    });
+    toolAction();
   }
 
   @override
@@ -93,7 +147,30 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
         children: [
           if (_showStrokeSlider) _buildTaperedStrokeSlider(),
           const SizedBox(height: 8),
-          _buildMagicDrawPanel(),
+
+          // WRAPPER CONTAINER FOR MENU + PANEL
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // RENDER DROPDOWN ON TOP
+                if (_showModelMenu) _buildModelDropdown(),
+
+                _buildMagicDrawPanel(),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -127,228 +204,270 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
     );
   }
 
-  Widget _buildMagicDrawPanel() {
+  // --- NEW: DROPDOWN MENU UI ---
+  Widget _buildModelDropdown() {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 12,
-            offset: Offset(0, 4),
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Local',
+            style: TextStyle(color: Colors.grey, fontSize: 12),
           ),
+          const SizedBox(height: 4),
+
+          ..._aiModels.map((model) {
+            final isSelected = model.id == _selectedModel.id;
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedModel = model;
+                  _showModelMenu = false;
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.star_half,
+                      color: isSelected ? const Color(0xFFD8705D) : Colors.grey,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      model.name,
+                      style: TextStyle(
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (model.badge != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          model.badge!,
+                          style: TextStyle(
+                            color: Colors.blue.shade900,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+          Divider(height: 1, color: Colors.grey.shade100),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Container(
+    );
+  }
+
+  Widget _buildMagicDrawPanel() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            children: [
+              // --- TRIGGER ICON FOR DROPDOWN ---
+              GestureDetector(
+                onTap: _toggleModelMenu,
+                child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _showModelMenu ? Colors.grey.shade100 : Colors.white,
                     border: Border.all(color: Colors.grey.shade300),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
-                    Icons.emergency_recording,
+                    Icons.star_half, // Using star icon as requested
                     color: Color(0xFFD8705D),
                     size: 20,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _promptController,
-                    onSubmitted: (_) => _handleSubmit(),
-                    decoration: const InputDecoration.collapsed(
-                      hintText: "tap imagination...",
-                      hintStyle: TextStyle(fontSize: 14, color: Colors.black54),
-                    ),
+              ),
+
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _promptController,
+                  onSubmitted: (_) => _handleSubmit(),
+                  decoration: const InputDecoration.collapsed(
+                    hintText: "tap imagination...",
+                    hintStyle: TextStyle(fontSize: 14, color: Colors.black54),
                   ),
                 ),
-                const Icon(Icons.mic_none, color: Colors.grey),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _handleSubmit,
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF2B2B2B),
-                      shape: BoxShape.circle,
-                    ),
-                    child:
-                        widget.isProcessing
-                            ? const Padding(
-                              padding: EdgeInsets.all(12.0),
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                            : const Icon(
-                              Icons.auto_awesome,
+              ),
+              const Icon(Icons.mic_none, color: Colors.grey),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _handleSubmit,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF2B2B2B),
+                    shape: BoxShape.circle,
+                  ),
+                  child:
+                      widget.isProcessing
+                          ? const Padding(
+                            padding: EdgeInsets.all(12.0),
+                            child: CircularProgressIndicator(
                               color: Colors.white,
-                              size: 20,
+                              strokeWidth: 2,
                             ),
-                  ),
+                          )
+                          : const Icon(
+                            Icons.auto_awesome,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Divider(height: 1, color: Colors.grey.shade200),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildToolIcon(Icons.pan_tool, widget.isMagicPanelDisabled, () {
-                  setState(() => _showStrokeSlider = false);
+        ),
+        Divider(height: 1, color: Colors.grey.shade200),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildToolIcon(Icons.pan_tool, widget.isMagicPanelDisabled, () {
+                setState(() => _showStrokeSlider = false);
+                _showModelMenu = false; // Close menu
 
-                  // Deactivate drawing tools when hand icon is activated
+                if (!widget.isMagicPanelDisabled) {
+                  widget.onEraserToggle(false);
+                }
 
-                  if (!widget.isMagicPanelDisabled) {
-                    widget.onEraserToggle(false);
+                widget.onMagicPanelActivityToggle(!widget.isMagicPanelDisabled);
+              }),
+              _buildToolIcon(
+                'assets/icons/brush-line.svg',
+                !widget.isEraser &&
+                    !_isViewMode &&
+                    !widget.isMagicPanelDisabled,
+                () {
+                  setState(() {
+                    _showStrokeSlider = false;
+                    _showModelMenu = false; // Close menu
+                  });
+
+                  if (_isViewMode) {
+                    setState(() => _isViewMode = false);
+                    widget.onViewModeToggle(false);
+                  }
+                  if (widget.isMagicPanelDisabled) {
+                    widget.onMagicPanelActivityToggle(false);
                   }
 
-                  widget.onMagicPanelActivityToggle(
-                    !widget.isMagicPanelDisabled,
-                  );
-                }),
-                _buildToolIcon(
-                  'assets/icons/brush-line.svg',
+                  widget.onEraserToggle(false);
+                },
+              ),
 
-                  !widget.isEraser &&
-                      !_isViewMode &&
-                      !widget.isMagicPanelDisabled,
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showStrokeSlider = false;
+                    _showModelMenu = false;
+                  });
 
-                  () {
-                    setState(() => _showStrokeSlider = false);
+                  if (_isViewMode) {
+                    setState(() => _isViewMode = false);
+                    widget.onViewModeToggle(false);
+                  }
 
-                    if (_isViewMode) {
-                      setState(() => _isViewMode = false);
-
-                      widget.onViewModeToggle(false);
-                    }
-
-                    // Deactivate hand icon when brush is activated
-
-                    if (widget.isMagicPanelDisabled) {
-                      widget.onMagicPanelActivityToggle(false);
-                    }
-
-                    widget.onEraserToggle(false);
-                  },
-                ),
-
-                GestureDetector(
-                  onTap: () {
-                    setState(() => _showStrokeSlider = false);
-
-                    if (_isViewMode) {
-                      setState(() => _isViewMode = false);
-
-                      widget.onViewModeToggle(false);
-                    }
-
-                    _showAdvancedColorPicker(context);
-                  },
-
-                  child: Container(
-                    width: 28,
-
-                    height: 28,
-
-                    decoration: BoxDecoration(
-                      color: widget.selectedColor,
-
-                      shape: BoxShape.circle,
-
-                      border: Border.all(color: Colors.white, width: 2),
-
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                GestureDetector(
-                  onTap: () {
-                    if (_isViewMode) {
-                      setState(() => _isViewMode = false);
-
-                      widget.onViewModeToggle(false);
-                    }
-
-                    setState(() => _showStrokeSlider = !_showStrokeSlider);
-                  },
-
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-
-                    decoration: BoxDecoration(
-                      color:
-                          _showStrokeSlider
-                              ? Colors.grey.shade200
-                              : Colors.transparent,
-
-                      shape: BoxShape.circle,
-                    ),
-
-                    child: Container(
-                      width: 10,
-
-                      height: 10,
-
-                      decoration: const BoxDecoration(
-                        color: Colors.black87,
-
-                        shape: BoxShape.circle,
+                  _showAdvancedColorPicker(context);
+                },
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: widget.selectedColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
                       ),
+                    ],
+                  ),
+                ),
+              ),
+
+              GestureDetector(
+                onTap: () {
+                  if (_isViewMode) {
+                    setState(() => _isViewMode = false);
+                    widget.onViewModeToggle(false);
+                  }
+
+                  setState(() {
+                    _showStrokeSlider = !_showStrokeSlider;
+                    _showModelMenu = false; // Close menu
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color:
+                        _showStrokeSlider
+                            ? Colors.grey.shade200
+                            : Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: Colors.black87,
+                      shape: BoxShape.circle,
                     ),
                   ),
                 ),
+              ),
 
-                _buildToolIcon(
-                  'assets/icons/eraser-line.svg',
+              _buildToolIcon(
+                'assets/icons/eraser-line.svg',
+                widget.isEraser && !_isViewMode && !widget.isMagicPanelDisabled,
+                () {
+                  setState(() {
+                    _showStrokeSlider = false;
+                    _showModelMenu = false;
+                  });
 
-                  widget.isEraser &&
-                      !_isViewMode &&
-                      !widget.isMagicPanelDisabled,
+                  if (_isViewMode) {
+                    setState(() => _isViewMode = false);
+                    widget.onViewModeToggle(false);
+                  }
+                  if (widget.isMagicPanelDisabled) {
+                    widget.onMagicPanelActivityToggle(false);
+                  }
 
-                  () {
-                    setState(() => _showStrokeSlider = false);
-
-                    if (_isViewMode) {
-                      setState(() => _isViewMode = false);
-
-                      widget.onViewModeToggle(false);
-                    }
-
-                    // Deactivate hand icon when eraser is activated
-
-                    if (widget.isMagicPanelDisabled) {
-                      widget.onMagicPanelActivityToggle(false);
-                    }
-
-                    widget.onEraserToggle(true);
-                  },
-                ),
-              ],
-            ),
+                  widget.onEraserToggle(true);
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

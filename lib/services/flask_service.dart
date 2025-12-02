@@ -61,7 +61,7 @@ class FlaskService {
         "$stylePrompt. $userPrompt. The image features: $sketchDescription";
 
     debugPrint("🔗 [Pipeline] Generating base image...");
-    
+
     final String? generatedImagePath = await generateAndSaveImage(globalPrompt);
 
     if (generatedImagePath == null) {
@@ -71,7 +71,7 @@ class FlaskService {
 
     // 3. Remove Background (Pipeline Extension)
     debugPrint("🔗 [Pipeline] Removing background from generated result...");
-    
+
     // This returns the path to the no-background version
     return generateAsset(imagePath: generatedImagePath);
   }
@@ -114,34 +114,58 @@ class FlaskService {
     );
   }
 
+  /// [Inpainting]
+  Future<String?> inpaintApiImage({
+    required String imagePath,
+    required String maskPath,
+    required String prompt,
+  }) async {
+    final String? base64Image = await _encodeFile(imagePath);
+    final String? base64Mask = await _encodeFile(maskPath);
+
+    if (base64Image == null || base64Mask == null) return null;
+
+    return _performImageOperation(
+      endpoint: '/inpainting-api',
+      logPrefix: '🖌️ Inpainting',
+      body: {
+        'prompt': prompt,
+        'negative_prompt': 'blurry, bad quality, low res, ugly',
+        'image': base64Image,
+        'mask_image': base64Mask,
+      },
+      filenamePrefix: 'inpaint_$prompt',
+    );
+  }
+
   /// [Background Removal]
   Future<String?> generateAsset({required String imagePath}) async {
     // 1. Prepare and Upload
     final String? base64Image = await _encodeFile(imagePath);
     if (base64Image == null) return null;
-  
+
     final String? generatedAssetPath = await _performImageOperation(
       fullUrl: _urlAsset,
       logPrefix: '✂️ Asset Gen',
       body: {'image': base64Image},
       filenamePrefix: 'asset',
     );
-  
+
     // 2. Resolve Project ID and Save
     if (generatedAssetPath != null) {
       int? projectId;
-  
+
       // --- CHECK 1: Is this a Main Image? ---
       final imageModel = await _imageRepo.getByFilePath(imagePath);
       if (imageModel != null) {
         projectId = imageModel.projectId;
       }
-  
+
       // --- CHECK 2: Is this a Note Crop? (NEW) ---
       if (projectId == null) {
         // You need a method in NoteRepo to find a note by its crop path
-        final noteModel = await _noteRepo.getByCropPath(imagePath); 
-        
+        final noteModel = await _noteRepo.getByCropPath(imagePath);
+
         if (noteModel != null) {
           // Traverse up: Note -> Parent Image -> Project
           final parentImage = await _imageRepo.getById(noteModel.imageId);
@@ -151,7 +175,7 @@ class FlaskService {
           }
         }
       }
-  
+
       // --- CHECK 3: Is this a generic File? ---
       if (projectId == null) {
         final fileModel = await _fileRepo.getByFilePath(imagePath);
@@ -159,12 +183,12 @@ class FlaskService {
           projectId = fileModel.projectId;
         }
       }
-  
+
       // 3. Update the Project
       if (projectId != null) {
         final project = await _projectRepo.getProjectById(projectId);
         if (project != null) {
-          project.assetsPath.add(generatedAssetPath); 
+          project.assetsPath.add(generatedAssetPath);
           await _projectRepo.updateAssets(projectId, project.assetsPath);
           debugPrint("✅ Asset path saved to Project DB: $generatedAssetPath");
         }
@@ -172,7 +196,7 @@ class FlaskService {
         debugPrint("⚠️ Asset generated but could not link to a Project ID.");
       }
     }
-  
+
     return generatedAssetPath;
   }
 
@@ -226,7 +250,9 @@ class FlaskService {
       return _saveImageFromResponse(response, filenamePrefix);
     }
 
-    debugPrint("❌ $logPrefix Failed: ${response?.statusCode ?? 'No Connection'}");
+    debugPrint(
+      "❌ $logPrefix Failed: ${response?.statusCode ?? 'No Connection'}",
+    );
     return null;
   }
 

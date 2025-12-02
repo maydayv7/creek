@@ -1244,7 +1244,9 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                   onColorChanged: (c) => setState(() => _selectedColor = c),
                   onWidthChanged: (w) => setState(() => _strokeWidth = w),
                   onEraserToggle: (e) => setState(() => _isEraser = e),
-                  onPromptSubmit: (prompt) => _processInpainting(prompt),
+                  onPromptSubmit:
+                      (prompt, serviceId) =>
+                          _processInpainting(prompt, serviceId),
                   isProcessing: _isInpainting,
                   onMagicPanelActivityToggle:
                       (disabled) =>
@@ -1438,7 +1440,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     });
   }
 
-  Future<void> _processInpainting(String prompt) async {
+  Future<void> _processInpainting(String prompt, String serviceId) async {
     if (prompt.isEmpty) {
       ScaffoldMessenger.of(
         context,
@@ -1450,44 +1452,48 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     _resetInactivityTimer();
 
     try {
-      // 1. Check for Image Layers
       bool hasImageLayers = elements.any((e) => e['type'] == 'file_image');
 
-      if (hasImageLayers) {
-        // --- INPAINTING FLOW (Existing) ---
-        if (_tempBaseImage == null) {
-          _tempBaseImage = await _captureCanvasToFile();
-        }
+      if (_tempBaseImage == null) {
+        _tempBaseImage = await _captureCanvasToFile();
+      }
+      if (_tempBaseImage == null) return;
 
-        if (_tempBaseImage == null) return;
+      File? maskFile = await _generateMaskImageFromPaths(
+        _magicPaths,
+        _canvasSize,
+        _tempBaseImage,
+      );
+      if (maskFile == null) throw Exception("Failed to generate mask");
 
-        File? maskFile = await _generateMaskImageFromPaths(
-          _magicPaths,
-          _canvasSize,
-          _tempBaseImage,
-        );
+      String? newImageUrl;
 
-        if (maskFile == null) throw Exception("Failed to generate mask");
-
-        final String? newImageUrl = await FlaskService().inpaintImage(
+      // --- SWITCH SERVICE ---
+      if (serviceId == 'api') {
+        // Call the dedicated API endpoint
+        newImageUrl = await FlaskService().inpaintApiImage(
           imagePath: _tempBaseImage!.path,
           maskPath: maskFile.path,
           prompt: prompt,
         );
-
-        _addGeneratedImage(newImageUrl);
       } else {
-        // --- SKETCH-TO-IMAGE FLOW (New) ---
-        // Capture the entire canvas (strokes only since no images exist)
-        File? sketchFile = await _captureCanvasToFile();
-        if (sketchFile == null) throw Exception("Failed to capture sketch");
+        // Default 'flask' service logic
+        if (hasImageLayers) {
+          newImageUrl = await FlaskService().inpaintImage(
+            imagePath: _tempBaseImage!.path,
+            maskPath: maskFile.path,
+            prompt: prompt,
+          );
+        } else {
+          newImageUrl = await FlaskService().sketchToImage(
+            sketchPath: _tempBaseImage!.path,
+            userPrompt: prompt,
+            stylePrompt: "high quality, realistic",
+          );
+        }
+      }
 
-        final String? newImageUrl = await FlaskService().sketchToImage(
-          sketchPath: sketchFile.path,
-          userPrompt: prompt,
-          stylePrompt: "high quality, realistic", // Default style
-        );
-
+      if (newImageUrl != null) {
         _addGeneratedImage(newImageUrl);
       }
     } catch (e) {
@@ -1500,7 +1506,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         _isInpainting = false;
         _tempBaseImage = null;
         _magicPaths.clear();
-        _magicDrawChangeStack.clear(); // <--- ADD THIS
+        _magicDrawChangeStack.clear();
       });
     }
   }
@@ -2134,7 +2140,7 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
   }
 
   Widget _cornerHandle({
-    required double size, 
+    required double size,
     required Function(DragUpdateDetails) onDrag,
   }) {
     return GestureDetector(
