@@ -1810,6 +1810,12 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
   late Offset _pos;
   late Size _size;
   late double _rot;
+  
+  // Gesture state
+  double _initialRotation = 0.0;
+  double _initialScale = 1.0;
+  bool _isTwoFingerGesture = false;
+  Offset _previousFocalPoint = Offset.zero;
 
   @override
   void initState() {
@@ -1853,19 +1859,67 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
               clipBehavior: Clip.none,
               children: [
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: widget.onTap,
                   onDoubleTap: widget.onDoubleTap,
-                  //moving element on drag works
-                  onPanStart: (_) => widget.onDragStart(),
-                  onPanUpdate: (details) {
+                  // Handle both single-finger drag and two-finger rotate/zoom using scale gestures
+                  onScaleStart: (details) {
                     if (widget.isSelected && !widget.isEditing) {
-                      final delta = details.delta;
-                      final rotated = _rotateVector(delta, _rot);
-                      setState(() => _pos += rotated);
-                      widget.onUpdate(_pos, _size, _rot);
+                      _previousFocalPoint = details.focalPoint;
+                      if (details.pointerCount == 2) {
+                        // Two-finger gesture: rotate and zoom
+                        _isTwoFingerGesture = true;
+                        _initialRotation = _rot;
+                        _initialScale = _size.width * _size.height;
+                      } else {
+                        // Single-finger gesture: prepare for drag
+                        _isTwoFingerGesture = false;
+                      }
+                      widget.onDragStart();
                     }
                   },
-                  onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
+                  onScaleUpdate: (details) {
+                    if (widget.isSelected && !widget.isEditing) {
+                      if (_isTwoFingerGesture && details.pointerCount == 2) {
+                        // Two-finger: handle rotation and zoom
+                        final newRotation = _initialRotation + details.rotation;
+                        
+                        // Handle scale (zoom) - maintain aspect ratio
+                        final scaleFactor = details.scale;
+                        final newArea = _initialScale * scaleFactor * scaleFactor;
+                        final aspectRatio = _size.width / _size.height;
+                        final newWidth = math.sqrt(newArea * aspectRatio).clamp(20.0, 5000.0);
+                        final newHeight = newWidth / aspectRatio;
+                        
+                        setState(() {
+                          _rot = newRotation % (2 * math.pi);
+                          _size = Size(newWidth, newHeight);
+                        });
+                        
+                        widget.onUpdate(_pos, _size, _rot);
+                      } else if (!_isTwoFingerGesture && details.pointerCount == 1) {
+                        // Single-finger: handle drag using incremental focal point delta
+                        final currentFocalPoint = details.focalPoint;
+                        final delta = currentFocalPoint - _previousFocalPoint;
+                        // Convert to canvas coordinates by dividing by zoom
+                        final zoom = widget.viewScale;
+                        final scaledDelta = delta / zoom;
+                        // Rotate delta to account for element rotation
+                        final rotated = _rotateVector(scaledDelta, -_rot);
+                        setState(() {
+                          _pos += rotated;
+                          _previousFocalPoint = currentFocalPoint; // Update for next frame
+                        });
+                        widget.onUpdate(_pos, _size, _rot);
+                      }
+                    }
+                  },
+                  onScaleEnd: (details) {
+                    if (widget.isSelected && !widget.isEditing) {
+                      _isTwoFingerGesture = false;
+                      widget.onDragEnd(_pos, _size, _rot);
+                    }
+                  },
                   child: Container(
                     width: _size.width,
                     height: _size.height,
@@ -2070,51 +2124,7 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                   ),
                 ],
 
-                // move not working
-                if (widget.isSelected && !widget.isEditing)
-                  Positioned(
-                    bottom: -buttonSize - 12,
-                    left: _size.width / 2 - buttonSize - 8,
-                    child: _buildCircleButton(
-                      size: buttonSize,
-                      icon: Icons.open_with,
-                      iconSize: iconSize,
-                      onDrag: (d) {
-                        // FIX 1: Convert screen pixel delta (d.delta) to world/canvas units by dividing by zoom.
-                        final scaledDelta = d.delta / zoom;
 
-                        // FIX 2: Un-rotate the delta by the inverse of the element's rotation.
-                        // This translates the screen drag back to the element's un-rotated position space.
-                        final finalDelta = _rotateVector(scaledDelta, -_rot);
-
-                        setState(() {
-                          _pos += finalDelta;
-                        });
-                        widget.onUpdate(_pos, _size, _rot);
-                      },
-                    ),
-                  ),
-
-                //rotate not working
-                if (widget.isSelected && !widget.isEditing)
-                  Positioned(
-                    bottom: -buttonSize - 12,
-                    left: _size.width / 2 + 8,
-                    child: _buildCircleButton(
-                      size: buttonSize,
-                      icon: Icons.rotate_right,
-                      iconSize: iconSize,
-                      onDrag: (d) {
-                        widget.onDragStart();
-
-                        // FIX 3: Ensures responsive rotation by increasing the multiplier.
-                        setState(() {
-                          _rot += d.delta.dx * 0.05; // Increased sensitivity
-                        });
-                        widget.onUpdate(_pos, _size, _rot);
-                      },
-                    ),
-                  ),
               ],
             ),
           ),

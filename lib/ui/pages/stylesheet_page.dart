@@ -251,6 +251,11 @@ class _StylesheetPageState extends State<StylesheetPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Regenerate Button
+            Center(
+              child: _buildGenerateButton("Regenerate Stylesheet"),
+            ),
+            const SizedBox(height: 24),
             // Logos Section - always show for manual upload
             _buildLogosSection(null),
             
