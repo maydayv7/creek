@@ -468,13 +468,11 @@ class FlaskService {
     required String imagePath,
     String prompt = '<MORE_DETAILED_CAPTION>',
   }) async {
-    debugPrint("👁️ [Describe] Preparing request...");
-
     final String? base64Image = await _encodeFile(imagePath);
     if (base64Image == null) return null;
 
     final response = await _postRequest(
-      endpoint: '/describe',
+      fullUrl: _urlDescribe,
       body: {'image': base64Image, 'prompt': prompt},
     );
 
@@ -495,34 +493,56 @@ class FlaskService {
   // ===========================================================================
 
   Future<String?> _performImageOperation({
-    required String endpoint,
+    String? endpoint,
+    String? fullUrl,
     required String logPrefix,
     required Map<String, dynamic> body,
     required String filenamePrefix,
   }) async {
-    final fullUrl = "$_serverUrl$endpoint";
-    debugPrint("$logPrefix Sending request to $fullUrl...");
+    String url;
+    if (fullUrl != null) {
+      url = fullUrl;
+    } else if (endpoint != null) {
+      // Map endpoints to their corresponding URL getters
+      switch (endpoint) {
+        case '/generate':
+          url = _urlGenerate;
+          break;
+        case '/inpainting':
+          url = _urlInpainting;
+          break;
+        case '/asset':
+          url = _urlAsset;
+          break;
+        case '/describe':
+          url = _urlDescribe;
+          break;
+        default:
+          url = '';
+      }
+    } else {
+      return null;
+    }
 
-    final response = await _postRequest(endpoint: endpoint, body: body);
+    if (url.isEmpty) {
+      return null;
+    }
+
+    final response = await _postRequest(fullUrl: url, body: body);
 
     if (response != null && response.statusCode == 200) {
       return _saveImageFromResponse(response, filenamePrefix);
     }
 
-    debugPrint(
-      "❌ $logPrefix Failed: ${response?.statusCode ?? 'No Connection'}",
-    );
     return null;
   }
 
   Future<http.Response?> _postRequest({
-    required String endpoint,
+    required String fullUrl,
     required Map<String, dynamic> body,
   }) async {
     try {
-      final fullUrl = "$_serverUrl$endpoint";
-      if (_serverUrl.isEmpty) {
-        debugPrint("❌ Config Error: SERVER_URL is missing in .env");
+      if (fullUrl.isEmpty) {
         return null;
       }
       return await http.post(
@@ -531,7 +551,6 @@ class FlaskService {
         body: jsonEncode(body),
       );
     } catch (e) {
-      debugPrint("❌ Network Error: $e");
       return null;
     }
   }
