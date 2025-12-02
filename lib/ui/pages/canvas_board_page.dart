@@ -463,8 +463,11 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 
   void _handleGestureStart() {
     // Check if we need to capture a clean base image
-    if (_isMagicDrawActive && !_isInpainting && _tempBaseImage == null) {
-      _ensureBaseImageCaptured();
+    if (_isMagicDrawActive) {
+      if (!_isInpainting && _tempBaseImage == null) {
+        _ensureBaseImageCaptured();
+      }
+      return;
     }
     _gestureStartSnapshot = _getCurrentState();
   }
@@ -1622,7 +1625,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                 'assets/icons/arrow-go-back-line.svg',
                 width: 22,
                 colorFilter: ColorFilter.mode(
-                  _changeStack.canUndo ? Colors.black : Colors.grey[400]!,
+                  canUndo ? Colors.black : Colors.grey[400]!,
                   BlendMode.srcIn,
                 ),
               ),
@@ -1641,7 +1644,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                 'assets/icons/arrow-go-forward-line.svg',
                 width: 22,
                 colorFilter: ColorFilter.mode(
-                  _changeStack.canRedo ? Colors.black : Colors.grey[400]!,
+                  canRedo ? Colors.black : Colors.grey[400]!,
                   BlendMode.srcIn,
                 ),
               ),
