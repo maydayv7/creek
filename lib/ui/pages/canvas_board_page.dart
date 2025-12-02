@@ -820,12 +820,20 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         if (widget.injectedMedia != null) {
           final oldState = _getCurrentState();
           setState(() {
+            final double imageWidth =
+                _canvasSize.width * 0.4; // 40% of canvas width
+            final double imageHeight =
+                _canvasSize.height * 0.4; // 40% of canvas height
+            final Offset centeredPosition = Offset(
+              (_canvasSize.width - imageWidth) / 2,
+              (_canvasSize.height - imageHeight) / 2,
+            );
             elements.add({
               'id': 'shared_${DateTime.now().millisecondsSinceEpoch}',
               'type': 'file_image',
               'content': widget.injectedMedia!.path,
-              'position': const Offset(50, 50),
-              'size': const Size(150, 150),
+              'position': centeredPosition,
+              'size': Size(imageWidth, imageHeight),
               'rotation': 0.0,
             });
           });
@@ -928,13 +936,21 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     final oldState = _getCurrentState();
     setState(() {
       for (var path in paths) {
+        final double imageWidth =
+            _canvasSize.width * 0.4; // 40% of canvas width
+        final double imageHeight =
+            _canvasSize.height * 0.4; // 40% of canvas height
+        final Offset centeredPosition = Offset(
+          (_canvasSize.width - imageWidth) / 2,
+          (_canvasSize.height - imageHeight) / 2,
+        );
         elements.add({
           'id':
               'asset_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(1000)}',
           'type': 'file_image',
           'content': path,
-          'position': const Offset(50, 50),
-          'size': const Size(150, 150),
+          'position': centeredPosition,
+          'size': Size(imageWidth, imageHeight),
           'rotation': 0.0,
         });
       }
@@ -1709,12 +1725,20 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       final oldState = _getCurrentState();
       setState(() {
         for (int i = 0; i < images.length; i++) {
+          final double imageWidth =
+              _canvasSize.width * 0.4; // 40% of canvas width
+          final double imageHeight =
+              _canvasSize.height * 0.4; // 40% of canvas height
+          final Offset centeredPosition = Offset(
+            (_canvasSize.width - imageWidth) / 2,
+            (_canvasSize.height - imageHeight) / 2,
+          );
           elements.add({
             'id': '${DateTime.now().millisecondsSinceEpoch}_$i',
             'type': 'file_image',
             'content': images[i].path,
-            'position': const Offset(50, 50),
-            'size': const Size(150, 150),
+            'position': centeredPosition,
+            'size': Size(imageWidth, imageHeight),
             'rotation': 0.0,
           });
         }
@@ -1807,10 +1831,11 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
     return ValueListenableBuilder(
       valueListenable: widget.transformationController,
       builder: (context, matrix, child) {
-        final double currentZoom = matrix.getMaxScaleOnAxis();
-        final double handleScale = (1.0 / currentZoom).clamp(0.1, 5.0);
-        final double touchTargetSize = 40.0 * handleScale;
-        final double visualSize = 24.0 * handleScale;
+        final double zoom = matrix.getMaxScaleOnAxis();
+        final double handleScale = (1 / zoom).clamp(0.2, 5.0);
+        final double edgeThickness = 18 * handleScale;
+        final double buttonSize = 32 * handleScale;
+        final double iconSize = 14 * handleScale;
 
         return Positioned(
           left: _pos.dx,
@@ -1821,15 +1846,15 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
               clipBehavior: Clip.none,
               children: [
                 GestureDetector(
-                  behavior: HitTestBehavior.translucent,
                   onTap: widget.onTap,
                   onDoubleTap: widget.onDoubleTap,
+                  //moving element on drag works
                   onPanStart: (_) => widget.onDragStart(),
                   onPanUpdate: (details) {
                     if (widget.isSelected && !widget.isEditing) {
                       final delta = details.delta;
-                      final globalDelta = _rotateVector(delta, _rot);
-                      setState(() => _pos += globalDelta);
+                      final rotated = _rotateVector(delta, _rot);
+                      setState(() => _pos += rotated);
                       widget.onUpdate(_pos, _size, _rot);
                     }
                   },
@@ -1837,22 +1862,17 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                   child: Container(
                     width: _size.width,
                     height: _size.height,
-                    decoration: BoxDecoration(
-                      border:
-                          widget.isSelected
-                              ? Border.all(
-                                color: Colors.blue,
-                                width: 2.0 * handleScale,
-                              )
-                              : (widget.type == 'text'
-                                  ? Border.all(
-                                    color: Colors.grey.withOpacity(0.3),
-                                    width: 1.0 * handleScale,
-                                  )
-                                  : null),
-                    ),
+                    decoration:
+                        widget.isSelected
+                            ? BoxDecoration(
+                              border: Border.all(
+                                color: Color(0xFFB44CFF),
+                                width: 2 * handleScale,
+                              ),
+                            )
+                            : null,
                     child:
-                        widget.type == 'file_image'
+                        widget.type == "file_image"
                             ? Image.file(
                               File(widget.content),
                               fit: BoxFit.contain,
@@ -1860,54 +1880,296 @@ class _ManipulatingBoxState extends State<_ManipulatingBox> {
                             : _buildText(),
                   ),
                 ),
-                if (widget.isSelected && !widget.isEditing) ...[
+
+                // ======================
+                //  RESIZE EDGES (4 SIDES)
+                // ======================
+
+                // RIGHT edge
+                if (widget.isSelected && !widget.isEditing)
                   Positioned(
-                    right: -visualSize / 2,
-                    bottom: -visualSize / 2,
-                    child: _buildHandle(
-                      touchSize: touchTargetSize,
-                      visualSize: visualSize,
-                      icon: Icons.zoom_out_map,
-                      color: Colors.blue,
-                      onDrag: (delta) {
+                    right: -edgeThickness / 2,
+                    top: 0,
+                    bottom: 0,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onPanUpdate: (d) {
                         setState(() {
-                          final localDelta = _rotateVector(delta, -_rot);
+                          _size = Size(_size.width + d.delta.dx, _size.height);
+                        });
+                        widget.onUpdate(_pos, _size, _rot);
+                      },
+                      onPanStart: (_) => widget.onDragStart(),
+                      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
+                      child: Container(
+                        width: edgeThickness,
+                        color: Colors.transparent,
+                      ),
+                    ),
+                  ),
+
+                // LEFT edge
+                if (widget.isSelected && !widget.isEditing)
+                  Positioned(
+                    left: -edgeThickness / 2,
+                    top: 0,
+                    bottom: 0,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onPanUpdate: (d) {
+                        setState(() {
+                          _pos += Offset(d.delta.dx, 0);
+                          _size = Size(_size.width - d.delta.dx, _size.height);
+                        });
+                        widget.onUpdate(_pos, _size, _rot);
+                      },
+                      onPanStart: (_) => widget.onDragStart(),
+                      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
+                      child: Container(
+                        width: edgeThickness,
+                        color: Colors.transparent,
+                      ),
+                    ),
+                  ),
+
+                // TOP edge
+                if (widget.isSelected && !widget.isEditing)
+                  Positioned(
+                    top: -edgeThickness / 2,
+                    left: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onPanUpdate: (d) {
+                        setState(() {
+                          _pos += Offset(0, d.delta.dy);
+                          _size = Size(_size.width, _size.height - d.delta.dy);
+                        });
+                        widget.onUpdate(_pos, _size, _rot);
+                      },
+                      onPanStart: (_) => widget.onDragStart(),
+                      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
+                      child: Container(
+                        height: edgeThickness,
+                        color: Colors.transparent,
+                      ),
+                    ),
+                  ),
+
+                // BOTTOM edge
+                if (widget.isSelected && !widget.isEditing)
+                  Positioned(
+                    bottom: -edgeThickness / 2,
+                    left: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onPanUpdate: (d) {
+                        setState(() {
+                          _size = Size(_size.width, _size.height + d.delta.dy);
+                        });
+                        widget.onUpdate(_pos, _size, _rot);
+                      },
+                      onPanStart: (_) => widget.onDragStart(),
+                      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
+                      child: Container(
+                        height: edgeThickness,
+                        color: Colors.transparent,
+                      ),
+                    ),
+                  ),
+
+                // ======================
+                //  CORNER RESIZE HANDLES
+                // ======================
+                if (widget.isSelected && !widget.isEditing) ...[
+                  // TOP-LEFT corner
+                  Positioned(
+                    top: -10 * handleScale,
+                    left: -10 * handleScale,
+                    child: _cornerHandle(
+                      size: 20 * handleScale,
+                      onDrag: (d) {
+                        final local = _rotateVector(d.delta, -_rot);
+                        setState(() {
+                          _pos += Offset(local.dx, local.dy);
                           _size = Size(
-                            (_size.width + localDelta.dx).clamp(50.0, 10000.0),
-                            (_size.height + localDelta.dy).clamp(30.0, 10000.0),
+                            (_size.width - local.dx).clamp(20, 5000),
+                            (_size.height - local.dy).clamp(20, 5000),
                           );
-                          final offset = Offset(
-                            localDelta.dx / 2,
-                            localDelta.dy / 2,
-                          );
-                          _pos += _rotateVector(offset, _rot);
                         });
                         widget.onUpdate(_pos, _size, _rot);
                       },
                     ),
                   ),
+
+                  // TOP-RIGHT corner
                   Positioned(
-                    right: -visualSize / 2,
-                    top: -visualSize / 2,
-                    child: _buildHandle(
-                      touchSize: touchTargetSize,
-                      visualSize: visualSize,
-                      icon: Icons.rotate_right,
-                      color: Colors.green,
-                      onDrag: (delta) {
+                    top: -10 * handleScale,
+                    right: -10 * handleScale,
+                    child: _cornerHandle(
+                      size: 20 * handleScale,
+                      onDrag: (d) {
+                        final local = _rotateVector(d.delta, -_rot);
                         setState(() {
-                          _rot += (delta.dx + delta.dy) * 0.005;
+                          _pos += Offset(0, local.dy);
+                          _size = Size(
+                            (_size.width + local.dx).clamp(20, 5000),
+                            (_size.height - local.dy).clamp(20, 5000),
+                          );
+                        });
+                        widget.onUpdate(_pos, _size, _rot);
+                      },
+                    ),
+                  ),
+
+                  // BOTTOM-LEFT corner
+                  Positioned(
+                    bottom: -10 * handleScale,
+                    left: -10 * handleScale,
+                    child: _cornerHandle(
+                      size: 20 * handleScale,
+                      onDrag: (d) {
+                        final local = _rotateVector(d.delta, -_rot);
+                        setState(() {
+                          _pos += Offset(local.dx, 0);
+                          _size = Size(
+                            (_size.width - local.dx).clamp(20, 5000),
+                            (_size.height + local.dy).clamp(20, 5000),
+                          );
+                        });
+                        widget.onUpdate(_pos, _size, _rot);
+                      },
+                    ),
+                  ),
+
+                  // BOTTOM-RIGHT corner
+                  Positioned(
+                    bottom: -10 * handleScale,
+                    right: -10 * handleScale,
+                    child: _cornerHandle(
+                      size: 20 * handleScale,
+                      onDrag: (d) {
+                        final local = _rotateVector(d.delta, -_rot);
+                        setState(() {
+                          _size = Size(
+                            (_size.width + local.dx).clamp(20, 5000),
+                            (_size.height + local.dy).clamp(20, 5000),
+                          );
                         });
                         widget.onUpdate(_pos, _size, _rot);
                       },
                     ),
                   ),
                 ],
+
+                // move not working
+                if (widget.isSelected && !widget.isEditing)
+                  Positioned(
+                    bottom: -buttonSize - 12,
+                    left: _size.width / 2 - buttonSize - 8,
+                    child: _buildCircleButton(
+                      size: buttonSize,
+                      icon: Icons.open_with,
+                      iconSize: iconSize,
+                      onDrag: (d) {
+                        // FIX 1: Convert screen pixel delta (d.delta) to world/canvas units by dividing by zoom.
+                        final scaledDelta = d.delta / zoom;
+
+                        // FIX 2: Un-rotate the delta by the inverse of the element's rotation.
+                        // This translates the screen drag back to the element's un-rotated position space.
+                        final finalDelta = _rotateVector(scaledDelta, -_rot);
+
+                        setState(() {
+                          _pos += finalDelta;
+                        });
+                        widget.onUpdate(_pos, _size, _rot);
+                      },
+                    ),
+                  ),
+
+                //rotate not working
+                if (widget.isSelected && !widget.isEditing)
+                  Positioned(
+                    bottom: -buttonSize - 12,
+                    left: _size.width / 2 + 8,
+                    child: _buildCircleButton(
+                      size: buttonSize,
+                      icon: Icons.rotate_right,
+                      iconSize: iconSize,
+                      onDrag: (d) {
+                        widget.onDragStart();
+
+                        // FIX 3: Ensures responsive rotation by increasing the multiplier.
+                        setState(() {
+                          _rot += d.delta.dx * 0.05; // Increased sensitivity
+                        });
+                        widget.onUpdate(_pos, _size, _rot);
+                      },
+                    ),
+                  ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _cornerHandle({
+    required double size, 
+    required Function(DragUpdateDetails) onDrag,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanStart: (_) => widget.onDragStart(),
+      onPanUpdate: onDrag,
+      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
+      child: Container(
+        width: size, // large invisible touch area
+        height: size,
+        alignment: Alignment.center,
+        color: Colors.transparent,
+        child: Container(
+          width: 6 * (1 / widget.viewScale), // <<< tiny visual square
+          height: 6 * (1 / widget.viewScale), // <<< tiny visual square
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.white, width: 1),
+            shape: BoxShape.rectangle,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCircleButton({
+    required double size,
+    required IconData icon,
+    required double iconSize,
+    required Function(DragUpdateDetails) onDrag,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (details) => widget.onDragStart(),
+      onPanUpdate: onDrag,
+      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(child: Icon(icon, size: iconSize, color: Colors.black87)),
+      ),
     );
   }
 
