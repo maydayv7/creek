@@ -88,73 +88,230 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
     if (!mounted) return;
 
-    await showDialog(
+    await showModalBottomSheet(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text(
-              "Create New Event",
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    hintText: "Event Name",
-                    labelText: "Name",
-                    border: OutlineInputBorder(),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFFAFAFA),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Container(
+                padding: const EdgeInsets.only(top: 8, bottom: 16),
+                child: Center(
+                  child: Container(
+                    width: 48,
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF71717B),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
                   ),
-                  autofocus: true,
-                  style: const TextStyle(fontFamily: 'GeneralSans'),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    hintText: "Description (optional)",
-                    labelText: "Description",
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                  style: const TextStyle(fontFamily: 'GeneralSans'),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Cancel"),
               ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (nameController.text.trim().isNotEmpty) {
-                    try {
-                      await _projectService.createProject(
-                        nameController.text.trim(),
-                        description:
-                            descriptionController.text.trim().isEmpty
-                                ? null
-                                : descriptionController.text.trim(),
-                        parentId: _project!.id,
-                      );
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        _loadData(); // Refresh to show new event
-                      }
-                    } catch (e) {
-                      debugPrint("Error creating event: $e");
-                    }
-                  }
-                },
-                child: const Text("Create"),
+              // Header section
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Color(0xFFE4E4E7),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: const Text(
+                  "Event Details",
+                  style: TextStyle(
+                    fontFamily: 'GeneralSans',
+                    fontSize: 14,
+                    fontWeight: FontWeight.normal,
+                    color: Color(0xFF27272A),
+                    height: 20 / 14,
+                  ),
+                ),
+              ),
+              // Content section
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Name field
+                    Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE4E4E7),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: TextField(
+                        controller: nameController,
+                        autofocus: true,
+                        style: const TextStyle(
+                          fontFamily: 'GeneralSans',
+                          fontSize: 12,
+                          fontWeight: FontWeight.normal,
+                          color: Color(0xFF27272A),
+                          height: 16 / 12,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: "Add Name*",
+                          hintStyle: TextStyle(
+                            fontFamily: 'GeneralSans',
+                            fontSize: 12,
+                            fontWeight: FontWeight.normal,
+                            color: Color(0xFF71717B),
+                            height: 16 / 12,
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Description field
+                    Container(
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE4E4E7),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: TextField(
+                        controller: descriptionController,
+                        maxLines: null,
+                        expands: true,
+                        textAlignVertical: TextAlignVertical.top,
+                        style: const TextStyle(
+                          fontFamily: 'GeneralSans',
+                          fontSize: 12,
+                          fontWeight: FontWeight.normal,
+                          color: Color(0xFF27272A),
+                          height: 16 / 12,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: "Add Description",
+                          hintStyle: TextStyle(
+                            fontFamily: 'GeneralSans',
+                            fontSize: 12,
+                            fontWeight: FontWeight.normal,
+                            color: Color(0xFF71717B),
+                            height: 16 / 12,
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Bottom actions
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                child: Row(
+                  children: [
+                    // Cancel button
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE4E4E7),
+                            borderRadius: BorderRadius.circular(1000),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              "Cancel",
+                              style: TextStyle(
+                                fontFamily: 'GeneralSans',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF27272A),
+                                height: 20 / 14,
+                                letterSpacing: 0.25,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Add Event button
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          if (nameController.text.trim().isNotEmpty) {
+                            try {
+                              await _projectService.createProject(
+                                nameController.text.trim(),
+                                description:
+                                    descriptionController.text.trim().isEmpty
+                                        ? null
+                                        : descriptionController.text.trim(),
+                                parentId: _project!.id,
+                              );
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                _loadData(); // Refresh to show new event
+                              }
+                            } catch (e) {
+                              debugPrint("Error creating event: $e");
+                            }
+                          }
+                        },
+                        child: Container(
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF27272A),
+                            borderRadius: BorderRadius.circular(1000),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              "Add Event",
+                              style: TextStyle(
+                                fontFamily: 'GeneralSans',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFFFAFAFA),
+                                height: 20 / 14,
+                                letterSpacing: 0.25,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
+        ),
+      ),
     );
   }
 
@@ -548,7 +705,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             ),
             // Event title
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, 16, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               child: Text(
                 event.title,
                 style: const TextStyle(
