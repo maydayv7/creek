@@ -521,13 +521,39 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                       const SizedBox(height: 12),
 
                       if (_filteredAllFiles().isEmpty)
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Text(
-                              "No files found",
-                              style: TextStyle(color: Colors.grey[500]),
-                            ),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 48),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.folder_outlined,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _search.isEmpty ? "No files yet" : "No files found",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: 'GeneralSans',
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _search.isEmpty
+                                    ? "Create your first file to get started"
+                                    : "Try a different search term",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontFamily: 'GeneralSans',
+                                  color: Colors.grey[500],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
                         )
                       else
@@ -557,14 +583,36 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
 
                       if (_events.isEmpty)
                         Container(
-                          padding: const EdgeInsets.all(32),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            "No events yet",
-                            style: TextStyle(color: Colors.grey[500]),
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 48),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.event_outlined,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                "No events yet",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: 'GeneralSans',
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "Create an event to organize your files",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontFamily: 'GeneralSans',
+                                  color: Colors.grey[500],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
                         )
                       else
@@ -579,10 +627,39 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                             const SizedBox(height: 16),
 
                             _eventFiles.isEmpty
-                                ? Text(
-                                  "No files in this event yet",
-                                  style: TextStyle(color: Colors.grey[500]),
-                                )
+                                ? Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(vertical: 48),
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.insert_drive_file_outlined,
+                                          size: 64,
+                                          color: Colors.grey[400],
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          "No files in this event yet",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w500,
+                                            fontFamily: 'GeneralSans',
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          "Create a file to add it to this event",
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontFamily: 'GeneralSans',
+                                            color: Colors.grey[500],
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
+                                  )
                                 : Column(
                                   children:
                                       _eventFiles
