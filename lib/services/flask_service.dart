@@ -15,10 +15,11 @@ class FlaskService {
   // CONFIGURATION
   // ===========================================================================
 
-  // Ensure SERVER_URL is defined in .env file (New/Refactored Config)
-  static String get _serverUrl {
-    return dotenv.env['SERVER_URL'] ?? 'http://127.0.0.1:5000';
-  }
+  static String get _urlGenerate => dotenv.env['URL_GENERATE'] ?? '';
+  static String get _urlInpainting => dotenv.env['URL_INPAINTING'] ?? '';
+  static String get _urlInpaintingApi => dotenv.env['URL_INPAINTING_API'] ?? '';
+  static String get _urlAsset => dotenv.env['URL_ASSET'] ?? '';
+  static String get _urlDescribe => dotenv.env['URL_DESCRIBE'] ?? '';
 
   static const Map<String, String> _headers = {
     'Content-Type': 'application/json',
@@ -384,8 +385,8 @@ class FlaskService {
     if (base64Image == null || base64Mask == null) return null;
 
     return _performImageOperation(
-      endpoint: '/inpainting-api', // Keeping the custom endpoint logic
-      logPrefix: '🖌️ Inpainting (API)',
+      fullUrl: _urlInpaintingApi,
+      logPrefix: '🖌️ Inpainting',
       body: {
         'prompt': prompt,
         'negative_prompt': 'blurry, bad quality, low res, ugly',
