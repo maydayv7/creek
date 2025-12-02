@@ -1,0 +1,70 @@
+name: Release Android Build
+
+on:
+  push:
+    tags:
+      - "v*" # Triggers the workflow on tags like v1.0.0, v1.0.1, etc.
+
+jobs:
+  build:
+    name: Build APK and Release
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout Code (with LFS for your ONNX models)
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true 
+
+      # 2. Setup Java (Required for Android Build)
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 3. Setup Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.38.x'
+
+      # 4. Create .env file from Secrets
+      - name: Create .env file
+        run: echo "${{ secrets.ENV_FILE_CONTENT }}" > .env
+
+      # 5. Decode Keystore (For Signing)
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "storeFile=upload-keystore.jks" >> android/key.properties
+
+      # 6. Setup Python 3.11 (Matches your local version)
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 7. Install Dependencies
+      - name: Install dependencies
+        run: flutter pub get
+
+      # 8. Build APK
+      # split-per-abi is optional, but --release is mandatory. 
+      # Removing split-per-abi creates one "fat" APK compatible with all devices.
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      # 9. Create GitHub Release
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: build/app/outputs/flutter-apk/app-release.apk
+          generate_release_notes: true
