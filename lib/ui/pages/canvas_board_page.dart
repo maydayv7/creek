@@ -122,6 +122,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
 
   // Detection Timer & AI Analysis
   Timer? _inactivityTimer;
+  DateTime _lastAnalysisTime = DateTime.now();
   final GlobalKey _canvasGlobalKey = GlobalKey();
   String? _aiDescription;
   bool _isAnalyzing = false;
@@ -469,9 +470,9 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   }
 
   void _handleGestureStart() {
-    // Check if we need to capture a clean base image
     if (_isMagicDrawActive) {
-      if (!_isInpainting && _tempBaseImage == null) {
+      bool hasImageLayers = elements.any((e) => e['type'] == 'file_image');
+      if (hasImageLayers && !_isInpainting && _tempBaseImage == null) {
         _ensureBaseImageCaptured();
       }
       return;
@@ -1407,6 +1408,15 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
         DrawingPoint(offset: details.localPosition, paint: Paint()),
       );
     });
+
+    // NEW: Throttle Analysis: Trigger "Describe" every 2.5s while actively drawing
+    if (_isMagicDrawActive &&
+        !_isAnalyzing &&
+        !_isInpainting &&
+        DateTime.now().difference(_lastAnalysisTime).inMilliseconds > 2500) {
+      _lastAnalysisTime = DateTime.now();
+      _analyzeCanvas();
+    }
   }
 
   Future<void> _onPanEnd(DragEndDetails details) async {

@@ -81,13 +81,13 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
 
   // --- 2. LIST FOR SKETCH TO IMAGE (When No Image Exists) ---
   final List<AIModelOption> _sketchModels = [
-    AIModelOption(id: 'sketch_fusion', name: 'Slider Fusion', badge: null),
+    AIModelOption(id: 'sketch_fusion', name: 'Sketch Model 1', badge: null),
     AIModelOption(
       id: 'sketch_advanced',
-      name: 'Advanced Fusion',
+      name: 'Sketch Model 2',
       badge: 'Fastest',
     ),
-    AIModelOption(id: 'sketch_creative', name: 'Creative Flow', badge: 'New'),
+    AIModelOption(id: 'sketch_creative', name: 'Sketch Model 3', badge: 'New'),
   ];
 
   @override
