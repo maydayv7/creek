@@ -210,8 +210,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
           : (_stylesheetMap == null && _rawJsonString == null && _projectAssets.isEmpty && _logoPaths.isEmpty)
               ? _buildEmptyState()
               : _buildContent(),
-      floatingActionButton: _buildFAB(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: BottomBar(currentTab: BottomBarItem.stylesheet, projectId: _currentProjectId),
     );
   }
@@ -249,7 +247,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
     return RefreshIndicator(
       onRefresh: _generateStylesheet,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 104),
+        padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -290,36 +288,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
                     ],
                   ),
                 ),
-    );
-  }
-
-  Widget _buildFAB() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 104),
-      child: FloatingActionButton.extended(
-        onPressed: () {
-          // Handle visualize action
-        },
-        backgroundColor: Variables.textPrimary,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(1000),
-        ),
-        label: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.visibility, size: 20, color: Variables.textWhite),
-              const SizedBox(width: 8),
-              Text(
-                'Visualize',
-                style: Variables.buttonTextStyle,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
