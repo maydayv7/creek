@@ -15,10 +15,10 @@ class FlaskService {
   // CONFIGURATION
   // ===========================================================================
 
-  // Ensure SERVER_URL is defined in .env file
-  static String get _serverUrl {
-    return dotenv.env['SERVER_URL'] ?? 'http://127.0.0.1:5000';
-  }
+  static String get _urlGenerate => dotenv.env['URL_GENERATE'] ?? '';
+  static String get _urlInpainting => dotenv.env['URL_INPAINTING'] ?? '';
+  static String get _urlAsset => dotenv.env['URL_ASSET'] ?? '';
+  static String get _urlDescribe => dotenv.env['URL_DESCRIBE'] ?? '';
 
   static const Map<String, String> _headers = {
     'Content-Type': 'application/json',
@@ -83,7 +83,7 @@ class FlaskService {
   /// [Text-to-Image]
   Future<String?> generateAndSaveImage(String prompt) async {
     return _performImageOperation(
-      endpoint: '/generate',
+      fullUrl: _urlGenerate,
       logPrefix: '🎨 Text-to-Image',
       body: {'prompt': prompt},
       filenamePrefix: prompt,
@@ -102,7 +102,7 @@ class FlaskService {
     if (base64Image == null || base64Mask == null) return null;
 
     return _performImageOperation(
-      endpoint: '/inpainting',
+      fullUrl: _urlInpainting,
       logPrefix: '🖌️ Inpainting',
       body: {
         'prompt': prompt,
@@ -121,7 +121,7 @@ class FlaskService {
     if (base64Image == null) return null;
   
     final String? generatedAssetPath = await _performImageOperation(
-      endpoint: '/asset',
+      fullUrl: _urlAsset,
       logPrefix: '✂️ Asset Gen',
       body: {'image': base64Image},
       filenamePrefix: 'asset',
@@ -191,7 +191,7 @@ class FlaskService {
     if (base64Image == null) return null;
 
     final response = await _postRequest(
-      endpoint: '/describe',
+      fullUrl: _urlDescribe,
       body: {'image': base64Image, 'prompt': prompt},
     );
 
@@ -213,14 +213,14 @@ class FlaskService {
   // ===========================================================================
 
   Future<String?> _performImageOperation({
-    required String endpoint,
+    required String fullUrl,
     required String logPrefix,
     required Map<String, dynamic> body,
     required String filenamePrefix,
   }) async {
-    debugPrint("$logPrefix Sending request to $endpoint...");
+    debugPrint("$logPrefix Sending request to $fullUrl...");
 
-    final response = await _postRequest(endpoint: endpoint, body: body);
+    final response = await _postRequest(fullUrl: fullUrl, body: body);
 
     if (response != null && response.statusCode == 200) {
       return _saveImageFromResponse(response, filenamePrefix);
@@ -231,17 +231,21 @@ class FlaskService {
   }
 
   Future<http.Response?> _postRequest({
-    required String endpoint,
+    required String fullUrl,
     required Map<String, dynamic> body,
   }) async {
     try {
+      if (fullUrl.isEmpty) {
+        debugPrint("❌ Config Error: URL is missing in .env");
+        return null;
+      }
       return await http.post(
-        Uri.parse("$_serverUrl$endpoint"),
+        Uri.parse(fullUrl),
         headers: _headers,
         body: jsonEncode(body),
       );
     } catch (e) {
-      debugPrint("❌ Network Error ($endpoint): $e");
+      debugPrint("❌ Network Error ($fullUrl): $e");
       return null;
     }
   }
