@@ -15,12 +15,15 @@ from PIL import Image, ImageFilter
 from torchvision import transforms
 import time
 import uuid
+from dotenv import load_dotenv
+load_dotenv()
 
 # --- FAL.AI IMPORTS ---
 try:
     import fal_client
-    # 1. SETUP API KEY
-    os.environ["FAL_KEY"] = "f040803a-2cc4-4210-86f2-53b4a0e33354:335fb1972606d25f80004bd3bd11d935"
+    # SETUP API KEY
+    if not os.getenv("FAL_KEY"):
+        print("⚠️ Warning: FAL_KEY not found in environment variables.")
     FAL_AVAILABLE = True
 except ImportError:
     print("⚠️ Fal.ai Client not installed. /inpainting-api will fail.")

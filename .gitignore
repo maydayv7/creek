@@ -47,3 +47,7 @@ __pycache__
 
 # VS Code
 .vscode/
+
+# .env Files
+#.env
+flask/.env

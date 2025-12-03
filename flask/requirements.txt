@@ -6,9 +6,11 @@ fal-client
 flask
 flask-cors
 kornia
+modal
 numpy
 opencv-python
 pillow
+python-dotenv
 requests
 safetensors
 scipy

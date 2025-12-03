@@ -37,11 +37,6 @@ image = (
         "fal-client",
         "requests",
     )
-    .env(
-        {
-            "FAL_KEY": "f040803a-2cc4-4210-86f2-53b4a0e33354:335fb1972606d25f80004bd3bd11d935"
-        }
-    )
     # --- MOUNT LOCAL MODELS ---
     .add_local_dir("local_inpainting_model", remote_path="/models/sd-inpainting")
     .add_local_dir("Florence-2-4bit-Quantized", remote_path="/models/florence-2")
@@ -54,7 +49,11 @@ app = modal.App("adobe-flask", image=image)
 # ==============================================================================
 # 2. THE BACKEND SERVER CLASS
 # ==============================================================================
-@app.cls(gpu="any", scaledown_window=300)
+@app.cls(
+    gpu="any", 
+    scaledown_window=300,
+    secrets=[modal.Secret.from_name("fal-secret")]
+)
 class ModelBackend:
 
     @modal.enter()
@@ -66,6 +65,12 @@ class ModelBackend:
         import sys
 
         self.device = "cuda"
+
+        # FAL.AI API KEY
+        if "FAL_KEY" not in os.environ:
+            print("❌ Error: FAL_KEY secret not found!")
+        else:
+            print("✅ FAL_KEY loaded securely.")
 
         # --- 1. SETUP BiRefNet PATHS ---
         sys.path.append("/root/BiRefNet")
