@@ -129,7 +129,14 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   // Magic Draw / Inpainting State
   File? _tempBaseImage;
   bool _isInpainting = false;
-  bool _isCapturingBase = false; // New flag to hide strokes during capture
+  bool _isCapturingBase = false; // Hide strokes during capture
+
+  // Background Removal Banner State
+  bool _showBgRemovalBanner = false;
+  String? _bgRemovalTargetId;
+  String? _bgRemovalTargetPath;
+  Timer? _bgRemovalBannerTimer;
+  bool _isRemovingBg = false;
 
   String? selectedId;
   late Size _canvasSize;
@@ -193,6 +200,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
   @override
   void dispose() {
     _inactivityTimer?.cancel();
+    _bgRemovalBannerTimer?.cancel();
     _textEditingController.dispose();
     _textFocusNode.dispose();
     _transformationController.dispose();
@@ -1019,7 +1027,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
               children: [
                 GestureDetector(
                   onTap: () {
-                    // <--- CHANGED: Allow deselecting if MagicDraw is OFF OR if Hand Mode (PanelDisabled) is ON
                     if (!_isMagicDrawActive || _isMagicPanelDisabled) {
                       _exitEditMode();
                       setState(() => selectedId = null);
@@ -1032,7 +1039,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                     boundaryMargin: const EdgeInsets.all(double.infinity),
                     minScale: 0.01,
                     maxScale: 10.0,
-                    // <--- CHANGED: Enable Zoom/Pan if MagicDraw is OFF OR if Hand Mode (PanelDisabled) is ON
                     scaleEnabled: !_isMagicDrawActive || _isMagicPanelDisabled,
                     panEnabled: !_isMagicDrawActive || _isMagicPanelDisabled,
                     child: RepaintBoundary(
@@ -1067,8 +1073,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                                 type: e['type'],
                                 content: e['content'],
                                 styleData: e,
-                                // <--- OPTIONAL: If you want to move elements while Hand is active, change this line too:
-                                // isSelected: isSelected && (!_isMagicDrawActive || _isMagicPanelDisabled),
                                 isSelected: isSelected && !_isMagicDrawActive,
                                 isEditing:
                                     isSelected &&
@@ -1122,7 +1126,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                             }),
                             // Drawing Layer
                             IgnorePointer(
-                              // <--- CHANGED: Ignore touches (disable drawing) if MagicDraw is OFF OR if Hand Mode (PanelDisabled) is ON
                               ignoring:
                                   !_isMagicDrawActive || _isMagicPanelDisabled,
                               child: RepaintBoundary(
@@ -1162,8 +1165,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                   ),
                 ),
 
-                // ... (Rest of your UI: AI Description, MagicDrawTools, etc.) ...
-                // I have truncated the bottom part as it remains unchanged.
                 if (_aiDescription != null && _isMagicDrawActive)
                   Positioned(
                     top: 10,
@@ -1280,6 +1281,58 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
                   onFontSizeChanged:
                       (s) => _updateSelectedTextProperty('style_fontSize', s),
                 ),
+
+                // Background Removal Banner
+                if (_showBgRemovalBanner)
+                  Positioned(
+                    top: SafeArea(child: Container()).minimum.top + 10,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))
+                          ]
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_isRemovingBg) ...[
+                               const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                               const SizedBox(width: 8),
+                               const Text("Removing...", style: TextStyle(color: Colors.white, fontFamily: 'GeneralSans', fontSize: 14)),
+                            ] else ...[
+                               const Text(
+                                "Remove background?",
+                                style: TextStyle(color: Colors.white, fontFamily: 'GeneralSans', fontSize: 14),
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: _confirmRemoveBackground,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.check, size: 16, color: Colors.black),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () => setState(() => _showBgRemovalBanner = false),
+                                child: const Icon(Icons.close, size: 18, color: Colors.white54),
+                              ),
+                            ]
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
 
                 Positioned(
                   bottom: 0,
@@ -1398,6 +1451,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       ),
     );
   }
+
   // --- DRAWING HELPERS ---
 
   void _onPanUpdate(DragUpdateDetails details) {
@@ -1451,7 +1505,65 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     });
   }
 
+  // --- BACKGROUND REMOVAL LOGIC ---
+
+  void _triggerBgRemovalBanner(String elementId, String imagePath) {
+    _bgRemovalBannerTimer?.cancel();
+    setState(() {
+      _showBgRemovalBanner = true;
+      _bgRemovalTargetId = elementId;
+      _bgRemovalTargetPath = imagePath;
+    });
+
+    // Automatically hide after 10 seconds
+    _bgRemovalBannerTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted) {
+        setState(() => _showBgRemovalBanner = false);
+      }
+    });
+  }
+
+  Future<void> _confirmRemoveBackground() async {
+    if (_bgRemovalTargetId == null || _bgRemovalTargetPath == null) return;
+    
+    _bgRemovalBannerTimer?.cancel();
+
+    setState(() {
+      _isRemovingBg = true;
+    });
+
+    try {
+      // Call service to remove background
+      final newPath = await FlaskService().generateAsset(imagePath: _bgRemovalTargetPath!);
+
+      if (newPath != null && mounted) {
+        // Find the element and update its content
+        final index = elements.indexWhere((e) => e['id'] == _bgRemovalTargetId);
+        if (index != -1) {
+           final oldState = _getCurrentState();
+           setState(() {
+             elements[index]['content'] = newPath; // Replace with transparent png
+             _showBgRemovalBanner = false;
+             _isRemovingBg = false;
+             _hasUnsavedChanges = true;
+           });
+           _recordChange(oldState);
+        }
+      }
+    } catch (e) {
+      debugPrint("BG Removal Failed: $e");
+    } finally {
+      if (mounted) setState(() {
+         _isRemovingBg = false;
+         _showBgRemovalBanner = false;
+      });
+    }
+  }
+
   Future<void> _processInpainting(String prompt, String modelId) async {
+    // Lock editing and hide keyboard
+    FocusScope.of(context).unfocus(); 
+
     setState(() => _isInpainting = true);
     _resetInactivityTimer();
 
@@ -1479,15 +1591,15 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       // CASE 1: INPAINTING (When hasImageLayers is TRUE)
       if (hasImageLayers) {
         if (modelId == 'inpaint_api') {
-          // Call API Inpainting
-          newImageUrl = await FlaskService().inpaintApiImage(
+            // Call API Inpainting
+            newImageUrl = await FlaskService().inpaintApiImage(
             imagePath: _tempBaseImage!.path,
             maskPath: maskFile.path,
             prompt: prompt,
           );
         } else {
-          // Default: Standard Flask Inpainting ('inpaint_standard')
-          newImageUrl = await FlaskService().inpaintImage(
+            // Default: Standard Flask Inpainting ('inpaint_standard')
+            newImageUrl = await FlaskService().inpaintImage(
             imagePath: _tempBaseImage!.path,
             maskPath: maskFile.path,
             prompt: prompt,
@@ -1514,7 +1626,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
             option: 1,
             imageDescription: _aiDescription,
           );
-
         }
         else if (modelId == 'sketch_creative') {
           newImageUrl = await FlaskService().sketchToImageAPI(
@@ -1529,10 +1640,15 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       }
 
       if (newImageUrl != null) {
-        _addGeneratedImage(newImageUrl);
+        final id = _addGeneratedImage(newImageUrl);
         setState(() {
           _isMagicDrawActive = false;
         });
+
+        // Trigger Banner for Background Removal (Only if it was a generation, not inpainting)
+        if (!hasImageLayers) {
+          _triggerBgRemovalBanner(id, newImageUrl);
+        }
       }
     } catch (e) {
       debugPrint("Generation Error: $e");
@@ -1549,22 +1665,24 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
     }
   }
 
-  void _addGeneratedImage(String? newImageUrl) {
+  String _addGeneratedImage(String? newImageUrl) {
+    String id = '';
     if (newImageUrl != null) {
       debugPrint("✅ Adding generated image to canvas: $newImageUrl");
+      id = 'gen_${DateTime.now().millisecondsSinceEpoch}';
       setState(() {
         elements.add({
-          'id': 'gen_${DateTime.now().millisecondsSinceEpoch}',
+          'id': id,
           'type': 'file_image',
           'content': newImageUrl,
           'position': const Offset(0, 0),
           'size': _canvasSize,
           'rotation': 0.0,
         });
-        // Clear magic paths now that operation is done
         _magicPaths.clear();
       });
     }
+    return id;
   }
 
   // Updated to generate mask as: Base Image + Drawing Strokes

@@ -94,10 +94,7 @@ class FlaskService {
       return null;
     }
 
-    // 3. Remove Background
-    debugPrint("🔗 [Pipeline] Removing background from generated result...");
-
-    return generateAsset(imagePath: generatedImagePath);
+    return generatedImagePath;
   }
 
   // ===========================================================================
@@ -223,10 +220,7 @@ class FlaskService {
       return null;
     }
 
-    // 3. Remove Background (Pipeline Extension)
-    debugPrint("🔗 [Pipeline] Removing background from generated result...");
-
-    return generateAsset(imagePath: generatedImagePath);
+    return generatedImagePath;
   }
 
   /// [Background Removal]

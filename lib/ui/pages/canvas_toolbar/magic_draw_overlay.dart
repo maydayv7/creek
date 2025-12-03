@@ -27,7 +27,7 @@ class MagicDrawTools extends StatefulWidget {
   final Function(bool) onMagicPanelActivityToggle;
   final bool isMagicPanelDisabled;
 
-  // NEW: To decide which dropdown list to show
+  // To decide which dropdown list to show
   final bool hasImageLayers;
 
   const MagicDrawTools({
@@ -46,7 +46,7 @@ class MagicDrawTools extends StatefulWidget {
     required this.onViewModeToggle,
     required this.onMagicPanelActivityToggle,
     required this.isMagicPanelDisabled,
-    required this.hasImageLayers, // <-- Added
+    required this.hasImageLayers,
   });
 
   @override
@@ -102,6 +102,11 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
     // If the layer state changes (image added/removed), reset selection to correct group
     if (oldWidget.hasImageLayers != widget.hasImageLayers) {
       _updateSelectedModelGroup();
+    }
+
+    // Clear prompt when opening the tool
+    if (!oldWidget.isActive && widget.isActive) {
+      _promptController.clear();
     }
   }
 
@@ -330,6 +335,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
               Expanded(
                 child: TextField(
                   controller: _promptController,
+                  enabled: !widget.isProcessing,
                   onSubmitted: (_) => _handleSubmit(),
                   decoration: const InputDecoration.collapsed(
                     hintText: "tap imagination...",

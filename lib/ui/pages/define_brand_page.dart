@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:adobe/ui/styles/variables.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../services/project_service.dart';
+import 'project_detail_page.dart';
 
 class DefineBrandPage extends StatefulWidget {
   final String projectName;
@@ -82,9 +83,14 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
         description: description.isEmpty ? null : description,
       );
 
-      // 4. Success Handling - Return the ID and Title map
+      // 4. Navigate to ProjectDetailPage
       if (mounted) {
-        Navigator.pop(context, {'id': newId, 'title': title});
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProjectDetailPage(projectId: newId),
+          ),
+        );
       }
     } catch (e) {
       // 5. Error Handling
