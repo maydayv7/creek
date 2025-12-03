@@ -43,8 +43,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
     'dramaticcontrast': 'assets/stylesheet/lighting/dramatic-contrast.png',
     'flatlighting': 'assets/stylesheet/lighting/flat-lighting.png',
     'softlight': 'assets/stylesheet/lighting/soft-light.png',
-    'spectacularhighlights': 'assets/stylesheet/lighting/spectacular-highlights.png',
-    'specularhighlights': 'assets/stylesheet/lighting/spectacular-highlights.png',
+    'specularhighlights': 'assets/stylesheet/lighting/specular-highlights.png',
     'studiolighting': 'assets/stylesheet/lighting/studio-lighting.png',
   };
 
@@ -52,30 +51,27 @@ class _StylesheetPageState extends State<StylesheetPage> {
     'glossy': 'assets/stylesheet/material-look/glossy.png',
     'laminated': 'assets/stylesheet/material-look/laminated.png',
     'matte': 'assets/stylesheet/material-look/matte.png',
-    'metallic': 'assets/stylesheet/material-look/metallic.png',
     'mettalic': 'assets/stylesheet/material-look/metallic.png',
     'organic': 'assets/stylesheet/material-look/organic.png',
     'porcelain': 'assets/stylesheet/material-look/porcelain.png',
     'wetlook': 'assets/stylesheet/material-look/wet-look.png',
-    'wooden': 'assets/stylesheet/material-look/wooden.png',
     'wood': 'assets/stylesheet/material-look/wooden.png',
-    'plastic': 'assets/stylesheet/material-look/laminated.png',
   };
 
   final Map<String, String> _textureAssets = {
     'bokehbackground': 'assets/stylesheet/texture/bokeh-background.png',
+    'brick': 'assets/stylesheet/texture/brick.png',
     'concrete': 'assets/stylesheet/texture/concrete.png',
-    'stone': 'assets/stylesheet/texture/concrete.png',
-    'motifs': 'assets/stylesheet/texture/motifs.png',
-    'motif': 'assets/stylesheet/texture/motifs.png',
-    'newspapertexture': 'assets/stylesheet/texture/newspaper-texture.png',
-    'newspaper': 'assets/stylesheet/texture/newspaper-texture.png',
-    'papergrain': 'assets/stylesheet/texture/paper-grain.png',
-    'printedpattern': 'assets/stylesheet/texture/printed-pattern.png',
-    'studiobackdrop': 'assets/stylesheet/texture/studio-backdrop.png',
-    'studio_backdrop': 'assets/stylesheet/texture/studio-backdrop.png',
-    'subtlegrid': 'assets/stylesheet/texture/subtle-grid.png',
+    'denim': 'assets/stylesheet/texture/denim.png',
+    'fabric': 'assets/stylesheet/texture/fabric.png',
     'grid': 'assets/stylesheet/texture/subtle-grid.png',
+    'ground': 'assets/stylesheet/texture/ground.png',
+    'motif': 'assets/stylesheet/texture/motifs.png',
+    'newspaper': 'assets/stylesheet/texture/newspaper-texture.png',
+    'paper': 'assets/stylesheet/texture/paper-grain.png',
+    'pattern': 'assets/stylesheet/texture/printed-pattern.png',
+    'stone': 'assets/stylesheet/texture/stone.png',
+    'studiobackdrop': 'assets/stylesheet/texture/studio-backdrop.png',
   };
 
   @override
