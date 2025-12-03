@@ -1,5 +1,8 @@
 # Backend
 
+> [!NOTE]
+> Python 3.11 is the preferred version for running the backend
+
 This project provides a unified AI backend for image generation, inpainting, background removal, and captioning. It supports two modes of operation:
 
 ## 1. Local Server (`index.py`)

@@ -554,39 +554,34 @@ def sketch_api():
             return jsonify({"error": "Missing prompt"}), 400
 
         # --- ENFORCE SHARPNESS IN PROMPT ---
-        # We append these words to ensure the "cartoon" style isn't blurry
         enhanced_prompt = f"{prompt}, sharp focus, high definition, 4k, vector art, crisp lines"
 
         if int(option) == 1:
-            # Flux Schnell (No change needed, it ignores guidance)
-            print(f"🚀 Using Flux Schnell for: {prompt}")
-            model_id = "fal-ai/flux/schnell"
+            # Nano Banana
+            print(f"🍌 Using Nano Banana for: {prompt}")
+            model_id = "fal-ai/nano-banana"
             arguments = {
-                "image_size": "square_hd",
-                "num_inference_steps": 4, 
-                "enable_safety_checker": False,
-                "prompt": enhanced_prompt 
+                "prompt": enhanced_prompt,
+                "num_images": 1,
+                "aspect_ratio": "1:1",
+                "output_format": "png"
             }
         elif int(option) == 2:
-            # Flux Dev (THIS IS THE FIX)
+            # Flux Dev
             print(f"🚀 Using Flux Dev for: {prompt}")
             model_id = "fal-ai/flux/dev"
             arguments = {
                 "image_size": "square_hd",
                 "num_inference_steps": 28, 
-                
-                # 👇 KEY FIX: Set this to 3.5 or 4.0 for sharp images
                 "guidance_scale": 3.5,     
-                
-                # 👇 OPTIONAL: Makes it less likely to return black images
                 "safety_tolerance": "2",   
-                
                 "enable_safety_checker": False,
                 "prompt": enhanced_prompt
             }
         else:
-            return jsonify({"error": "Invalid option. Use 1 for Schnell, 2 for Dev."}), 400
+            return jsonify({"error": "Invalid option. Use 1 for Nano Banana, 2 for Flux Dev."}), 400
 
+        # Execute request
         handler = fal_client.submit(
             model_id,
             arguments=arguments
@@ -597,7 +592,7 @@ def sketch_api():
         if 'images' in result and len(result['images']) > 0:
             image_url = result['images'][0]['url']
             print(f"✨ Success! Image generated: {image_url}")
-            
+
             response = requests.get(image_url)
             if response.status_code == 200:
                 img = Image.open(io.BytesIO(response.content)).convert("RGB")

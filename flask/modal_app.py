@@ -377,14 +377,18 @@ class ModelBackend:
         )
 
         if int(option) == 1:
-            model_id = "fal-ai/flux/schnell"
+            # Nano Banana
+            print(f"🍌 Using Nano Banana for: {prompt}")
+            model_id = "fal-ai/nano-banana"
             arguments = {
-                "image_size": "square_hd",
-                "num_inference_steps": 4,
-                "enable_safety_checker": False,
                 "prompt": enhanced_prompt,
+                "num_images": 1,
+                "aspect_ratio": "1:1",
+                "output_format": "png"
             }
         else:
+            # Flux Dev
+            print(f"🚀 Using Flux Dev for: {prompt}")
             model_id = "fal-ai/flux/dev"
             arguments = {
                 "image_size": "square_hd",
