@@ -4,15 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:adobe/ui/styles/variables.dart';
 import 'package:adobe/ui/widgets/bottom_bar.dart';
 import 'package:adobe/ui/widgets/top_bar.dart';
-import 'package:adobe/data/repos/image_repo.dart';
 import 'package:adobe/data/repos/project_repo.dart';
-import 'package:adobe/services/python_service.dart';
+import 'package:adobe/data/repos/image_repo.dart';
 import 'package:adobe/data/repos/note_repo.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:adobe/services/stylesheet_service.dart';
+import 'package:adobe/services/python_service.dart';
 
 class StylesheetPage extends StatefulWidget {
   final int projectId;
@@ -28,13 +29,13 @@ class _StylesheetPageState extends State<StylesheetPage> {
   late int _currentProjectId;
   bool _isLoading = false;
 
-  Map<String, dynamic>? _stylesheetMap;
+  StylesheetData? _stylesheetData;
   String? _rawJsonString;
 
   List<String> _projectAssets = [];
   List<String> _logoPaths = [];
-  final Map<String, String> _fontNameCache = {};
   final ImagePicker _picker = ImagePicker();
+  final StylesheetService _stylesheetService = StylesheetService();
 
   // --- ASSET MAPPING ---
   final Map<String, String> _lightingAssets = {
@@ -89,17 +90,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
   }
 
   // --- UTILS ---
-  String _cleanJsonString(String raw) {
-    // 1. Remove Markdown code blocks if present (common AI artifact)
-    String cleaned = raw.replaceAll(RegExp(r'^```json\s*|\s*```$'), '');
-
-    // 2. Fix unquoted keys if necessary (only if standard parse fails)
-    cleaned = cleaned.replaceAllMapped(
-      RegExp(r'([{,]\s*)([a-zA-Z0-9_\s/]+)(\s*:)'),
-      (match) => '${match[1]}"${match[2]?.trim()}"${match[3]}',
-    );
-    return cleaned;
-  }
 
   String _formatLabel(String label) {
     String clean = label.replaceAll(RegExp(r'[-_]'), ' ');
@@ -113,22 +103,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
   String? _findAssetPath(Map<String, String> assetMap, String label) {
     String normalized = label.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     return assetMap[normalized];
-  }
-
-  String _resolveGoogleFontName(String dirtyName) {
-    if (_fontNameCache.containsKey(dirtyName)) {
-      return _fontNameCache[dirtyName]!;
-    }
-    String cleanInput = dirtyName.toLowerCase().replaceAll(RegExp(r'[-_]regular$'), '').replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final allFonts = GoogleFonts.asMap().keys;
-    for (String officialName in allFonts) {
-      String cleanOfficial = officialName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-      if (cleanOfficial == cleanInput) {
-        _fontNameCache[dirtyName] = officialName;
-        return officialName;
-      }
-    }
-    return dirtyName;
   }
 
   Future<File?> _resolveFile(String path) async {
@@ -151,43 +125,19 @@ class _StylesheetPageState extends State<StylesheetPage> {
     if (project == null) return;
 
     List<String> currentAssets = project.assetsPath;
-    Map<String, dynamic>? parsedMap;
-    String? rawJson;
+    String? rawJson = project.globalStylesheet;
+    StylesheetData? data;
 
-    if (project.globalStylesheet != null && project.globalStylesheet!.isNotEmpty) {
-      rawJson = project.globalStylesheet!;
-      dynamic parsed;
-
-      // Try standard decode first
-      try {
-        parsed = jsonDecode(rawJson);
-      } catch (e) {
-        // Try cleaning markdown and loose keys
-        try {
-          parsed = jsonDecode(_cleanJsonString(rawJson));
-        } catch (_) {}
-      }
-
-      if (parsed is String) {
-        try {
-          parsed = jsonDecode(parsed);
-        } catch (_) {}
-      }
-
-      if (parsed is Map<String, dynamic>) {
-        if (parsed.containsKey('results') && parsed['results'] is Map) {
-          parsedMap = parsed['results'];
-        } else {
-          parsedMap = parsed;
-        }
-      }
+    if (rawJson != null && rawJson.isNotEmpty) {
+      // Use the service to parse
+      data = _stylesheetService.parse(rawJson);
     }
 
     if (mounted) {
       setState(() {
         _projectAssets = currentAssets;
         _rawJsonString = rawJson;
-        _stylesheetMap = parsedMap;
+        _stylesheetData = data;
       });
     }
   }
@@ -195,7 +145,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
   Future<void> _generateStylesheet() async {
     setState(() {
       _isLoading = true;
-      _stylesheetMap = null;
+      _stylesheetData = null;
       _rawJsonString = null;
     });
 
@@ -228,17 +178,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
     }
   }
 
-  dynamic _getData(List<String> keys) {
-    if (_stylesheetMap == null) return null;
-    for (var k in keys) {
-      if (_stylesheetMap!.containsKey(k)) return _stylesheetMap![k];
-      for (var mapKey in _stylesheetMap!.keys) {
-        if (mapKey.toLowerCase() == k.toLowerCase()) return _stylesheetMap![mapKey];
-      }
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -248,7 +187,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
         onBack: () => Navigator.of(context).pop(),
         onProjectChanged: (p) => setState(() {
           _currentProjectId = p.id!;
-          _stylesheetMap = null;
+          _stylesheetData = null;
           _projectAssets = [];
           _logoPaths = [];
           _loadSavedStylesheet();
@@ -258,7 +197,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
       // Only show content once full stylesheet is parsed atleast once
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Variables.textPrimary))
-          : (_stylesheetMap == null && _rawJsonString == null)
+          : (_stylesheetData == null && _rawJsonString == null)
               ? _buildEmptyState()
               : _buildContent(),
       bottomNavigationBar: BottomBar(currentTab: BottomBarItem.stylesheet, projectId: _currentProjectId),
@@ -283,16 +222,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
   }
 
   Widget _buildContent() {
-    final graphics = _getData(['Graphics', 'graphics']);
-    final colors = _getData(['Colour Palette', 'Color Palette', 'colors', 'Colors']);
-    final typography = _getData(['Typography', 'fonts', 'Fonts']);
-    final compositions = _getData(['Compositions', 'Composition', 'compositions']);
-    final materialLook = _getData(['Material look', 'Material Look', 'material_look']);
-    final textures = _getData(['Textures', 'Background/Texture', 'textures']);
-    final lighting = _getData(['Lighting', 'lighting']);
-    final style = _getData(['Style', 'style']);
-    final era = _getData(['Era/Cultural Reference', 'Era', 'era']);
-    final emotions = _getData(['Emotions', 'Emotional', 'emotions']);
+    final data = _stylesheetData;
+    if (data == null) return const SizedBox();
 
     return RefreshIndicator(
       onRefresh: _generateStylesheet,
@@ -305,16 +236,16 @@ class _StylesheetPageState extends State<StylesheetPage> {
             const SizedBox(height: 24),
             
             _buildLogosSection(null),
-            if (graphics != null || _projectAssets.isNotEmpty) _buildGraphicsSection(graphics),
-            if (colors != null) _buildColorsSection(colors),
-            if (typography != null) _buildFontsSection(typography),
-            if (compositions != null) _buildCompositionsSection(compositions),
-            if (materialLook != null) _buildMaterialLookSection(materialLook),
-            if (textures != null) _buildTexturesSection(textures),
-            if (lighting != null) _buildLightingSection(lighting),
-            if (style != null) _buildStyleSection(style),
-            if (era != null) _buildEraSection(era),
-            if (emotions != null) _buildEmotionsSection(emotions),
+            if (data.graphics.isNotEmpty || _projectAssets.isNotEmpty) _buildGraphicsSection(data.graphics),
+            if (data.colors.isNotEmpty) _buildColorsSection(data.colors),
+            if (data.fonts.isNotEmpty) _buildFontsSection(data.fonts),
+            if (data.compositions.isNotEmpty) _buildCompositionsSection(data.compositions),
+            if (data.materialLook.isNotEmpty) _buildMaterialLookSection(data.materialLook),
+            if (data.textures.isNotEmpty) _buildTexturesSection(data.textures),
+            if (data.lighting.isNotEmpty) _buildLightingSection(data.lighting),
+            if (data.style.isNotEmpty) _buildStyleSection(data.style),
+            if (data.era.isNotEmpty) _buildEraSection(data.era),
+            if (data.emotions.isNotEmpty) _buildEmotionsSection(data.emotions),
             
             const SizedBox(height: 24),
           ],
@@ -451,14 +382,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
   }
 
   // --- Graphics ---
-  Widget _buildGraphicsSection(dynamic data) {
+  Widget _buildGraphicsSection(List<String> extractedGraphics) {
     List<String> graphicPaths = List.from(_projectAssets);
-    if (data is List) {
-      for (var item in data) {
-        if (item is Map && item.containsKey('path')) graphicPaths.add(item['path'].toString());
-        else if (item is String) graphicPaths.add(item);
-      }
-    } else if (data is String) graphicPaths.add(data);
+    graphicPaths.addAll(extractedGraphics);
 
     if (graphicPaths.isEmpty) return const SizedBox();
 
@@ -507,17 +433,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
   }
 
   // --- Fonts ---
-  Widget _buildFontsSection(dynamic data) {
-    List<String> fontNames = [];
-    if (data is List) {
-      for (var item in data) {
-        if (item is Map && item.containsKey('label')) fontNames.add(item['label'].toString().trim());
-        else if (item is String) fontNames.add(item.trim());
-      }
-    } else if (data is Map && data.containsKey('label')) {
-      fontNames.add(data['label'].toString().trim());
-    }
-
+  Widget _buildFontsSection(List<String> fontNames) {
     if (fontNames.isEmpty) return const SizedBox();
 
     return Column(
@@ -538,13 +454,12 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
-  Widget _buildFontCard(String rawFontName) {
-    final String correctFontName = _resolveGoogleFontName(rawFontName);
-    final String displayFontName = _formatLabel(rawFontName);
-    
+  Widget _buildFontCard(String resolvedFontName) {
+    final String displayFontName = _formatLabel(resolvedFontName);
+
     TextStyle sampleStyle;
     try {
-      sampleStyle = GoogleFonts.getFont(correctFontName);
+      sampleStyle = GoogleFonts.getFont(resolvedFontName);
     } catch (_) {
       sampleStyle = const TextStyle(fontFamily: 'GeneralSans');
     }
@@ -585,16 +500,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
   }
 
   // --- Colors ---
-  Widget _buildColorsSection(dynamic data) {
-    List<String> colorList = [];
-    if (data is List) {
-      for (var item in data) {
-        if (item is Map && item.containsKey('label')) colorList.add(item['label'].toString());
-        else if (item is String) colorList.add(item);
-      }
-    }
-
-    if (colorList.isEmpty) return const SizedBox();
+  Widget _buildColorsSection(List<Color> colors) {
+    if (colors.isEmpty) return const SizedBox();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,29 +509,18 @@ class _StylesheetPageState extends State<StylesheetPage> {
         _buildSectionHeader("Colors", showArrow: false),
         Wrap(
           spacing: 8, runSpacing: 8,
-          children: colorList.take(5).map((color) => _buildColorSwatch(color)).toList(),
+          children: colors.take(5).map((color) => _buildColorSwatch(color)).toList(),
         ),
         const SizedBox(height: 16),
       ],
     );
   }
 
-  Widget _buildColorSwatch(String label) {
-    Color color = _getColorFromLabel(label);
+  Widget _buildColorSwatch(Color color) {
     return Container(
       width: 104, height: 52,
       decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
     );
-  }
-
-  Color _getColorFromLabel(String label) {
-    if (label.startsWith('#') || label.length == 6) {
-      try {
-        String hex = label.replaceAll('#', '');
-        if (hex.length == 6) return Color(int.parse('0xFF$hex'));
-      } catch (_) {}
-    }
-    return Colors.grey.shade400;
   }
 
   // --- Unified Card Builder ---
@@ -705,15 +601,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
     }
   }
 
-  Widget _buildAttributeSection(String title, dynamic data, Map<String, String>? assetMap) {
-    List<String> items = [];
-    if (data is List) {
-      for (var item in data) {
-        if (item is Map && item.containsKey('label')) items.add(item['label'].toString());
-        else if (item is String) items.add(item);
-      }
-    } else if (data is String) items.add(data);
-
+  Widget _buildAttributeSection(String title, List<String> items, Map<String, String>? assetMap) {
     if (items.isEmpty) return const SizedBox();
 
     return Column(
@@ -738,31 +626,31 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
-  Widget _buildCompositionsSection(dynamic data) {
+  Widget _buildCompositionsSection(List<String> data) {
     return _buildAttributeSection("Compositions", data, null);
   }
 
-  Widget _buildMaterialLookSection(dynamic data) {
+  Widget _buildMaterialLookSection(List<String> data) {
     return _buildAttributeSection("Material Look", data, _materialAssets);
   }
 
-  Widget _buildTexturesSection(dynamic data) {
+  Widget _buildTexturesSection(List<String> data) {
     return _buildAttributeSection("Textures", data, _textureAssets);
   }
 
-  Widget _buildLightingSection(dynamic data) {
+  Widget _buildLightingSection(List<String> data) {
     return _buildAttributeSection("Lighting", data, _lightingAssets);
   }
 
-  Widget _buildStyleSection(dynamic data) {
+  Widget _buildStyleSection(List<String> data) {
     return _buildAttributeSection("Style", data, null);
   }
 
-  Widget _buildEraSection(dynamic data) {
+  Widget _buildEraSection(List<String> data) {
     return _buildAttributeSection("Era", data, null);
   }
 
-  Widget _buildEmotionsSection(dynamic data) {
+  Widget _buildEmotionsSection(List<String> data) {
     return _buildAttributeSection("Emotions", data, null);
   }
 }

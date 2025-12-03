@@ -2,17 +2,36 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// A simple model to hold the extracted design tokens
+// A simple model to hold the extracted design tokens
 class StylesheetData {
   final List<Color> colors;
   final List<String> fonts;
+  final List<String> graphics;
+  final List<String> compositions;
+  final List<String> materialLook;
+  final List<String> textures;
+  final List<String> lighting;
+  final List<String> style;
+  final List<String> era;
+  final List<String> emotions;
 
-  StylesheetData({required this.colors, required this.fonts});
+  StylesheetData({
+    required this.colors,
+    required this.fonts,
+    this.graphics = const [],
+    this.compositions = const [],
+    this.materialLook = const [],
+    this.textures = const [],
+    this.lighting = const [],
+    this.style = const [],
+    this.era = const [],
+    this.emotions = const [],
+  });
 }
 
 class StylesheetService {
-  /// Main entry point: Parses a raw (potentially dirty) JSON string
-  /// and returns a structured [StylesheetData] object.
+  // Main entry point: Parses a raw (potentially dirty) JSON string
+  // and returns a structured [StylesheetData] object
   StylesheetData parse(String? rawJson) {
     if (rawJson == null || rawJson.isEmpty) {
       return StylesheetData(colors: [], fonts: []);
@@ -27,14 +46,26 @@ class StylesheetService {
     // 3. Extract and Process Colors
     List<Color> colors = _extractColors(data);
 
-    return StylesheetData(colors: colors, fonts: fonts);
+    // 4. Extract other attributes
+    return StylesheetData(
+      colors: colors,
+      fonts: fonts,
+      graphics: _extractStrings(data, ['Graphics', 'graphics'], valueKey: 'path'),
+      compositions: _extractStrings(data, ['Compositions', 'Composition', 'compositions']),
+      materialLook: _extractStrings(data, ['Material look', 'Material Look', 'material_look']),
+      textures: _extractStrings(data, ['Textures', 'Background/Texture', 'textures']),
+      lighting: _extractStrings(data, ['Lighting', 'lighting']),
+      style: _extractStrings(data, ['Style', 'style']),
+      era: _extractStrings(data, ['Era/Cultural Reference', 'Era', 'era']),
+      emotions: _extractStrings(data, ['Emotions', 'Emotional', 'emotions']),
+    );
   }
 
   // ---------------------------------------------------------------------------
   // PARSING LOGIC
   // ---------------------------------------------------------------------------
 
-  /// Safely parses the raw string into a Map, handling dirty AI output.
+  // Safely parses the raw string into a Map, handling dirty AI output
   Map<String, dynamic> _parseRawJson(String rawString) {
     try {
       // Try standard decode first
@@ -50,9 +81,13 @@ class StylesheetService {
     }
   }
 
-  /// Cleans "dirty" JSON strings by fixing quotes and unquoted keys.
+  /// Cleans "dirty" JSON strings by fixing quotes and unquoted keys
   String _cleanJsonString(String raw) {
     String cleaned = raw;
+
+    // Remove Markdown code blocks if present (common AI artifact)
+    cleaned = cleaned.replaceAll(RegExp(r'^```json\s*|\s*```$'), '');
+
     // Add quotes to keys
     cleaned = cleaned.replaceAllMapped(
       RegExp(r'([{,]\s*)([a-zA-Z0-9_\s/]+)(\s*:)'),
@@ -75,7 +110,7 @@ class StylesheetService {
     return cleaned;
   }
 
-  /// Normalizes the structure if the API returns { "results": ... }
+  // Normalizes the structure if the API returns { "results": ... }
   Map<String, dynamic> _normalizeResult(dynamic parsed) {
     if (parsed is String) {
       try {
@@ -96,9 +131,9 @@ class StylesheetService {
   // EXTRACTION LOGIC
   // ---------------------------------------------------------------------------
 
-  /// Extracts font names and resolves them to valid Google Font strings.
+  // Extracts font names and resolves them to valid Google Font strings.
   List<String> _extractFonts(Map<String, dynamic> data) {
-    dynamic fontData = _findValue(data, ['Typography', 'fonts', 'typography']);
+    dynamic fontData = _findValue(data, ['Typography', 'fonts', 'typography', 'Fonts']);
     if (fontData == null) return [];
 
     List<String> rawNames = [];
@@ -119,12 +154,13 @@ class StylesheetService {
     return rawNames.map((name) => _resolveGoogleFontName(name)).toList();
   }
 
-  /// Extracts colors from Hex codes or semantic labels.
+  // Extracts colors from Hex codes or semantic labels
   List<Color> _extractColors(Map<String, dynamic> data) {
     dynamic colorData = _findValue(data, [
       'Colour Palette',
       'Color Palette',
       'colors',
+      'Colors'
     ]);
     if (colorData == null) return [];
 
@@ -145,6 +181,29 @@ class StylesheetService {
       }
     }
     return resolvedColors;
+  }
+
+  // Generic helper to extract a list of strings from various keys
+  // Supports extraction from [{ "label": "val" }] or ["val"] or "val"
+  List<String> _extractStrings(Map<String, dynamic> data, List<String> keys, {String valueKey = 'label'}) {
+    dynamic rawData = _findValue(data, keys);
+    if (rawData == null) return [];
+
+    List<String> results = [];
+    if (rawData is List) {
+      for (var item in rawData) {
+        if (item is Map && item.containsKey(valueKey)) {
+          results.add(item[valueKey].toString());
+        } else if (item is String) {
+          results.add(item);
+        }
+      }
+    } else if (rawData is Map && rawData.containsKey(valueKey)) {
+      results.add(rawData[valueKey].toString());
+    } else if (rawData is String) {
+      results.add(rawData);
+    }
+    return results;
   }
 
   // ---------------------------------------------------------------------------
