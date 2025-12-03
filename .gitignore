@@ -41,5 +41,9 @@ app.*.map.json
 /android/app/release
 
 # Python
+venv
 python_env/
-/.vscode/
+__pycache__
+
+# VS Code
+.vscode/
