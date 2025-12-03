@@ -28,6 +28,8 @@ class StylesheetPage extends StatefulWidget {
 class _StylesheetPageState extends State<StylesheetPage> {
   late int _currentProjectId;
   bool _isLoading = false;
+  // State to toggle hex code visibility
+  bool _showHexCodes = false;
 
   StylesheetData? _stylesheetData;
   String? _rawJsonString;
@@ -80,7 +82,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
     super.initState();
     _currentProjectId = widget.projectId;
     if (widget.autoGenerate) {
-      // Generate stylesheet automatically after a short delay to ensure page is built
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _generateStylesheet();
       });
@@ -129,7 +130,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
     StylesheetData? data;
 
     if (rawJson != null && rawJson.isNotEmpty) {
-      // Use the service to parse
       data = _stylesheetService.parse(rawJson);
     }
 
@@ -194,7 +194,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
         }),
         onSettingsPressed: () {},
       ),
-      // Only show content once full stylesheet is parsed atleast once
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Variables.textPrimary))
           : (_stylesheetData == null && _rawJsonString == null)
@@ -281,7 +280,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
-  Widget _buildSectionHeader(String title, {bool showArrow = true}) {
+  // Modified to support a custom trailing widget (e.g. Eye Icon)
+  Widget _buildSectionHeader(String title, {bool showArrow = true, Widget? trailing}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -299,7 +299,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
               ),
             ),
           ),
-          if (showArrow)
+          if (trailing != null)
+            trailing
+          else if (showArrow)
             Transform.rotate(
               angle: 3.14159,
               child: SvgPicture.asset(
@@ -329,10 +331,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
   }
 
   Widget _buildLogosSection(dynamic data) {
-    // Use manually uploaded logos
     List<String> logoPaths = List.from(_logoPaths);
 
-    // Also add any logos from data if present
     if (data is List) {
       for (var item in data) {
         if (item is Map && item.containsKey('path')) logoPaths.add(item['path'].toString());
@@ -352,7 +352,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
               if (index == logoPaths.length) {
-                // Add button
                 return GestureDetector(
                   onTap: _pickLogo,
                   child: Container(
@@ -506,7 +505,19 @@ class _StylesheetPageState extends State<StylesheetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader("Colors", showArrow: false),
+        // Using custom trailing widget for the Eye Icon toggle
+        _buildSectionHeader(
+          "Colors", 
+          showArrow: false,
+          trailing: GestureDetector(
+            onTap: () => setState(() => _showHexCodes = !_showHexCodes),
+            child: Icon(
+              _showHexCodes ? Icons.visibility : Icons.visibility_outlined,
+              color: Variables.textPrimary,
+              size: 20,
+            ),
+          ),
+        ),
         Wrap(
           spacing: 8, runSpacing: 8,
           children: colors.take(5).map((color) => _buildColorSwatch(color)).toList(),
@@ -517,9 +528,25 @@ class _StylesheetPageState extends State<StylesheetPage> {
   }
 
   Widget _buildColorSwatch(Color color) {
+    final String hexCode = '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+    final Color textColor = color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+
     return Container(
       width: 104, height: 52,
       decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
+      alignment: Alignment.center,
+      // Only show text if _showHexCodes is true
+      child: _showHexCodes 
+        ? Text(
+            hexCode,
+            style: TextStyle(
+              fontFamily: 'GeneralSans',
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: textColor,
+            ),
+          )
+        : null,
     );
   }
 

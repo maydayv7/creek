@@ -1,57 +1,32 @@
-# AI Image Generator Backend
+# Backend
 
-This project sets up a local Flask server that uses the Stable Diffusion v1.5 model to generate images from text prompts.
-Prerequisites
-Before you begin, ensure you have the following installed:
-Python 3.10 or 3.11 (Recommended for compatibility)
+This project provides a unified AI backend for image generation, inpainting, background removal, and captioning. It supports two modes of operation:
 
-### Prerequisites
+## 1. Local Server (`index.py`)
 
-- NVIDIA GPU (Recommended)  
-  You need a GPU with at least 4GB VRAM  
-  Ensure you have the latest NVIDIA drivers installed  
-  Check CUDA availability: Open terminal and run `nvidia-smi`
+Runs purely on your local machine
 
-## Installation & Setup
+> [!IMPORTANT]
+> Requires Cuda-enabled NVIDIA GPU
 
-### A. Install Standard Packages
-
-```
-pip install flask flask-cors diffusers transformers accelerate safetensors
-```
-
-### B. Install PyTorch & xFormers (GPU Acceleration)
-
-This step differs slightly depending on your OS and GPU
-
-#### Windows (NVIDIA GPU)
-
-To ensure you get the version compatible with your GPU, run:
-
-```
-pip install torch torchvision xformers --index-url https://download.pytorch.org/whl/cu118
-```
-
-If you have a very new GPU, you can try `cu121` instead of `cu118`
-
-#### Mac (M1/M2/M3 Silicon)
-
-Macs use "MPS" (Metal Performance Shaders) instead of CUDA
-
-```
-pip install torch torchvision torchaudio
-```
-
-### C. Models
-
-Download the requisite models from [here](https://github.com/adobeinter/Adobe-Models/tree/main)
-
-## Running the Server
+To run backend locally, run the following commands:
 
 ```shell
-python index.py
+pip install -r requirements.txt
+python ./index.py
 ```
 
-# Server Deployment
+## 2. Cloud Server (`modal_app.py`)
 
-To deploy to [Modal](https://modal.com/) server, simply modify `modal_app.py` according to your requirements and run `modal deploy modal_app.py`
+Deploys to [Modal.com](https://modal.com) for serverless GPU inference
+
+To deploy, run the following commands:
+
+```shell
+pip install modal
+modal setup
+modal deploy modal_app.py
+```
+
+> [!NOTE]
+> You must update the root `.env` file for the app to recognize the deployed backend

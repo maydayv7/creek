@@ -4,32 +4,32 @@ A Flutter project with AI-based image analysis
 
 ## Prerequisites
 
-- Flutter SDK
-- Python 3.8
-- Kotlin + Gradle
-- JDK
-- Android SDK
+- `git` & `git-lfs`
+- Flutter SDK **>=3.7**
+- Python **3.8**
+- Gradle **8.9.1**
+- Java/JDK **17** & Kotlin
+- Android SDK & NDK
+  - Platform Level **>=34**
+  - Build Tools **>=34.0.0**
+  - NDK Version **27.0.12077973**
+  - CMake **3.22.1**
+
+Ensure that all these programs with the correct versions are installed on your system before using this repository
 
 ## Setup
 
-### 1. Setup Python
+### 1. Clone Repository
+
+Clone using `git lfs clone` to ensure all models are correctly pulled
+
+### 2. Setup Python
+
+The Android app compiles Python code using [Chaquopy](https://chaquo.com/chaquopy/), which requires the following setup, mandatorily using Python Version 3.8:
 
 #### A) Install Python 3.8
 
-**macOS:**
-
-```bash
-brew install python@3.8
-```
-
-**Linux:**
-
-```bash
-sudo apt-get install python3.8 python3.8-venv
-```
-
-**Windows:**
-Download from [python.org](https://www.python.org/downloads/)
+Download from [python.org](https://www.python.org/downloads/release/python-3810/)
 
 #### B) Set up Virtual Environment
 
@@ -37,13 +37,16 @@ Download from [python.org](https://www.python.org/downloads/)
 python -m venv python_env
 ```
 
-### 3. AI Models
-
-Download the models from [here](https://mega.nz/folder/WghwgRYA#byC4igRSImx0LRd9KW40hw) and place them under `assets`
-
-### 4. Build the APK
+### 3. Build the APK
 
 ```bash
 flutter clean
-flutter build apk --release
+flutter pub get
+flutter build apk
 ```
+
+If you have `adb` properly installed, you can use `flutter run`
+
+## Backend
+
+Read [flask/README.md](flask/README.md) to run the server

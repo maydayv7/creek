@@ -71,7 +71,7 @@ android {
 
     buildTypes {
         release {
-            // Signing with the relsease keys, so `flutter run --release` works.
+            // Signing with the release keys, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("release")
 
             // Optional: Enable shrinking for smaller APKs (recommended for release)
