@@ -43,7 +43,6 @@ class FlaskService {
     required int projectId,
     required String sketchPath,
     required String userPrompt,
-    String? stylePrompt,
     String? imageDescription,
   }) async {
     debugPrint("🔗 [Pipeline] Starting Sketch-to-Image...");
@@ -164,7 +163,6 @@ class FlaskService {
     required int projectId,
     required String sketchPath,
     required String userPrompt,
-    String? stylePrompt,
     required int option,
     String? imageDescription,
   }) async {

@@ -538,11 +538,14 @@ DEFAULT_OPTIONS = {
 
 # ---- normalize sheet ----
 def normalize_sheet(sheet: Dict[str, Any]) -> Dict[str, Dict[str, List[str]]]:
+    """
+    Organizes the flat stylesheet tags into Primary and Secondary categories.
+    """
     results = sheet.get("results", sheet)
     norm: Dict[str, Dict[str, List[str]]] = {}
 
     for cat, val in results.items():
-        if cat in ("filename", "meta"):
+        if cat in ("filename", "meta", "Color Palette"): # Explicitly ignore Palette here if desired, or later
             continue
 
         items = []
@@ -566,36 +569,14 @@ def normalize_sheet(sheet: Dict[str, Any]) -> Dict[str, Dict[str, List[str]]]:
 
     return norm
 
-# ---- extract top colors ----
-def top_color_list(sheet: Dict[str, Any], max_colors: int = 5) -> List[str]:
-    palette = sheet.get("results", {}).get("Color Palette", [])
-    if isinstance(palette, dict) and "scores" in palette:
-        palette = palette["scores"]
-
-    try:
-        palette_sorted = sorted(
-            palette, key=lambda x: float(x.get("score", 0)), reverse=True
-        )
-    except Exception:
-        palette_sorted = palette
-
-    out: List[str] = []
-    for it in palette_sorted:
-        lab = it.get("label")
-        if lab:
-            out.append(lab.strip())
-        if len(out) >= max_colors:
-            break
-
-    return out
-
-# ---- remove style/color words helpers ----
+# ---- remove style words helpers ----
 STYLE_WORDS = [
-    "hand-drawn", "hand drawn", "sketch", "thin lines", "curves", "minimalistic",
+    "hand-drawn", "hand drawn", "sketch", "thin lines", "minimalistic",
     "minimal", "flat", "cartoon", "comic", "pop-art", "surreal", "photorealistic",
     "realistic", "painting", "oil painting", "pastel", "artistic", "illustration",
     "line drawing", "line art", "3d effect", "texture", "pattern", "soft light",
     "studio light", "dramatic", "cinematic", "moody", "vintage", "retro", "poster",
+    "render", "octane render", "unreal engine","digital illustration",
 ]
 
 style_words_regex = re.compile(
@@ -604,45 +585,42 @@ style_words_regex = re.compile(
 )
 
 def remove_style_words(caption: str) -> str:
+    """
+    Removes specific artistic style descriptions from the caption so they 
+    don't conflict with the Stylesheet.
+    """
     if not caption: return caption
     clean = style_words_regex.sub(" ", caption)
+    # Collapse multiple spaces into one
     clean = re.sub(r"\s{2,}", " ", clean).strip()
     return clean
 
-COMMON_COLOR_WORDS = {
-    "black", "white", "red", "green", "blue", "yellow", "orange", "purple",
-    "pink", "brown", "gray", "grey", "monochrome", "vibrant", "pastel",
-    "tinted", "sepia", "muted", "desaturated",
-}
-
-_COLOR_PATTERN = re.compile(
-    r"\b(" + "|".join(re.escape(w) for w in COMMON_COLOR_WORDS) + r")\b",
-    flags=re.IGNORECASE,
-)
-
-def remove_color_phrases_from_caption(caption: str) -> str:
-    if not caption: return caption
-    c = _COLOR_PATTERN.sub(" ", caption)
-    c = re.sub(r"\s{2,}", " ", c).strip()
-    if len(c) < 3: return caption
-    return c
-
 def extract_subject(caption_text: str) -> str:
+    """
+    Heuristic to guess the main subject (first few words of the first sentence).
+    """
     txt = caption_text.strip()
     if not txt: return "subject"
     first_clause = re.split(r"[.?!]\s*", txt)[0]
     return " ".join(first_clause.split()[:12])
 
 def pick_style_phrases(norm: Dict[str, Dict[str, List[str]]], max_secondaries=3) -> List[str]:
+    """
+    Extracts non-color features from the Stylesheet.
+    """
     cats = [
         "Style", "Background/Texture", "Lighting", "Composition",
         "Era/Cultural Reference", "Material Look", "Typography",
     ]
+    # Mappings for cleaner prompt text
     key_map = {
-        "Style": "style", "Background/Texture": "background/texture",
-        "Lighting": "lighting", "Composition": "composition",
-        "Era/Cultural Reference": "era / reference",
-        "Material Look": "material look", "Typography": "typography",
+        "Style": "art style", 
+        "Background/Texture": "background texture",
+        "Lighting": "lighting", 
+        "Composition": "composition",
+        "Era/Cultural Reference": "era",
+        "Material Look": "material", 
+        "Typography": "typography",
     }
 
     out: List[str] = []
@@ -658,10 +636,14 @@ def pick_style_phrases(norm: Dict[str, Dict[str, List[str]]], max_secondaries=3)
             if s and len(chosen) < (1 + max_secondaries):
                 chosen.append(s)
         if chosen:
+            # Format: "art style: Bauhaus, minimalist"
             out.append(f"{key_map.get(cat, cat)}: {', '.join(chosen)}")
     return out
 
 def style_to_tone(primary: str) -> str:
+    """
+    Infers a general tone based on the primary style.
+    """
     s = (primary or "").lower()
     if any(k in s for k in ["retro", "collage", "poster", "pop-art", "surreal"]):
         return "illustrative, textured, poster-like"
@@ -679,48 +661,44 @@ def generate_magic_prompt(stylesheet_json_str: str, caption: str, user_prompt: s
         # Fallback if parsing fails
         return f"{user_prompt}. The image features: {caption}"
 
-    # CLEAN caption
-    caption_no_style = remove_style_words(caption)
-    cleaned_caption = remove_color_phrases_from_caption(caption_no_style)
+    # 1. CLEAN CAPTION: Remove "Style" words, but KEEP "Color" words.
+    # We do NOT run any color removal function here.
+    cleaned_caption = remove_style_words(caption)
 
+    # 2. NORMALIZE SHEET: Get the structure from JSON
     norm = normalize_sheet(sheet)
     subject = extract_subject(cleaned_caption)
 
-    # Style cues
+    # 3. EXTRACT STYLESHEET FEATURES (Ignoring Color)
     style_phrases = pick_style_phrases(norm)
+    
+    # 4. INFER TONE
     style_primary = (norm.get("Style") or {}).get("Primary", "")
     tone_hint = style_to_tone(style_primary)
 
-    # Color palette
-    top_colors = top_color_list(sheet)
-
-    # Build style instruction
+    # 5. CONSTRUCT PROMPT
+    # We do NOT append 'top_color_list' from the sheet.
+    
     style_instruction = ""
     if style_phrases:
-        style_instruction = (
-            "User prefers these style cues (use as inspiration): " + "; ".join(style_phrases)
-        )
-    if top_colors:
-        color_str = ", ".join(top_colors)
-        style_instruction += f"; color palette: {color_str}"
-
-    # Construct final prompt parts
-    combined_parts: List[str] = []
-    if cleaned_caption: combined_parts.append(cleaned_caption)
-    if style_phrases: combined_parts.append("; ".join(style_phrases))
-    if user_prompt: combined_parts.append(user_prompt)
-
-    combined_description = " | ".join(combined_parts)
+        style_instruction = "Style elements: " + "; ".join(style_phrases)
+        # Note: We deliberately do NOT add color palette here.
 
     prompt_lines: List[str] = [
         f"Main subject: {subject}.",
-        f"Description: {combined_description}.",
-        "NOTE: Ignore any style words in the caption; style comes only from the stylesheet.",
+        # cleaned_caption contains the original colors from the image
+        f"Description: {cleaned_caption}.", 
     ]
+    
+    if user_prompt:
+        prompt_lines.append(f"User instruction: {user_prompt}.")
+        
     if style_instruction:
-        prompt_lines.append(style_instruction + ".")
+        prompt_lines.append(f"{style_instruction}.")
+
     prompt_lines += [
         f"Tone: {tone_hint}.",
+        "Note: Colors should be derived strictly from the Description.",
         "Avoid: blurry, deformed, text, watermark, extra limbs, artifacts.",
     ]
 
@@ -731,7 +709,7 @@ def generate_magic_prompt(stylesheet_json_str: str, caption: str, user_prompt: s
         "negative_prompt": "blurry, low resolution, deformed, text, watermark, extra limbs, artifacts",
         "options": DEFAULT_OPTIONS,
         "provenance": {"generated_from": "final_output"},
-        "weights": {"caption": 0.6, "style_sheet": 0.3, "user": 0.1},
+        "weights": {"caption": 0.7, "style_sheet": 0.2, "user": 0.1},
     }
 
     # Return concatenated prompt and payload as string

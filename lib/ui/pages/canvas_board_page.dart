@@ -1598,7 +1598,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
             prompt: prompt,
           );
         } else {
-            // Default: Standard Flask Inpainting ('inpaint_standard')
+            // Local Inpainting
             newImageUrl = await FlaskService().inpaintImage(
             imagePath: _tempBaseImage!.path,
             maskPath: maskFile.path,
@@ -1613,7 +1613,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
             projectId: widget.projectId,
             sketchPath: _tempBaseImage!.path,
             userPrompt: prompt,
-            stylePrompt: "high quality, realistic", 
             imageDescription: _aiDescription,
           );
         }
@@ -1622,7 +1621,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
             projectId: widget.projectId,
             sketchPath: _tempBaseImage!.path,
             userPrompt: prompt,
-            stylePrompt: "high quality, realistic",
             option: 1,
             imageDescription: _aiDescription,
           );
@@ -1632,7 +1630,6 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
             projectId: widget.projectId,
             sketchPath: _tempBaseImage!.path,
             userPrompt: prompt,
-            stylePrompt: "high quality, realistic",
             option: 2,
             imageDescription: _aiDescription,
           );
