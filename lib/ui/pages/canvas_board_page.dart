@@ -1502,6 +1502,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
             sketchPath: _tempBaseImage!.path,
             userPrompt: prompt,
             stylePrompt: "high quality, realistic", 
+            imageDescription: _aiDescription,
           );
         }
         else if(modelId == 'sketch_advanced'){
@@ -1510,7 +1511,8 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
             sketchPath: _tempBaseImage!.path,
             userPrompt: prompt,
             stylePrompt: "high quality, realistic",
-            option:1 ,
+            option: 1,
+            imageDescription: _aiDescription,
           );
 
         }
@@ -1521,12 +1523,16 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
             userPrompt: prompt,
             stylePrompt: "high quality, realistic",
             option: 2,
+            imageDescription: _aiDescription,
           );
         }
       }
 
       if (newImageUrl != null) {
         _addGeneratedImage(newImageUrl);
+        setState(() {
+          _isMagicDrawActive = false;
+        });
       }
     } catch (e) {
       debugPrint("Generation Error: $e");

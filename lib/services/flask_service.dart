@@ -44,11 +44,12 @@ class FlaskService {
     required String sketchPath,
     required String userPrompt,
     String? stylePrompt,
+    String? imageDescription,
   }) async {
     debugPrint("🔗 [Pipeline] Starting Sketch-to-Image...");
 
-    // 1. Analyze Sketch
-    final String? sketchDescription = await describeImage(
+    // 1. Analyze Sketch (Use cached description if available)
+    final String? sketchDescription = imageDescription ?? await describeImage(
       imagePath: sketchPath,
       prompt: '<MORE_DETAILED_CAPTION>',
     );
@@ -168,11 +169,12 @@ class FlaskService {
     required String userPrompt,
     String? stylePrompt,
     required int option,
+    String? imageDescription,
   }) async {
     debugPrint("🔗 [Pipeline] Starting Sketch-to-Image-API...");
 
-    // 1. Analyze Sketch
-    final String? sketchDescription = await describeImage(
+    // 1. Analyze Sketch (Use cached description if available)
+    final String? sketchDescription = imageDescription ?? await describeImage(
       imagePath: sketchPath,
       prompt: '<MORE_DETAILED_CAPTION>',
     );
