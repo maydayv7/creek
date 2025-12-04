@@ -566,7 +566,8 @@ class _ImageSavePageState extends State<ImageSavePage> {
                                   height: 16 / 12,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: "I love the serif font and how it is used...",
+                                  hintText:
+                                      "I love the serif font and how it is used...",
                                   hintStyle: const TextStyle(
                                     fontFamily: 'GeneralSans',
                                     fontSize: 12,
@@ -703,10 +704,11 @@ class _ImageSavePageState extends State<ImageSavePage> {
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(
-              builder: (_) => ProjectBoardPage(
-                projectId: widget.projectId,
-                initialShowAlternateView: true, // Show grid view
-              ),
+              builder:
+                  (_) => ProjectBoardPage(
+                    projectId: widget.projectId,
+                    initialShowAlternateView: true, // Show grid view
+                  ),
             ),
             (route) => false, // Remove all previous routes
           );
@@ -764,21 +766,13 @@ class _ImageSavePageState extends State<ImageSavePage> {
           // CONFIRM SELECTION BUTTON (Visible only in resizing mode)
           if (_isResizing && _finalSelectionRect != null)
             IconButton(
-              icon: const Icon(
-                Icons.check,
-                color: Color(0xFF7C86FF),
-                size: 24,
-              ),
+              icon: const Icon(Icons.check, color: Color(0xFF7C86FF), size: 24),
               onPressed: _confirmSelectionAndShowModal,
             ),
           // CANCEL SELECTION BUTTON (Visible only in drawing/resizing mode)
           if (_isDrawMode || _isResizing)
             IconButton(
-              icon: const Icon(
-                Icons.close,
-                color: Colors.black87,
-                size: 24,
-              ),
+              icon: const Icon(Icons.close, color: Colors.black87, size: 24),
               onPressed: _resetSelectionMode,
             ),
         ],

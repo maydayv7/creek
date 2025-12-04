@@ -36,9 +36,10 @@ class TopBar extends StatefulWidget implements PreferredSizeWidget {
   State<TopBar> createState() => _TopBarState();
 
   @override
-  Size get preferredSize => hideSecondRow 
-      ? const Size.fromHeight(48.0) // Height for single row
-      : const Size.fromHeight(88.0); // Height for two rows
+  Size get preferredSize =>
+      hideSecondRow
+          ? const Size.fromHeight(48.0) // Height for single row
+          : const Size.fromHeight(88.0); // Height for two rows
 }
 
 class _TopBarState extends State<TopBar> {
@@ -136,32 +137,33 @@ class _TopBarState extends State<TopBar> {
                   ],
                   // Title
                   Expanded(
-                    child: widget.titleOverride != null
-                        ? Text(
-                            widget.titleOverride!,
-                            style: const TextStyle(
-                              fontFamily: 'GeneralSans',
-                              fontSize: 20,
-                              fontWeight: FontWeight.w500,
-                              height: 24 / 20, // line-height: 24px
-                              color: Variables.textPrimary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          )
-                        : (!_isLoading &&
+                    child:
+                        widget.titleOverride != null
+                            ? Text(
+                              widget.titleOverride!,
+                              style: const TextStyle(
+                                fontFamily: 'GeneralSans',
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                                height: 24 / 20, // line-height: 24px
+                                color: Variables.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            )
+                            : (!_isLoading &&
                                 _currentProject != null &&
                                 _rootProject != null)
                             ? Text(
-                                _rootProject!.title,
-                                style: const TextStyle(
-                                  fontFamily: 'GeneralSans',
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w500,
-                                  height: 24 / 20,
-                                  color: Variables.textPrimary,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              )
+                              _rootProject!.title,
+                              style: const TextStyle(
+                                fontFamily: 'GeneralSans',
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                                height: 24 / 20,
+                                color: Variables.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            )
                             : const SizedBox(),
                   ),
                   // Settings Icon (only show if second row is visible)
@@ -184,161 +186,170 @@ class _TopBarState extends State<TopBar> {
             // Second Row: Global Dropdown and Action Buttons
             if (!widget.hideSecondRow)
               Container(
-              height: 40.0, // py-[8px] = 16px + 24px content
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: [
-                  // Left group: Global Dropdown and Layout Button
-                  Row(
-                    children: [
-                      // Global Dropdown
-                      if (!_isLoading &&
-                          _currentProject != null &&
-                          _rootProject != null)
-                        PopupMenuButton<ProjectModel>(
-                          padding: EdgeInsets.zero,
-                          onSelected: (project) =>
-                              widget.onProjectChanged?.call(project),
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          offset: const Offset(0, 42),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
+                height: 40.0, // py-[8px] = 16px + 24px content
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  children: [
+                    // Left group: Global Dropdown and Layout Button
+                    Row(
+                      children: [
+                        // Global Dropdown
+                        if (!_isLoading &&
+                            _currentProject != null &&
+                            _rootProject != null)
+                          PopupMenuButton<ProjectModel>(
+                            padding: EdgeInsets.zero,
+                            onSelected:
+                                (project) =>
+                                    widget.onProjectChanged?.call(project),
+                            color: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            decoration: BoxDecoration(
-                              color: Variables.borderSubtle, // #e4e4e7
-                              borderRadius: BorderRadius.circular(1000),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _currentProject!.id == _rootProject!.id
-                                      ? "Global"
-                                      : _currentProject!.title,
-                                  style: const TextStyle(
-                                    fontFamily: 'GeneralSans',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    height: 20 / 14,
+                            offset: const Offset(0, 42),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Variables.borderSubtle, // #e4e4e7
+                                borderRadius: BorderRadius.circular(1000),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _currentProject!.id == _rootProject!.id
+                                        ? "Global"
+                                        : _currentProject!.title,
+                                    style: const TextStyle(
+                                      fontFamily: 'GeneralSans',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      height: 20 / 14,
+                                      color: Variables.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    size: 20,
                                     color: Variables.textPrimary,
                                   ),
+                                ],
+                              ),
+                            ),
+                            itemBuilder: (context) {
+                              return _contextList.map((project) {
+                                final isSelected =
+                                    project.id == _currentProject!.id;
+                                final isRoot = project.id == _rootProject!.id;
+                                return PopupMenuItem<ProjectModel>(
+                                  value: project,
+                                  child: Text(
+                                    isRoot ? "Global" : project.title,
+                                    style: Variables.bodyStyle.copyWith(
+                                      fontFamily: 'GeneralSans',
+                                      fontWeight:
+                                          isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                      color:
+                                          isSelected
+                                              ? Variables.textPrimary
+                                              : Variables.textSecondary,
+                                    ),
+                                  ),
+                                );
+                              }).toList();
+                            },
+                          ),
+                        // Layout Icon Button (Toggle between All Images/Categorized) or Edit Icon
+                        if (widget.onLayoutToggle != null ||
+                            widget.onLayoutPressed != null) ...[
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap:
+                                widget.onLayoutToggle ?? widget.onLayoutPressed,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Variables.borderSubtle,
+                                borderRadius: BorderRadius.circular(1000),
+                              ),
+                              child: Icon(
+                                widget.onLayoutToggle != null
+                                    ? (widget.isAlternateView == true
+                                        ? Icons.dashboard
+                                        : Icons.view_agenda_outlined)
+                                    : Icons
+                                        .edit, // Use edit icon when only onLayoutPressed is provided
+                                size: 20,
+                                color: Variables.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const Spacer(),
+                    // Right group: Filter and AI/Sparkle Buttons
+                    if (widget.onFilterPressed != null ||
+                        widget.onAIPressed != null)
+                      Row(
+                        children: [
+                          // Filter Icon Button
+                          if (widget.onFilterPressed != null)
+                            GestureDetector(
+                              onTap: widget.onFilterPressed,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
                                 ),
-                                const SizedBox(width: 8),
-                                const Icon(
-                                  Icons.keyboard_arrow_down_rounded,
+                                decoration: BoxDecoration(
+                                  color: Variables.borderSubtle,
+                                  borderRadius: BorderRadius.circular(1000),
+                                ),
+                                child: const Icon(
+                                  Icons.tune,
                                   size: 20,
                                   color: Variables.textPrimary,
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                          itemBuilder: (context) {
-                            return _contextList.map((project) {
-                              final isSelected = project.id == _currentProject!.id;
-                              final isRoot = project.id == _rootProject!.id;
-                              return PopupMenuItem<ProjectModel>(
-                                value: project,
-                                child: Text(
-                                  isRoot ? "Global" : project.title,
-                                  style: Variables.bodyStyle.copyWith(
-                                    fontFamily: 'GeneralSans',
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                    color: isSelected
-                                        ? Variables.textPrimary
-                                        : Variables.textSecondary,
-                                  ),
+                          if (widget.onFilterPressed != null &&
+                              widget.onAIPressed != null)
+                            const SizedBox(width: 8),
+                          // AI/Sparkle Icon Button
+                          if (widget.onAIPressed != null)
+                            GestureDetector(
+                              onTap: widget.onAIPressed,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
                                 ),
-                              );
-                            }).toList();
-                          },
-                        ),
-                      // Layout Icon Button (Toggle between All Images/Categorized) or Edit Icon
-                      if (widget.onLayoutToggle != null || widget.onLayoutPressed != null) ...[
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: widget.onLayoutToggle ?? widget.onLayoutPressed,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Variables.borderSubtle,
-                              borderRadius: BorderRadius.circular(1000),
-                            ),
-                            child: Icon(
-                              widget.onLayoutToggle != null
-                                  ? (widget.isAlternateView == true
-                                      ? Icons.dashboard
-                                      : Icons.view_agenda_outlined)
-                                  : Icons.edit, // Use edit icon when only onLayoutPressed is provided
-                              size: 20,
-                              color: Variables.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const Spacer(),
-                  // Right group: Filter and AI/Sparkle Buttons
-                  if (widget.onFilterPressed != null || widget.onAIPressed != null)
-                    Row(
-                      children: [
-                        // Filter Icon Button
-                        if (widget.onFilterPressed != null)
-                          GestureDetector(
-                            onTap: widget.onFilterPressed,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Variables.borderSubtle,
-                                borderRadius: BorderRadius.circular(1000),
-                              ),
-                              child: const Icon(
-                                Icons.tune,
-                                size: 20,
-                                color: Variables.textPrimary,
+                                decoration: BoxDecoration(
+                                  color: Variables.borderSubtle,
+                                  borderRadius: BorderRadius.circular(1000),
+                                ),
+                                child: const Icon(
+                                  Icons.auto_awesome,
+                                  size: 20,
+                                  color: Variables.textPrimary,
+                                ),
                               ),
                             ),
-                          ),
-                        if (widget.onFilterPressed != null && widget.onAIPressed != null)
-                          const SizedBox(width: 8),
-                        // AI/Sparkle Icon Button
-                        if (widget.onAIPressed != null)
-                          GestureDetector(
-                            onTap: widget.onAIPressed,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Variables.borderSubtle,
-                                borderRadius: BorderRadius.circular(1000),
-                              ),
-                              child: const Icon(
-                                Icons.auto_awesome,
-                                size: 20,
-                                color: Variables.textPrimary,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                ],
+                        ],
+                      ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),

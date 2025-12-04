@@ -124,10 +124,10 @@ class AnalysisQueueManager {
       }
 
       final appDir = await getApplicationDocumentsDirectory();
-      
-      final cropDirPath = p.join(appDir.path, 'crops'); 
+
+      final cropDirPath = p.join(appDir.path, 'crops');
       final cropDir = Directory(cropDirPath);
-      
+
       if (!await cropDir.exists()) {
         await cropDir.create(recursive: true);
       }
@@ -187,14 +187,14 @@ class AnalysisQueueManager {
       }
 
       await _noteRepo.updateNote(
-        note.id!, 
+        note.id!,
         status: 'analyzing',
-        cropFilePath: cropPath
+        cropFilePath: cropPath,
       );
 
       // 3. Analysis
       debugPrint("[Queue]: Analyzing Note ${note.id} tag: ${note.category}");
-      
+
       // Now when this calls generateAsset internally, the DB lookup will succeed
       final result = await ImageAnalyzerService.analyzeSelected(cropPath, [
         note.category,
@@ -204,7 +204,7 @@ class AnalysisQueueManager {
       if (result['success'] == true && result['data'] != null) {
         final resultsMap = result['data']['results'] ?? {};
         final jsonString = jsonEncode(resultsMap);
-        
+
         await _noteRepo.updateNote(
           note.id!,
           analysisData: jsonString,

@@ -253,8 +253,6 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
     }
   }
 
-
-
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
@@ -573,7 +571,6 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
       ),
     );
   }
-
 
   Widget _buildFileItem(FileModel file) {
     final preview = _resolvePreviewPath(file);

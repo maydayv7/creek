@@ -92,226 +92,229 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFFAFAFA),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Drag handle
-              Container(
-                padding: const EdgeInsets.only(top: 8, bottom: 16),
-                child: Center(
-                  child: Container(
-                    width: 48,
-                    height: 2,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF71717B),
-                      borderRadius: BorderRadius.circular(100),
+      builder:
+          (context) => Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFFFAFAFA),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+            ),
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Drag handle
+                  Container(
+                    padding: const EdgeInsets.only(top: 8, bottom: 16),
+                    child: Center(
+                      child: Container(
+                        width: 48,
+                        height: 2,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF71717B),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              // Header section
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: Color(0xFFE4E4E7),
-                      width: 1,
+                  // Header section
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: Color(0xFFE4E4E7), width: 1),
+                      ),
+                    ),
+                    child: const Text(
+                      "Event Details",
+                      style: TextStyle(
+                        fontFamily: 'GeneralSans',
+                        fontSize: 14,
+                        fontWeight: FontWeight.normal,
+                        color: Color(0xFF27272A),
+                        height: 20 / 14,
+                      ),
                     ),
                   ),
-                ),
-                child: const Text(
-                  "Event Details",
-                  style: TextStyle(
-                    fontFamily: 'GeneralSans',
-                    fontSize: 14,
-                    fontWeight: FontWeight.normal,
-                    color: Color(0xFF27272A),
-                    height: 20 / 14,
-                  ),
-                ),
-              ),
-              // Content section
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Name field
-                    Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE4E4E7),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: TextField(
-                        controller: nameController,
-                        autofocus: true,
-                        style: const TextStyle(
-                          fontFamily: 'GeneralSans',
-                          fontSize: 12,
-                          fontWeight: FontWeight.normal,
-                          color: Color(0xFF27272A),
-                          height: 16 / 12,
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: "Add Name*",
-                          hintStyle: TextStyle(
-                            fontFamily: 'GeneralSans',
-                            fontSize: 12,
-                            fontWeight: FontWeight.normal,
-                            color: Color(0xFF71717B),
-                            height: 16 / 12,
-                          ),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Description field
-                    Container(
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE4E4E7),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: TextField(
-                        controller: descriptionController,
-                        maxLines: null,
-                        expands: true,
-                        textAlignVertical: TextAlignVertical.top,
-                        style: const TextStyle(
-                          fontFamily: 'GeneralSans',
-                          fontSize: 12,
-                          fontWeight: FontWeight.normal,
-                          color: Color(0xFF27272A),
-                          height: 16 / 12,
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: "Add Description",
-                          hintStyle: TextStyle(
-                            fontFamily: 'GeneralSans',
-                            fontSize: 12,
-                            fontWeight: FontWeight.normal,
-                            color: Color(0xFF71717B),
-                            height: 16 / 12,
-                          ),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Bottom actions
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                child: Row(
-                  children: [
-                    // Cancel button
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
+                  // Content section
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Name field
+                        Container(
                           height: 40,
                           decoration: BoxDecoration(
                             color: const Color(0xFFE4E4E7),
-                            borderRadius: BorderRadius.circular(1000),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Center(
-                            child: Text(
-                              "Cancel",
-                              style: TextStyle(
+                          child: TextField(
+                            controller: nameController,
+                            autofocus: true,
+                            style: const TextStyle(
+                              fontFamily: 'GeneralSans',
+                              fontSize: 12,
+                              fontWeight: FontWeight.normal,
+                              color: Color(0xFF27272A),
+                              height: 16 / 12,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: "Add Name*",
+                              hintStyle: TextStyle(
                                 fontFamily: 'GeneralSans',
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF27272A),
-                                height: 20 / 14,
-                                letterSpacing: 0.25,
+                                fontSize: 12,
+                                fontWeight: FontWeight.normal,
+                                color: Color(0xFF71717B),
+                                height: 16 / 12,
                               ),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Add Event button
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () async {
-                          if (nameController.text.trim().isNotEmpty) {
-                            try {
-                              await _projectService.createProject(
-                                nameController.text.trim(),
-                                description:
-                                    descriptionController.text.trim().isEmpty
-                                        ? null
-                                        : descriptionController.text.trim(),
-                                parentId: _project!.id,
-                              );
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                                _loadData(); // Refresh to show new event
-                              }
-                            } catch (e) {
-                              debugPrint("Error creating event: $e");
-                            }
-                          }
-                        },
-                        child: Container(
-                          height: 40,
+                        const SizedBox(height: 16),
+                        // Description field
+                        Container(
+                          height: 80,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF27272A),
-                            borderRadius: BorderRadius.circular(1000),
+                            color: const Color(0xFFE4E4E7),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Center(
-                            child: Text(
-                              "Add Event",
-                              style: TextStyle(
+                          child: TextField(
+                            controller: descriptionController,
+                            maxLines: null,
+                            expands: true,
+                            textAlignVertical: TextAlignVertical.top,
+                            style: const TextStyle(
+                              fontFamily: 'GeneralSans',
+                              fontSize: 12,
+                              fontWeight: FontWeight.normal,
+                              color: Color(0xFF27272A),
+                              height: 16 / 12,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: "Add Description",
+                              hintStyle: TextStyle(
                                 fontFamily: 'GeneralSans',
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFFFAFAFA),
-                                height: 20 / 14,
-                                letterSpacing: 0.25,
+                                fontSize: 12,
+                                fontWeight: FontWeight.normal,
+                                color: Color(0xFF71717B),
+                                height: 16 / 12,
+                              ),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Bottom actions
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                    child: Row(
+                      children: [
+                        // Cancel button
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE4E4E7),
+                                borderRadius: BorderRadius.circular(1000),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  "Cancel",
+                                  style: TextStyle(
+                                    fontFamily: 'GeneralSans',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF27272A),
+                                    height: 20 / 14,
+                                    letterSpacing: 0.25,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        // Add Event button
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () async {
+                              if (nameController.text.trim().isNotEmpty) {
+                                try {
+                                  await _projectService.createProject(
+                                    nameController.text.trim(),
+                                    description:
+                                        descriptionController.text
+                                                .trim()
+                                                .isEmpty
+                                            ? null
+                                            : descriptionController.text.trim(),
+                                    parentId: _project!.id,
+                                  );
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    _loadData(); // Refresh to show new event
+                                  }
+                                } catch (e) {
+                                  debugPrint("Error creating event: $e");
+                                }
+                              }
+                            },
+                            child: Container(
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF27272A),
+                                borderRadius: BorderRadius.circular(1000),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  "Add Event",
+                                  style: TextStyle(
+                                    fontFamily: 'GeneralSans',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFFFAFAFA),
+                                    height: 20 / 14,
+                                    letterSpacing: 0.25,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -395,7 +398,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
-              
+
               // Action Cards Row
               _buildActionCardsRow(_project!.id!),
 
@@ -415,13 +418,15 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     decoration: BoxDecoration(
                       color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.grey[300]!,
-                      ),
+                      border: Border.all(color: Colors.grey[300]!),
                     ),
                     child: Column(
                       children: [
-                        Icon(Icons.event_note, size: 48, color: Colors.grey[400]),
+                        Icon(
+                          Icons.event_note,
+                          size: 48,
+                          color: Colors.grey[400],
+                        ),
                         const SizedBox(height: 8),
                         Text(
                           "No events created yet",
@@ -439,9 +444,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   separatorBuilder: (_, __) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final event = _events[index];
-                    return Center(
-                      child: _buildEventCard(event),
-                    );
+                    return Center(child: _buildEventCard(event));
                   },
                 ),
 
@@ -499,10 +502,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: const Color(0xFFE4E4E7),
-            width: 1,
-          ),
+          border: Border.all(color: const Color(0xFFE4E4E7), width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -530,9 +530,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         blobImage,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: const Color(0xFF27272A),
-                          );
+                          return Container(color: const Color(0xFF27272A));
                         },
                       ),
                     ),
@@ -606,12 +604,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     return Container(
       padding: const EdgeInsets.only(bottom: 8, top: 16),
       decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: Color(0xFFE4E4E7),
-            width: 1,
-          ),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E4E7), width: 1)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -652,7 +645,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   Widget _buildEventCard(ProjectModel event) {
     final eventImages = _eventImages[event.id] ?? [];
-    
+
     return GestureDetector(
       onTap: () {
         if (event.id != null) {
@@ -663,10 +656,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         width: 328,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: const Color(0xFFE4E4E7),
-            width: 1,
-          ),
+          border: Border.all(color: const Color(0xFFE4E4E7), width: 1),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -683,19 +673,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     Expanded(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(4),
-                        child: i < eventImages.length
-                            ? Image.file(
-                                File(eventImages[i].filePath),
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[300],
-                                  );
-                                },
-                              )
-                            : Container(
-                                color: Colors.grey[200],
-                              ),
+                        child:
+                            i < eventImages.length
+                                ? Image.file(
+                                  File(eventImages[i].filePath),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(color: Colors.grey[300]);
+                                  },
+                                )
+                                : Container(color: Colors.grey[200]),
                       ),
                     ),
                     if (i < 2) const SizedBox(width: 4),

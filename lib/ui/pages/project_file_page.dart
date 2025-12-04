@@ -398,9 +398,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     );
   }
 
-
-
-
   // ---------------------------------------
   // BREADCRUMB
   // ---------------------------------------
@@ -531,7 +528,9 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                _search.isEmpty ? "No files yet" : "No files found",
+                                _search.isEmpty
+                                    ? "No files yet"
+                                    : "No files found",
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
@@ -626,38 +625,40 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
 
                             _eventFiles.isEmpty
                                 ? Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(vertical: 48),
-                                    child: Column(
-                                      children: [
-                                        Icon(
-                                          Icons.insert_drive_file_outlined,
-                                          size: 64,
-                                          color: Colors.grey[400],
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 48,
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.insert_drive_file_outlined,
+                                        size: 64,
+                                        color: Colors.grey[400],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        "No files in this event yet",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                          fontFamily: 'GeneralSans',
+                                          color: Colors.grey[600],
                                         ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          "No files in this event yet",
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500,
-                                            fontFamily: 'GeneralSans',
-                                            color: Colors.grey[600],
-                                          ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        "Create a file to add it to this event",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontFamily: 'GeneralSans',
+                                          color: Colors.grey[500],
                                         ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          "Create a file to add it to this event",
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontFamily: 'GeneralSans',
-                                            color: Colors.grey[500],
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ],
-                                    ),
-                                  )
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                )
                                 : Column(
                                   children:
                                       _eventFiles
@@ -745,7 +746,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
       ),
     );
   }
-
 
   // ---------------------------------------
   // FILTER

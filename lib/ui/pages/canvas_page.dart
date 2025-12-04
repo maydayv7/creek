@@ -1290,25 +1290,50 @@ class _CanvasPageState extends State<CanvasPage> {
                     right: 0,
                     child: Center(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black87,
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
-                            BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))
-                          ]
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (_isRemovingBg) ...[
-                               const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
-                               const SizedBox(width: 8),
-                               const Text("Removing...", style: TextStyle(color: Colors.white, fontFamily: 'GeneralSans', fontSize: 14)),
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                "Removing...",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'GeneralSans',
+                                  fontSize: 14,
+                                ),
+                              ),
                             ] else ...[
-                               const Text(
+                              const Text(
                                 "Remove background?",
-                                style: TextStyle(color: Colors.white, fontFamily: 'GeneralSans', fontSize: 14),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'GeneralSans',
+                                  fontSize: 14,
+                                ),
                               ),
                               const SizedBox(width: 8),
                               InkWell(
@@ -1319,15 +1344,26 @@ class _CanvasPageState extends State<CanvasPage> {
                                     color: Colors.white,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.check, size: 16, color: Colors.black),
+                                  child: const Icon(
+                                    Icons.check,
+                                    size: 16,
+                                    color: Colors.black,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 8),
                               InkWell(
-                                onTap: () => setState(() => _showBgRemovalBanner = false),
-                                child: const Icon(Icons.close, size: 18, color: Colors.white54),
+                                onTap:
+                                    () => setState(
+                                      () => _showBgRemovalBanner = false,
+                                    ),
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 18,
+                                  color: Colors.white54,
+                                ),
                               ),
-                            ]
+                            ],
                           ],
                         ),
                       ),
@@ -1525,7 +1561,7 @@ class _CanvasPageState extends State<CanvasPage> {
 
   Future<void> _confirmRemoveBackground() async {
     if (_bgRemovalTargetId == null || _bgRemovalTargetPath == null) return;
-    
+
     _bgRemovalBannerTimer?.cancel();
 
     setState(() {
@@ -1534,35 +1570,39 @@ class _CanvasPageState extends State<CanvasPage> {
 
     try {
       // Call service to remove background
-      final newPath = await FlaskService().generateAsset(imagePath: _bgRemovalTargetPath!);
+      final newPath = await FlaskService().generateAsset(
+        imagePath: _bgRemovalTargetPath!,
+      );
 
       if (newPath != null && mounted) {
         // Find the element and update its content
         final index = elements.indexWhere((e) => e['id'] == _bgRemovalTargetId);
         if (index != -1) {
-           final oldState = _getCurrentState();
-           setState(() {
-             elements[index]['content'] = newPath; // Replace with transparent png
-             _showBgRemovalBanner = false;
-             _isRemovingBg = false;
-             _hasUnsavedChanges = true;
-           });
-           _recordChange(oldState);
+          final oldState = _getCurrentState();
+          setState(() {
+            elements[index]['content'] =
+                newPath; // Replace with transparent png
+            _showBgRemovalBanner = false;
+            _isRemovingBg = false;
+            _hasUnsavedChanges = true;
+          });
+          _recordChange(oldState);
         }
       }
     } catch (e) {
       debugPrint("BG Removal Failed: $e");
     } finally {
-      if (mounted) setState(() {
-         _isRemovingBg = false;
-         _showBgRemovalBanner = false;
-      });
+      if (mounted)
+        setState(() {
+          _isRemovingBg = false;
+          _showBgRemovalBanner = false;
+        });
     }
   }
 
   Future<void> _processInpainting(String prompt, String modelId) async {
     // Lock editing and hide keyboard
-    FocusScope.of(context).unfocus(); 
+    FocusScope.of(context).unfocus();
 
     setState(() => _isInpainting = true);
     _resetInactivityTimer();
@@ -1591,15 +1631,15 @@ class _CanvasPageState extends State<CanvasPage> {
       // CASE 1: INPAINTING (When hasImageLayers is TRUE)
       if (hasImageLayers) {
         if (modelId == 'inpaint_api') {
-            // Call API Inpainting
-            newImageUrl = await FlaskService().inpaintApiImage(
+          // Call API Inpainting
+          newImageUrl = await FlaskService().inpaintApiImage(
             imagePath: _tempBaseImage!.path,
             maskPath: maskFile.path,
             prompt: prompt,
           );
         } else {
-            // Local Inpainting
-            newImageUrl = await FlaskService().inpaintImage(
+          // Local Inpainting
+          newImageUrl = await FlaskService().inpaintImage(
             imagePath: _tempBaseImage!.path,
             maskPath: maskFile.path,
             prompt: prompt,
@@ -1608,15 +1648,14 @@ class _CanvasPageState extends State<CanvasPage> {
       }
       // CASE 2: SKETCH TO IMAGE (When hasImageLayers is FALSE)
       else {
-        if(modelId == 'sketch_fusion'){
+        if (modelId == 'sketch_fusion') {
           newImageUrl = await FlaskService().sketchToImage(
             projectId: widget.projectId,
             sketchPath: _tempBaseImage!.path,
             userPrompt: prompt,
             imageDescription: _aiDescription,
           );
-        }
-        else if(modelId == 'sketch_advanced'){
+        } else if (modelId == 'sketch_advanced') {
           newImageUrl = await FlaskService().sketchToImageAPI(
             projectId: widget.projectId,
             sketchPath: _tempBaseImage!.path,
@@ -1624,8 +1663,7 @@ class _CanvasPageState extends State<CanvasPage> {
             option: 1,
             imageDescription: _aiDescription,
           );
-        }
-        else if (modelId == 'sketch_creative') {
+        } else if (modelId == 'sketch_creative') {
           newImageUrl = await FlaskService().sketchToImageAPI(
             projectId: widget.projectId,
             sketchPath: _tempBaseImage!.path,

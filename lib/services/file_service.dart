@@ -85,5 +85,5 @@ class FileService {
 
   Future<void> renameFile(String id, String newName) async {
     await _repo.updateDetails(id, name: newName);
-  } 
+  }
 }

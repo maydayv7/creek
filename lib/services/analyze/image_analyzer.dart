@@ -364,7 +364,7 @@ class ImageAnalyzerService {
             'Lighting': {"scores": results[5]['scores']},
             'Colour Palette': {
               "scores": results[1]['scores'],
-              "palette": results[1]['palette']
+              "palette": results[1]['palette'],
             },
             'Emotions': {"scores": results[4]['scores']},
             'Era': {"scores": results[6]['scores']},

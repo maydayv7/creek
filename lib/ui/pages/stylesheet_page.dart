@@ -19,7 +19,11 @@ class StylesheetPage extends StatefulWidget {
   final int projectId;
   final bool autoGenerate;
 
-  const StylesheetPage({super.key, required this.projectId, this.autoGenerate = false});
+  const StylesheetPage({
+    super.key,
+    required this.projectId,
+    this.autoGenerate = false,
+  });
 
   @override
   State<StylesheetPage> createState() => _StylesheetPageState();
@@ -95,14 +99,19 @@ class _StylesheetPageState extends State<StylesheetPage> {
   String _formatLabel(String label) {
     String clean = label.replaceAll(RegExp(r'[-_]'), ' ');
     List<String> words = clean.split(' ');
-    return words.map((w) {
-      if (w.isEmpty) return '';
-      return w[0].toUpperCase() + w.substring(1).toLowerCase();
-    }).join(' ');
+    return words
+        .map((w) {
+          if (w.isEmpty) return '';
+          return w[0].toUpperCase() + w.substring(1).toLowerCase();
+        })
+        .join(' ');
   }
 
   String? _findAssetPath(Map<String, String> assetMap, String label) {
-    String normalized = label.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    String normalized = label.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
     return assetMap[normalized];
   }
 
@@ -151,15 +160,27 @@ class _StylesheetPageState extends State<StylesheetPage> {
 
     try {
       final images = await ImageRepo().getImages(_currentProjectId);
-      final List<String> analysisData = images.map((img) => img.analysisData).where((data) => data != null && data.isNotEmpty).cast<String>().toList();
+      final List<String> analysisData =
+          images
+              .map((img) => img.analysisData)
+              .where((data) => data != null && data.isNotEmpty)
+              .cast<String>()
+              .toList();
       final notes = await NoteRepo().getNotesByProjectId(_currentProjectId);
-      final List<String> noteAnalysisData = notes.map((n) => n.analysisData).where((data) => data != null && data.isNotEmpty).cast<String>().toList();
+      final List<String> noteAnalysisData =
+          notes
+              .map((n) => n.analysisData)
+              .where((data) => data != null && data.isNotEmpty)
+              .cast<String>()
+              .toList();
 
       analysisData.addAll(noteAnalysisData);
 
       if (analysisData.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No analyzed images or notes found.")));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("No analyzed images or notes found.")),
+          );
         }
         return;
       }
@@ -185,21 +206,28 @@ class _StylesheetPageState extends State<StylesheetPage> {
       appBar: TopBar(
         currentProjectId: _currentProjectId,
         onBack: () => Navigator.of(context).pop(),
-        onProjectChanged: (p) => setState(() {
-          _currentProjectId = p.id!;
-          _stylesheetData = null;
-          _projectAssets = [];
-          _logoPaths = [];
-          _loadSavedStylesheet();
-        }),
+        onProjectChanged:
+            (p) => setState(() {
+              _currentProjectId = p.id!;
+              _stylesheetData = null;
+              _projectAssets = [];
+              _logoPaths = [];
+              _loadSavedStylesheet();
+            }),
         onSettingsPressed: () {},
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Variables.textPrimary))
-          : (_stylesheetData == null && _rawJsonString == null)
+      body:
+          _isLoading
+              ? const Center(
+                child: CircularProgressIndicator(color: Variables.textPrimary),
+              )
+              : (_stylesheetData == null && _rawJsonString == null)
               ? _buildEmptyState()
               : _buildContent(),
-      bottomNavigationBar: BottomBar(currentTab: BottomBarItem.stylesheet, projectId: _currentProjectId),
+      bottomNavigationBar: BottomBar(
+        currentTab: BottomBarItem.stylesheet,
+        projectId: _currentProjectId,
+      ),
     );
   }
 
@@ -233,19 +261,22 @@ class _StylesheetPageState extends State<StylesheetPage> {
           children: [
             Center(child: _buildGenerateButton("Regenerate Stylesheet")),
             const SizedBox(height: 24),
-            
+
             _buildLogosSection(null),
-            if (data.graphics.isNotEmpty || _projectAssets.isNotEmpty) _buildGraphicsSection(data.graphics),
+            if (data.graphics.isNotEmpty || _projectAssets.isNotEmpty)
+              _buildGraphicsSection(data.graphics),
             if (data.colors.isNotEmpty) _buildColorsSection(data.colors),
             if (data.fonts.isNotEmpty) _buildFontsSection(data.fonts),
-            if (data.compositions.isNotEmpty) _buildCompositionsSection(data.compositions),
-            if (data.materialLook.isNotEmpty) _buildMaterialLookSection(data.materialLook),
+            if (data.compositions.isNotEmpty)
+              _buildCompositionsSection(data.compositions),
+            if (data.materialLook.isNotEmpty)
+              _buildMaterialLookSection(data.materialLook),
             if (data.textures.isNotEmpty) _buildTexturesSection(data.textures),
             if (data.lighting.isNotEmpty) _buildLightingSection(data.lighting),
             if (data.style.isNotEmpty) _buildStyleSection(data.style),
             if (data.era.isNotEmpty) _buildEraSection(data.era),
             if (data.emotions.isNotEmpty) _buildEmotionsSection(data.emotions),
-            
+
             const SizedBox(height: 24),
           ],
         ),
@@ -259,8 +290,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         decoration: BoxDecoration(
-          color: Variables.textPrimary, 
-          borderRadius: BorderRadius.circular(112)
+          color: Variables.textPrimary,
+          borderRadius: BorderRadius.circular(112),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -270,9 +301,12 @@ class _StylesheetPageState extends State<StylesheetPage> {
             const SizedBox(width: 8),
             SvgPicture.asset(
               'assets/icons/generate_icon.svg',
-              width: 18, 
+              width: 18,
               height: 18,
-              colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+              colorFilter: const ColorFilter.mode(
+                Colors.white,
+                BlendMode.srcIn,
+              ),
             ),
           ],
         ),
@@ -281,7 +315,11 @@ class _StylesheetPageState extends State<StylesheetPage> {
   }
 
   // Modified to support a custom trailing widget (e.g. Eye Icon)
-  Widget _buildSectionHeader(String title, {bool showArrow = true, Widget? trailing}) {
+  Widget _buildSectionHeader(
+    String title, {
+    bool showArrow = true,
+    Widget? trailing,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -308,7 +346,10 @@ class _StylesheetPageState extends State<StylesheetPage> {
                 'assets/icons/arrow-left-s-line.svg',
                 width: 24,
                 height: 24,
-                colorFilter: const ColorFilter.mode(Variables.textPrimary, BlendMode.srcIn),
+                colorFilter: const ColorFilter.mode(
+                  Variables.textPrimary,
+                  BlendMode.srcIn,
+                ),
               ),
             ),
         ],
@@ -319,7 +360,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
   // --- Logos ---
   Future<void> _pickLogo() async {
     try {
-      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+      );
       if (pickedFile != null) {
         setState(() {
           _logoPaths.add(pickedFile.path);
@@ -335,10 +378,13 @@ class _StylesheetPageState extends State<StylesheetPage> {
 
     if (data is List) {
       for (var item in data) {
-        if (item is Map && item.containsKey('path')) logoPaths.add(item['path'].toString());
-        else if (item is String) logoPaths.add(item);
+        if (item is Map && item.containsKey('path'))
+          logoPaths.add(item['path'].toString());
+        else if (item is String)
+          logoPaths.add(item);
       }
-    } else if (data is String) logoPaths.add(data);
+    } else if (data is String)
+      logoPaths.add(data);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,8 +410,12 @@ class _StylesheetPageState extends State<StylesheetPage> {
                     child: Center(
                       child: SvgPicture.asset(
                         'assets/icons/add-line.svg',
-                        width: 20, height: 20,
-                        colorFilter: const ColorFilter.mode(Variables.textSecondary, BlendMode.srcIn),
+                        width: 20,
+                        height: 20,
+                        colorFilter: const ColorFilter.mode(
+                          Variables.textSecondary,
+                          BlendMode.srcIn,
+                        ),
                       ),
                     ),
                   ),
@@ -397,7 +447,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
             scrollDirection: Axis.horizontal,
             itemCount: graphicPaths.length,
             separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, index) => _buildGraphicCard(graphicPaths[index]),
+            itemBuilder:
+                (context, index) => _buildGraphicCard(graphicPaths[index]),
           ),
         ),
         const SizedBox(height: 16),
@@ -418,14 +469,19 @@ class _StylesheetPageState extends State<StylesheetPage> {
             color: Variables.surfaceSubtle,
           ),
           clipBehavior: Clip.antiAlias,
-          child: file != null
-              ? Image.file(file, fit: BoxFit.cover)
-              : Container(
-                  color: Variables.surfaceSubtle,
-                  child: const Center(
-                    child: Icon(Icons.broken_image, color: Colors.grey, size: 20),
+          child:
+              file != null
+                  ? Image.file(file, fit: BoxFit.cover)
+                  : Container(
+                    color: Variables.surfaceSubtle,
+                    child: const Center(
+                      child: Icon(
+                        Icons.broken_image,
+                        color: Colors.grey,
+                        size: 20,
+                      ),
+                    ),
                   ),
-                ),
         );
       },
     );
@@ -478,19 +534,22 @@ class _StylesheetPageState extends State<StylesheetPage> {
           Text(
             "Aa",
             style: sampleStyle.copyWith(
-              fontSize: 28, 
-              height: 1.2, 
-              fontWeight: FontWeight.w400, 
+              fontSize: 28,
+              height: 1.2,
+              fontWeight: FontWeight.w400,
               color: Variables.textPrimary,
             ),
           ),
           Text(
-            displayFontName, 
+            displayFontName,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontFamily: 'GeneralSans', fontSize: 12, height: 16 / 12,
-              color: Variables.textSecondary, fontWeight: FontWeight.w400,
+              fontFamily: 'GeneralSans',
+              fontSize: 12,
+              height: 16 / 12,
+              color: Variables.textSecondary,
+              fontWeight: FontWeight.w400,
             ),
           ),
         ],
@@ -507,7 +566,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
       children: [
         // Using custom trailing widget for the Eye Icon toggle
         _buildSectionHeader(
-          "Colors", 
+          "Colors",
           showArrow: false,
           trailing: GestureDetector(
             onTap: () => setState(() => _showHexCodes = !_showHexCodes),
@@ -519,8 +578,10 @@ class _StylesheetPageState extends State<StylesheetPage> {
           ),
         ),
         Wrap(
-          spacing: 8, runSpacing: 8,
-          children: colors.take(5).map((color) => _buildColorSwatch(color)).toList(),
+          spacing: 8,
+          runSpacing: 8,
+          children:
+              colors.take(5).map((color) => _buildColorSwatch(color)).toList(),
         ),
         const SizedBox(height: 16),
       ],
@@ -528,25 +589,32 @@ class _StylesheetPageState extends State<StylesheetPage> {
   }
 
   Widget _buildColorSwatch(Color color) {
-    final String hexCode = '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
-    final Color textColor = color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+    final String hexCode =
+        '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+    final Color textColor =
+        color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
 
     return Container(
-      width: 104, height: 52,
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
+      width: 104,
+      height: 52,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+      ),
       alignment: Alignment.center,
       // Only show text if _showHexCodes is true
-      child: _showHexCodes 
-        ? Text(
-            hexCode,
-            style: TextStyle(
-              fontFamily: 'GeneralSans',
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: textColor,
-            ),
-          )
-        : null,
+      child:
+          _showHexCodes
+              ? Text(
+                hexCode,
+                style: TextStyle(
+                  fontFamily: 'GeneralSans',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: textColor,
+                ),
+              )
+              : null,
     );
   }
 
@@ -570,11 +638,14 @@ class _StylesheetPageState extends State<StylesheetPage> {
               child: Image.asset(
                 assetPath,
                 fit: BoxFit.cover,
-                errorBuilder: (c, o, s) => Container(color: Variables.surfaceSubtle),
+                errorBuilder:
+                    (c, o, s) => Container(color: Variables.surfaceSubtle),
               ),
             ),
             Positioned(
-              left: 0, right: 0, bottom: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               height: 40,
               child: Container(
                 decoration: BoxDecoration(
@@ -587,7 +658,9 @@ class _StylesheetPageState extends State<StylesheetPage> {
               ),
             ),
             Positioned(
-              left: 4, right: 4, bottom: 4,
+              left: 4,
+              right: 4,
+              bottom: 4,
               child: Text(
                 formattedLabel,
                 style: const TextStyle(
@@ -628,7 +701,11 @@ class _StylesheetPageState extends State<StylesheetPage> {
     }
   }
 
-  Widget _buildAttributeSection(String title, List<String> items, Map<String, String>? assetMap) {
+  Widget _buildAttributeSection(
+    String title,
+    List<String> items,
+    Map<String, String>? assetMap,
+  ) {
     if (items.isEmpty) return const SizedBox();
 
     return Column(
@@ -643,7 +720,8 @@ class _StylesheetPageState extends State<StylesheetPage> {
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
               String label = items[index];
-              String? assetPath = assetMap != null ? _findAssetPath(assetMap, label) : null;
+              String? assetPath =
+                  assetMap != null ? _findAssetPath(assetMap, label) : null;
               return _buildUnifiedCard(label, assetPath);
             },
           ),

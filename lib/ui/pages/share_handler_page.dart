@@ -82,10 +82,7 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder:
-                  (_) => ShareToFilePage(
-                    sharedImage: tempFiles.first,
-                  ),
+              builder: (_) => ShareToFilePage(sharedImage: tempFiles.first),
             ),
           );
         } else {

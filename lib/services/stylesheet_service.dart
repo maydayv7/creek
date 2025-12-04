@@ -50,10 +50,25 @@ class StylesheetService {
     return StylesheetData(
       colors: colors,
       fonts: fonts,
-      graphics: _extractStrings(data, ['Graphics', 'graphics'], valueKey: 'path'),
-      compositions: _extractStrings(data, ['Compositions', 'Composition', 'compositions']),
-      materialLook: _extractStrings(data, ['Material look', 'Material Look', 'material_look']),
-      textures: _extractStrings(data, ['Textures', 'Background/Texture', 'textures']),
+      graphics: _extractStrings(data, [
+        'Graphics',
+        'graphics',
+      ], valueKey: 'path'),
+      compositions: _extractStrings(data, [
+        'Compositions',
+        'Composition',
+        'compositions',
+      ]),
+      materialLook: _extractStrings(data, [
+        'Material look',
+        'Material Look',
+        'material_look',
+      ]),
+      textures: _extractStrings(data, [
+        'Textures',
+        'Background/Texture',
+        'textures',
+      ]),
       lighting: _extractStrings(data, ['Lighting', 'lighting']),
       style: _extractStrings(data, ['Style', 'style']),
       era: _extractStrings(data, ['Era/Cultural Reference', 'Era', 'era']),
@@ -133,7 +148,12 @@ class StylesheetService {
 
   // Extracts font names and resolves them to valid Google Font strings.
   List<String> _extractFonts(Map<String, dynamic> data) {
-    dynamic fontData = _findValue(data, ['Typography', 'fonts', 'typography', 'Fonts']);
+    dynamic fontData = _findValue(data, [
+      'Typography',
+      'fonts',
+      'typography',
+      'Fonts',
+    ]);
     if (fontData == null) return [];
 
     List<String> rawNames = [];
@@ -160,7 +180,7 @@ class StylesheetService {
       'Colour Palette',
       'Color Palette',
       'colors',
-      'Colors'
+      'Colors',
     ]);
     if (colorData == null) return [];
 
@@ -185,7 +205,11 @@ class StylesheetService {
 
   // Generic helper to extract a list of strings from various keys
   // Supports extraction from [{ "label": "val" }] or ["val"] or "val"
-  List<String> _extractStrings(Map<String, dynamic> data, List<String> keys, {String valueKey = 'label'}) {
+  List<String> _extractStrings(
+    Map<String, dynamic> data,
+    List<String> keys, {
+    String valueKey = 'label',
+  }) {
     dynamic rawData = _findValue(data, keys);
     if (rawData == null) return [];
 

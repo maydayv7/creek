@@ -3,9 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class PythonService {
-  static const MethodChannel _channel = MethodChannel(
-    'com.creek.ui/methods',
-  );
+  static const MethodChannel _channel = MethodChannel('com.creek.ui/methods');
 
   // 1. Layout Analysis (OpenCV)
   Future<Map<String, dynamic>> analyzeLayout(String imagePath) async {
@@ -74,11 +72,14 @@ class PythonService {
     required String userPrompt,
   }) async {
     try {
-      final String? result = await _channel.invokeMethod('generateMagicPrompt', {
-        'stylesheetJson': stylesheetJson,
-        'caption': caption,
-        'userPrompt': userPrompt,
-      });
+      final String? result = await _channel.invokeMethod(
+        'generateMagicPrompt',
+        {
+          'stylesheetJson': stylesheetJson,
+          'caption': caption,
+          'userPrompt': userPrompt,
+        },
+      );
       return result;
     } catch (e) {
       debugPrint("Magic Prompt Generation Error: $e");

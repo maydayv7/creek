@@ -180,10 +180,11 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => StylesheetPage(
-                projectId: _currentProject!.id!,
-                autoGenerate: true,
-              ),
+              builder:
+                  (_) => StylesheetPage(
+                    projectId: _currentProject!.id!,
+                    autoGenerate: true,
+                  ),
             ),
           );
         },

@@ -198,65 +198,84 @@ class _HomePageState extends State<HomePage> {
 
     final didRename = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: theme.cardColor,
-        title: Text(
-          'Rename Project',
-          style: TextStyle(
-            fontFamily: 'GeneralSans',
-            fontSize: 18,
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: TextStyle(fontFamily: 'GeneralSans', color: theme.colorScheme.onSurface),
-          decoration: InputDecoration(
-            hintText: 'Enter new name',
-            hintStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5)),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: theme.cardColor,
+            title: Text(
+              'Rename Project',
+              style: TextStyle(
+                fontFamily: 'GeneralSans',
+                fontSize: 18,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: theme.colorScheme.primary),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              style: TextStyle(
+                fontFamily: 'GeneralSans',
+                color: theme.colorScheme.onSurface,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Enter new name',
+                hintStyle: TextStyle(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                  ),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: theme.colorScheme.primary),
+                ),
+              ),
+              textCapitalization: TextCapitalization.sentences,
             ),
+            actions: [
+              TextButton(
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(ctx, false),
+              ),
+              TextButton(
+                child: Text(
+                  'Save',
+                  style: TextStyle(color: theme.colorScheme.primary),
+                ),
+                onPressed: () {
+                  if (controller.text.trim().isNotEmpty) {
+                    Navigator.pop(ctx, true);
+                  }
+                },
+              ),
+            ],
           ),
-          textCapitalization: TextCapitalization.sentences,
-        ),
-        actions: [
-          TextButton(
-            child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7))),
-            onPressed: () => Navigator.pop(ctx, false),
-          ),
-          TextButton(
-            child: Text('Save', style: TextStyle(color: theme.colorScheme.primary)),
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                Navigator.pop(ctx, true);
-              }
-            },
-          ),
-        ],
-      ),
     );
 
     if (didRename == true && project.id != null) {
       setState(() => _isLoading = true);
       try {
-        await _projectService.updateProjectDetails(project.id!, title: controller.text.trim());
+        await _projectService.updateProjectDetails(
+          project.id!,
+          title: controller.text.trim(),
+        );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Project renamed')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Project renamed')));
         }
         _loadData();
       } catch (e) {
         if (mounted) {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error renaming: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error renaming: $e')));
         }
       }
     }
@@ -267,31 +286,43 @@ class _HomePageState extends State<HomePage> {
     final theme = Theme.of(context);
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: theme.cardColor,
-        title: Text(
-          'Delete Project',
-          style: TextStyle(
-            fontFamily: 'GeneralSans',
-            fontSize: 18,
-            color: theme.colorScheme.onSurface,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: theme.cardColor,
+            title: Text(
+              'Delete Project',
+              style: TextStyle(
+                fontFamily: 'GeneralSans',
+                fontSize: 18,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            content: Text(
+              'Are you sure you want to delete "${project.title}"? This cannot be undone.',
+              style: TextStyle(
+                fontFamily: 'GeneralSans',
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+              ),
+            ),
+            actions: [
+              TextButton(
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(ctx, false),
+              ),
+              TextButton(
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+              ),
+            ],
           ),
-        ),
-        content: Text(
-          'Are you sure you want to delete "${project.title}"? This cannot be undone.',
-          style: TextStyle(fontFamily: 'GeneralSans', color: theme.colorScheme.onSurface.withValues(alpha: 0.8)),
-        ),
-        actions: [
-          TextButton(
-            child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7))),
-            onPressed: () => Navigator.pop(ctx, false),
-          ),
-          TextButton(
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-            onPressed: () => Navigator.pop(ctx, true),
-          ),
-        ],
-      ),
     );
 
     if (confirm == true && project.id != null) {
@@ -307,9 +338,9 @@ class _HomePageState extends State<HomePage> {
       } catch (e) {
         if (mounted) {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting project: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error deleting project: $e')));
         }
       }
     }
@@ -347,12 +378,13 @@ class _HomePageState extends State<HomePage> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => CanvasPage(
-            projectId: file.projectId,
-            width: width,
-            height: height,
-            existingFile: file,
-          ),
+          builder:
+              (_) => CanvasPage(
+                projectId: file.projectId,
+                width: width,
+                height: height,
+                existingFile: file,
+              ),
         ),
       ).then((_) => _loadData());
     }
@@ -575,7 +607,7 @@ class _HomePageState extends State<HomePage> {
                                         onRename: () => _renameProject(p),
                                         onDelete: () => _deleteProject(p),
                                         isHorizontal: false,
-                                        showGrid: false, 
+                                        showGrid: false,
                                       ),
                                     ),
                                   ),
@@ -594,24 +626,23 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                ...filteredFiles.map(
-                                  (f) {
-                                    final meta = _fileMetadata[f.id] ?? {};
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 12),
-                                      child: _FileCard(
-                                        file: f,
-                                        theme: theme,
-                                        isDark: isDark,
-                                        breadcrumb: _getProjectBreadcrumb(f),
-                                        dimensions: meta['dimensions'] ?? 'Unknown',
-                                        previewPath: meta['preview'] ?? '',
-                                        timeAgo: _formatTimeAgo(f.lastUpdated),
-                                        onTap: () => _openFile(f),
-                                      ),
-                                    );
-                                  },
-                                ),
+                                ...filteredFiles.map((f) {
+                                  final meta = _fileMetadata[f.id] ?? {};
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _FileCard(
+                                      file: f,
+                                      theme: theme,
+                                      isDark: isDark,
+                                      breadcrumb: _getProjectBreadcrumb(f),
+                                      dimensions:
+                                          meta['dimensions'] ?? 'Unknown',
+                                      previewPath: meta['preview'] ?? '',
+                                      timeAgo: _formatTimeAgo(f.lastUpdated),
+                                      onTap: () => _openFile(f),
+                                    ),
+                                  );
+                                }),
                               ],
                             ]),
                           ),
@@ -634,33 +665,27 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                   ),
                                   const SizedBox(height: 12),
-                                  ...(_recentFiles
-                                      .take(2)
-                                      .map(
-                                        (file) {
-                                          final meta = _fileMetadata[file.id] ?? {};
-                                          return Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 12,
-                                            ),
-                                            child: _FileCard(
-                                              file: file,
-                                              theme: theme,
-                                              isDark: isDark,
-                                              breadcrumb: _getProjectBreadcrumb(
-                                                file,
-                                              ),
-                                              dimensions: meta['dimensions'] ?? 'Unknown',
-                                              previewPath: meta['preview'] ?? '',
-                                              timeAgo: _formatTimeAgo(
-                                                file.lastUpdated,
-                                              ),
-                                              onTap: () => _openFile(file),
-                                            ),
-                                          );
-                                        },
-                                      )
-                                      .toList()),
+                                  ...(_recentFiles.take(2).map((file) {
+                                    final meta = _fileMetadata[file.id] ?? {};
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 12,
+                                      ),
+                                      child: _FileCard(
+                                        file: file,
+                                        theme: theme,
+                                        isDark: isDark,
+                                        breadcrumb: _getProjectBreadcrumb(file),
+                                        dimensions:
+                                            meta['dimensions'] ?? 'Unknown',
+                                        previewPath: meta['preview'] ?? '',
+                                        timeAgo: _formatTimeAgo(
+                                          file.lastUpdated,
+                                        ),
+                                        onTap: () => _openFile(file),
+                                      ),
+                                    );
+                                  }).toList()),
                                   const SizedBox(height: 24),
                                 ],
                                 _buildSectionHeader(
@@ -673,37 +698,41 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                 ),
                                 const SizedBox(height: 12),
-                                
+
                                 // Show "Create Project" if empty, else list
                                 _allProjects.isEmpty
                                     ? _buildCreateProjectCard(theme, isDark)
                                     : SizedBox(
-                                        height: 140, // Reduced height
-                                        child: ListView.builder(
-                                          scrollDirection: Axis.horizontal,
-                                          itemCount: _allProjects.length,
-                                          itemBuilder: (context, index) {
-                                            final project = _allProjects[index];
-                                            return Padding(
-                                              padding: const EdgeInsets.only(
-                                                right: 12,
-                                              ),
-                                              child: _ProjectCard(
-                                                project: project,
-                                                theme: theme,
-                                                isDark: isDark,
-                                                previewImages:
-                                                    _projectPreviews[project.id] ??
-                                                    [],
-                                                onTap: () => _openProject(project),
-                                                onRename: () => _renameProject(project),
-                                                onDelete: () => _deleteProject(project),
-                                                showGrid: false,
-                                              ),
-                                            );
-                                          },
-                                        ),
+                                      height: 140, // Reduced height
+                                      child: ListView.builder(
+                                        scrollDirection: Axis.horizontal,
+                                        itemCount: _allProjects.length,
+                                        itemBuilder: (context, index) {
+                                          final project = _allProjects[index];
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              right: 12,
+                                            ),
+                                            child: _ProjectCard(
+                                              project: project,
+                                              theme: theme,
+                                              isDark: isDark,
+                                              previewImages:
+                                                  _projectPreviews[project
+                                                      .id] ??
+                                                  [],
+                                              onTap:
+                                                  () => _openProject(project),
+                                              onRename:
+                                                  () => _renameProject(project),
+                                              onDelete:
+                                                  () => _deleteProject(project),
+                                              showGrid: false,
+                                            ),
+                                          );
+                                        },
                                       ),
+                                    ),
                                 const SizedBox(height: 24),
                                 _buildSectionHeader(
                                   'Explore templates',
@@ -722,14 +751,15 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
-      floatingActionButton: _allProjects.isEmpty
-          ? null
-          : FloatingActionButton(
-              onPressed: _createNewProject,
-              backgroundColor: isDark ? Colors.grey[900] : Colors.grey[900],
-              foregroundColor: Colors.white,
-              child: const Icon(Icons.add, size: 24),
-            ),
+      floatingActionButton:
+          _allProjects.isEmpty
+              ? null
+              : FloatingActionButton(
+                onPressed: _createNewProject,
+                backgroundColor: isDark ? Colors.grey[900] : Colors.grey[900],
+                foregroundColor: Colors.white,
+                child: const Icon(Icons.add, size: 24),
+              ),
     );
   }
 
@@ -774,7 +804,7 @@ class _HomePageState extends State<HomePage> {
     return GestureDetector(
       onTap: _createNewProject,
       child: Container(
-        height: 130, 
+        height: 130,
         width: 130,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
@@ -941,14 +971,14 @@ class _FileCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center, 
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SizedBox(
               width: 88,
               height: 88,
               child: Center(
                 child: Container(
-                  width: 80, 
+                  width: 80,
                   height: 80,
                   decoration: BoxDecoration(
                     color: isDark ? Colors.grey[800] : Colors.grey[200],
@@ -963,34 +993,36 @@ class _FileCard extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: previewPath.isNotEmpty
-                        ? Image.file(
-                            File(previewPath),
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                              color: isDark ? Colors.grey[800] : Colors.grey[200],
-                              child: Icon(
-                                Icons.broken_image,
-                                size: 20,
-                                color:
-                                    theme.colorScheme.onSurface.withValues(
-                                      alpha: 0.3,
+                    child:
+                        previewPath.isNotEmpty
+                            ? Image.file(
+                              File(previewPath),
+                              fit: BoxFit.cover,
+                              errorBuilder:
+                                  (context, error, stackTrace) => Container(
+                                    color:
+                                        isDark
+                                            ? Colors.grey[800]
+                                            : Colors.grey[200],
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      size: 20,
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.3),
                                     ),
+                                  ),
+                            )
+                            : Container(
+                              color:
+                                  isDark ? Colors.grey[800] : Colors.grey[200],
+                              child: Icon(
+                                Icons.image,
+                                size: 24,
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.3,
+                                ),
                               ),
                             ),
-                          )
-                        : Container(
-                            color: isDark ? Colors.grey[800] : Colors.grey[200],
-                            child: Icon(
-                              Icons.image,
-                              size: 24,
-                              color:
-                                  theme.colorScheme.onSurface.withValues(
-                                    alpha: 0.3,
-                                  ),
-                            ),
-                          ),
                   ),
                 ),
               ),
@@ -1001,7 +1033,8 @@ class _FileCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min, // Keep height minimal for centering
+                  mainAxisSize:
+                      MainAxisSize.min, // Keep height minimal for centering
                   children: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1125,40 +1158,46 @@ class _ProjectCard extends StatelessWidget {
           children: [
             Expanded(
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: showGrid
-                    ? Padding(
-                      padding: const EdgeInsets.all(4.0),
-                      child: _buildGridPreview(),
-                    )
-                    : (previewImages.isNotEmpty
-                        ? Image.file(
-                            File(previewImages.first),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                              color: isDark ? Colors.grey[800] : Colors.grey[200],
-                              child: Icon(
-                                Icons.broken_image,
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.3,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
+                child:
+                    showGrid
+                        ? Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: _buildGridPreview(),
+                        )
+                        : (previewImages.isNotEmpty
+                            ? Image.file(
+                              File(previewImages.first),
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              errorBuilder:
+                                  (context, error, stackTrace) => Container(
+                                    color:
+                                        isDark
+                                            ? Colors.grey[800]
+                                            : Colors.grey[200],
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                            )
+                            : Container(
+                              color:
+                                  isDark ? Colors.grey[800] : Colors.grey[200],
+                              child: Center(
+                                child: Icon(
+                                  Icons.folder_outlined,
+                                  size: 32,
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.3,
+                                  ),
                                 ),
                               ),
-                            ),
-                          )
-                        : Container(
-                            color: isDark ? Colors.grey[800] : Colors.grey[200],
-                            child: Center(
-                              child: Icon(
-                                Icons.folder_outlined,
-                                size: 32,
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.3,
-                                ),
-                              ),
-                            ),
-                          )),
+                            )),
               ),
             ),
             Padding(
@@ -1186,7 +1225,9 @@ class _ProjectCard extends StatelessWidget {
                       icon: Icon(
                         Icons.more_vert,
                         size: 16,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                       padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(
@@ -1199,28 +1240,42 @@ class _ProjectCard extends StatelessWidget {
                           onDelete!();
                         }
                       },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'rename',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit_outlined, size: 18),
-                              SizedBox(width: 12),
-                              Text('Rename', style: TextStyle(fontFamily: 'GeneralSans')),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                              SizedBox(width: 12),
-                              Text('Delete', style: TextStyle(fontFamily: 'GeneralSans', color: Colors.red)),
-                            ],
-                          ),
-                        ),
-                      ],
+                      itemBuilder:
+                          (context) => [
+                            const PopupMenuItem(
+                              value: 'rename',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit_outlined, size: 18),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    'Rename',
+                                    style: TextStyle(fontFamily: 'GeneralSans'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.delete_outline,
+                                    size: 18,
+                                    color: Colors.red,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(
+                                      fontFamily: 'GeneralSans',
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                     ),
                   ),
                 ],
@@ -1282,16 +1337,21 @@ class _ProjectCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(6), // Rounded grid items
       ),
       clipBehavior: Clip.antiAlias,
-      child: imagePath != null
-          ? Image.file(
-              File(imagePath),
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              errorBuilder: (context, error, stackTrace) =>
-                  const Icon(Icons.broken_image, size: 16, color: Colors.grey),
-            )
-          : null, // Empty placeholder
+      child:
+          imagePath != null
+              ? Image.file(
+                File(imagePath),
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                errorBuilder:
+                    (context, error, stackTrace) => const Icon(
+                      Icons.broken_image,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
+              )
+              : null, // Empty placeholder
     );
   }
 }
@@ -1348,12 +1408,12 @@ class _SeeAllPageState extends State<_SeeAllPage> {
             List<String> eventImages = [];
             // Get 1 image from up to 4 distinct events
             for (final event in events.take(4)) {
-               if (event.id != null) {
-                 final imgs = await widget.imageRepo.getImages(event.id!);
-                 if (imgs.isNotEmpty) {
-                   eventImages.add(imgs.first.filePath);
-                 }
-               }
+              if (event.id != null) {
+                final imgs = await widget.imageRepo.getImages(event.id!);
+                if (imgs.isNotEmpty) {
+                  eventImages.add(imgs.first.filePath);
+                }
+              }
             }
             _projectPreviews[p.id!] = eventImages;
           }
@@ -1446,63 +1506,65 @@ class _SeeAllPageState extends State<_SeeAllPage> {
         elevation: 0,
         iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: widget.isProjects
-                  ? GridView.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.8,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                      ),
-                      itemCount: _items.length,
-                      itemBuilder: (context, index) {
-                        final project = _items[index] as ProjectModel;
-                        return _ProjectCard(
-                          project: project,
-                          theme: theme,
-                          isDark: isDark,
-                          previewImages: _projectPreviews[project.id] ?? [],
-                          onTap: () => widget.onProjectTap(project),
-                          // Chain callbacks, reload data on completion
-                          onRename: () async {
-                            await widget.onProjectRename(project);
-                            _fetchData();
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Padding(
+                padding: const EdgeInsets.all(16.0),
+                child:
+                    widget.isProjects
+                        ? GridView.builder(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.8,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                          itemCount: _items.length,
+                          itemBuilder: (context, index) {
+                            final project = _items[index] as ProjectModel;
+                            return _ProjectCard(
+                              project: project,
+                              theme: theme,
+                              isDark: isDark,
+                              previewImages: _projectPreviews[project.id] ?? [],
+                              onTap: () => widget.onProjectTap(project),
+                              // Chain callbacks, reload data on completion
+                              onRename: () async {
+                                await widget.onProjectRename(project);
+                                _fetchData();
+                              },
+                              onDelete: () async {
+                                await widget.onProjectDelete(project);
+                                _fetchData();
+                              },
+                              isHorizontal: false,
+                              showGrid: true,
+                            );
                           },
-                          onDelete: () async {
-                            await widget.onProjectDelete(project);
-                            _fetchData();
+                        )
+                        : ListView.builder(
+                          itemCount: _items.length,
+                          itemBuilder: (context, index) {
+                            final file = _items[index] as FileModel;
+                            final meta = _fileMetadata[file.id] ?? {};
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _FileCard(
+                                file: file,
+                                theme: theme,
+                                isDark: isDark,
+                                breadcrumb: _getBreadcrumb(file),
+                                dimensions: meta['dimensions'] ?? 'Unknown',
+                                previewPath: meta['preview'] ?? '',
+                                timeAgo: _timeAgo(file.lastUpdated),
+                                onTap: () => widget.onFileTap(file),
+                              ),
+                            );
                           },
-                          isHorizontal: false,
-                          showGrid: true,
-                        );
-                      },
-                    )
-                  : ListView.builder(
-                      itemCount: _items.length,
-                      itemBuilder: (context, index) {
-                        final file = _items[index] as FileModel;
-                        final meta = _fileMetadata[file.id] ?? {};
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _FileCard(
-                            file: file,
-                            theme: theme,
-                            isDark: isDark,
-                            breadcrumb: _getBreadcrumb(file),
-                            dimensions: meta['dimensions'] ?? 'Unknown',
-                            previewPath: meta['preview'] ?? '',
-                            timeAgo: _timeAgo(file.lastUpdated),
-                            onTap: () => widget.onFileTap(file),
-                          ),
-                        );
-                      },
-                    ),
-            ),
+                        ),
+              ),
     );
   }
 }

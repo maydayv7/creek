@@ -53,10 +53,12 @@ class FlaskService {
     debugPrint("🔗 [Pipeline] Starting Sketch-to-Image...");
 
     // 1. Analyze Sketch (Use cached description if available)
-    final String? sketchDescription = imageDescription ?? await describeImage(
-      imagePath: sketchPath,
-      prompt: '<MORE_DETAILED_CAPTION>',
-    );
+    final String? sketchDescription =
+        imageDescription ??
+        await describeImage(
+          imagePath: sketchPath,
+          prompt: '<MORE_DETAILED_CAPTION>',
+        );
 
     if (sketchDescription == null) {
       debugPrint("❌ [Pipeline] Failed: Could not analyze sketch.");
@@ -81,13 +83,14 @@ class FlaskService {
     );
 
     if (magicPrompt != null) {
-        await _logToFile("debug_magic_prompt.txt", magicPrompt);
-        debugPrint("🐛 [DEBUG] 4. Magic Prompt: $magicPrompt");
+      await _logToFile("debug_magic_prompt.txt", magicPrompt);
+      debugPrint("🐛 [DEBUG] 4. Magic Prompt: $magicPrompt");
     } else {
-        debugPrint("🐛 [DEBUG] 4. Magic Prompt: null");
+      debugPrint("🐛 [DEBUG] 4. Magic Prompt: null");
     }
 
-    final String globalPrompt = magicPrompt ?? "$userPrompt. The image features: $sketchDescription";
+    final String globalPrompt =
+        magicPrompt ?? "$userPrompt. The image features: $sketchDescription";
 
     debugPrint("🔗 [Pipeline] Generating base image...");
 
@@ -142,10 +145,10 @@ class FlaskService {
     );
 
     if (magicPrompt != null) {
-        await _logToFile("debug_magic_prompt.txt", magicPrompt);
-        debugPrint("🐛 [DEBUG] 4. Magic Prompt: $magicPrompt");
+      await _logToFile("debug_magic_prompt.txt", magicPrompt);
+      debugPrint("🐛 [DEBUG] 4. Magic Prompt: $magicPrompt");
     } else {
-        debugPrint("🐛 [DEBUG] 4. Magic Prompt: null");
+      debugPrint("🐛 [DEBUG] 4. Magic Prompt: null");
     }
 
     final String globalPrompt =
