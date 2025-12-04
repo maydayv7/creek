@@ -86,8 +86,8 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
       name: 'Nano Banana',
       badge: 'Premium',
     ),
-    AIModelOption(id: 'sketch_fusion', name: 'Stable Diffusion v1.5', badge: null),
     AIModelOption(id: 'sketch_creative', name: 'FLUX Dev', badge: 'Fast'),
+    AIModelOption(id: 'sketch_fusion', name: 'Stable Diffusion v1.5', badge: null),
   ];
 
   @override

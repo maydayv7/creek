@@ -9,22 +9,134 @@ import torch
 import traceback
 import requests
 import scipy.ndimage
+import json
+from functools import wraps
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from PIL import Image, ImageFilter
 from torchvision import transforms
 import time
 import uuid
+from Crypto.Cipher import AES
 from dotenv import load_dotenv
 load_dotenv()
+
+class CryptoManager:
+    def __init__(self, key_base64):
+        # Decode the base64 key to raw bytes (must be 32 bytes for AES-256)
+        self.key = base64.b64decode(key_base64)
+
+    def encrypt(self, plain_text):
+        # 1. Generate a random unique Nonce (12 bytes is standard for GCM)
+        nonce = os.urandom(12)
+
+        # 2. Initialize Cipher
+        cipher = AES.new(self.key, AES.MODE_GCM, nonce=nonce)
+
+        # 3. Encrypt and get Tag (MAC)
+        ciphertext, tag = cipher.encrypt_and_digest(plain_text.encode('utf-8'))
+
+        # 4. Pack: Nonce + Ciphertext + Tag
+        combined = nonce + ciphertext + tag
+
+        # 5. Return as Base64 string
+        return base64.b64encode(combined).decode('utf-8')
+
+    def decrypt(self, encrypted_b64):
+        try:
+            # 1. Decode Base64
+            data = base64.b64decode(encrypted_b64)
+
+            # 2. Unpack (Slice the bytes)
+            nonce = data[:12]
+            tag = data[-16:]
+            ciphertext = data[12:-16]
+
+            # 3. Decrypt
+            cipher = AES.new(self.key, AES.MODE_GCM, nonce=nonce)
+            decrypted_data = cipher.decrypt_and_verify(ciphertext, tag)
+            return decrypted_data.decode('utf-8')
+        except Exception as e:
+            print(f"Decryption failed: {e}")
+            return None
+
+# Setup Secret Key
+SHARED_SECRET_KEY = os.getenv("SHARED_SECRET_KEY")
+if not SHARED_SECRET_KEY:
+    print("❌ Error: SHARED_SECRET_KEY not found in .env")
+    sys.exit(1)
+
+crypto = CryptoManager(SHARED_SECRET_KEY)
+
+# ==============================================================================
+# SECURITY DECORATOR (Middleware)
+# ==============================================================================
+def secure_endpoint(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # --- 1. INCOMING DECRYPTION ---
+        try:
+            # Expecting JSON format: { "data": "BASE64_ENCRYPTED_STRING" }
+            incoming = request.get_json(silent=True)
+            if not incoming or 'data' not in incoming:
+                return jsonify({"error": "Invalid format. Expected {'data': 'encrypted_string'}"}), 400
+
+            encrypted_b64 = incoming['data']
+            decrypted_json_str = crypto.decrypt(encrypted_b64)
+
+            if decrypted_json_str is None:
+                return jsonify({"error": "Decryption failed (Check Key or Nonce)"}), 403
+
+            # Parse the decrypted string back to a Python dictionary
+            decrypted_payload = json.loads(decrypted_json_str)
+
+            # OVERRIDE request.get_json() so the inner function sees the decrypted data
+            request.get_json = lambda **k: decrypted_payload
+
+        except Exception as e:
+            return jsonify({"error": f"Security Middleware Error: {str(e)}"}), 500
+
+        # --- 2. EXECUTE ORIGINAL LOGIC ---
+        response = f(*args, **kwargs)
+
+        # --- 3. OUTGOING ENCRYPTION ---
+        try:
+            # Handle Flask response tuples (e.g., jsonify(...), 500)
+            resp_obj = response
+            status_code = 200
+            if isinstance(response, tuple):
+                resp_obj = response[0]
+                if len(response) > 1: status_code = response[1]
+
+            # Extract the plain JSON data from the Response object
+            if hasattr(resp_obj, 'get_json'):
+                plain_data = resp_obj.get_json()
+            else:
+                # Fallback if it's not a response object yet
+                plain_data = resp_obj
+
+            # Convert dict -> JSON String -> Encrypt
+            plain_json_str = json.dumps(plain_data)
+            encrypted_response = crypto.encrypt(plain_json_str)
+
+            # Return standard encrypted wrapper
+            return jsonify({"data": encrypted_response}), status_code
+
+        except Exception as e:
+            return jsonify({"error": f"Response Encryption Error: {str(e)}"}), 500
+
+    return decorated_function
 
 # --- FAL.AI IMPORTS ---
 try:
     import fal_client
     # SETUP API KEY
-    if not os.getenv("FAL_KEY"):
+    if os.getenv("FAL_KEY"):
+        os.environ["FAL_KEY"] = os.getenv("FAL_KEY")
+        FAL_AVAILABLE = True
+    else:
         print("⚠️ Warning: FAL_KEY not found in environment variables.")
-    FAL_AVAILABLE = True
+        FAL_AVAILABLE = False
 except ImportError:
     print("⚠️ Fal.ai Client not installed. /inpainting-api will fail.")
     FAL_AVAILABLE = False
@@ -223,11 +335,29 @@ def resize_to_limit(img, max_dim=1024, multiple=8):
 # ==============================================================================
 # ROUTES
 # ==============================================================================
+
 @app.route('/')
 def index():
     return "Image Processing API is running."
 
+@app.route('/test-encrypt', methods=['POST'])
+def test_encrypt():
+    # Helper route to debug encryption/decryption
+    try:
+        data = request.get_json()
+        plain_text = data.get('text', 'Hello, World!')
+        encrypted = crypto.encrypt(plain_text)
+        decrypted = crypto.decrypt(encrypted)
+        return jsonify({
+            "original": plain_text,
+            "encrypted": encrypted,
+            "decrypted": decrypted
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/generate', methods=['POST'])
+@secure_endpoint
 def generate_image():
     if not sd_pipe: return jsonify({"error": "SD Model not loaded"}), 500
     try:
@@ -242,6 +372,7 @@ def generate_image():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/inpainting', methods=['POST'])
+@secure_endpoint
 def inpaint_image():
     if not sd_pipe: return jsonify({"error": "SD Model not loaded"}), 500
     try:
@@ -330,6 +461,7 @@ def inpaint_image():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/asset', methods=['POST'])
+@secure_endpoint
 def remove_background():
     if not birefnet_model: 
         return jsonify({"error": "BiRefNet not loaded"}), 500
@@ -359,6 +491,7 @@ def remove_background():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/describe', methods=['POST'])
+@secure_endpoint
 def describe_image():
     if not florence_model or not florence_processor:
         return jsonify({"error": "Florence-2 not loaded"}), 500
@@ -434,6 +567,7 @@ def describe_image():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/inpainting-api', methods=['POST'])
+@secure_endpoint
 def inpainting_api_fal():
     if not FAL_AVAILABLE:
         return jsonify({"error": "Fal.ai client not installed or API Key missing"}), 500
@@ -537,14 +671,12 @@ def inpainting_api_fal():
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# ==============================================================================
-# 5. NEW ROUTE: SKETCH API (Text-to-Image)
-# ==============================================================================
 @app.route('/sketch-api', methods=['POST'])
+@secure_endpoint
 def sketch_api():
     if not FAL_AVAILABLE:
         return jsonify({"error": "Fal.ai client not installed or API Key missing"}), 500
-    
+
     try:
         data = request.get_json()
         prompt = data.get('prompt')

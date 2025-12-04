@@ -2,6 +2,7 @@ import os
 import io
 import sys
 import base64
+import json
 import modal
 
 # ==============================================================================
@@ -36,6 +37,7 @@ image = (
         "fastapi[standard]",
         "fal-client",
         "requests",
+        "pycryptodome",
     )
     # --- MOUNT LOCAL MODELS ---
     .add_local_dir("local_inpainting_model", remote_path="/models/sd-inpainting")
@@ -43,16 +45,16 @@ image = (
     .add_local_dir("BiRefNet", remote_path="/root/BiRefNet")
 )
 
-app = modal.App("creekui-flask", image=image)
+app = modal.App("creekui", image=image)
 
 
 # ==============================================================================
 # 2. THE BACKEND SERVER CLASS
 # ==============================================================================
 @app.cls(
-    gpu="any", 
+    gpu="any",
     scaledown_window=300,
-    secrets=[modal.Secret.from_name("fal-secret")]
+    secrets=[modal.Secret.from_name("creek-secrets")],
 )
 class ModelBackend:
 
@@ -63,19 +65,52 @@ class ModelBackend:
         import torch
         import torch.nn as nn
         import sys
+        from Crypto.Cipher import AES
 
         self.device = "cuda"
 
-        # FAL.AI API KEY
+        # --- 1. SETUP CRYPTO ---
+        secret_key_b64 = os.environ.get("SHARED_SECRET_KEY")
+        if not secret_key_b64:
+            raise ValueError("SHARED_SECRET_KEY not set in Modal Secrets")
+
+        # Define CryptoManager inside container
+        class CryptoManager:
+            def __init__(self, key_base64):
+                self.key = base64.b64decode(key_base64)
+
+            def decrypt(self, encrypted_b64):
+                try:
+                    data = base64.b64decode(encrypted_b64)
+                    nonce = data[:12]
+                    tag = data[-16:]
+                    ciphertext = data[12:-16]
+                    cipher = AES.new(self.key, AES.MODE_GCM, nonce=nonce)
+                    return cipher.decrypt_and_verify(ciphertext, tag).decode("utf-8")
+                except Exception as e:
+                    print(f"Decryption failed: {e}")
+                    return None
+
+            def encrypt(self, plain_text):
+                nonce = os.urandom(12)
+                cipher = AES.new(self.key, AES.MODE_GCM, nonce=nonce)
+                ciphertext, tag = cipher.encrypt_and_digest(plain_text.encode("utf-8"))
+                combined = nonce + ciphertext + tag
+                return base64.b64encode(combined).decode("utf-8")
+
+        self.crypto = CryptoManager(secret_key_b64)
+        print("✅ Crypto Initialized")
+
+        # Check FAL KEY
         if "FAL_KEY" not in os.environ:
             print("❌ Error: FAL_KEY secret not found!")
         else:
             print("✅ FAL_KEY loaded securely.")
 
-        # --- 1. SETUP BiRefNet PATHS ---
+        # --- 2. SETUP PATHS & MODELS ---
         sys.path.append("/root/BiRefNet")
 
-        # --- 2. LOAD STABLE DIFFUSION ---
+        # Load Stable Diffusion
         from diffusers import StableDiffusionInpaintPipeline
 
         self.sd_pipe = StableDiffusionInpaintPipeline.from_pretrained(
@@ -87,16 +122,12 @@ class ModelBackend:
         self.sd_pipe.enable_attention_slicing()
         print("✅ Stable Diffusion Loaded")
 
-        # --- 3. LOAD FLORENCE-2 ---
+        # Load Florence-2
         import transformers.dynamic_module_utils
 
-        # Patch 1: Fix import check
-        def check_imports_fixed(filename):
-            return []
+        transformers.dynamic_module_utils.check_imports = lambda f: []
 
-        transformers.dynamic_module_utils.check_imports = check_imports_fixed
-
-        # Patch 2: Fix '_supports_sdpa' error
+        # Patch for _supports_sdpa
         _old_getattr = nn.Module.__getattr__
 
         def _fixed_getattr(self, name):
@@ -124,17 +155,16 @@ class ModelBackend:
         )
         print("✅ Florence-2 Loaded")
 
-        # --- 4. LOAD BIREFNET ---
+        # Load BiRefNet
         try:
             from models.birefnet import BiRefNet
 
             self.birefnet = BiRefNet(bb_pretrained=False)
-
             weight_path = "/root/BiRefNet/birefnet_fp16.pt"
             state_dict = torch.load(weight_path, map_location=self.device)
             self.birefnet.load_state_dict(state_dict)
             self.birefnet.to(self.device).half().eval()
-            print(f"✅ BiRefNet Loaded from {weight_path}")
+            print(f"✅ BiRefNet Loaded")
         except Exception as e:
             print(f"❌ BiRefNet Error: {e}")
             self.birefnet = None
@@ -151,329 +181,288 @@ class ModelBackend:
             ]
         )
 
+    # --- SECURITY WRAPPER ---
+    def _handle_secure_request(self, item: dict, logic_func):
+        """Decrypts input -> Runs Logic -> Encrypts Output"""
+        try:
+            # 1. Decrypt Incoming
+            if "data" not in item:
+                return {"error": "Invalid format. Expected {'data': ...}"}
+
+            decrypted_json_str = self.crypto.decrypt(item["data"])
+            if decrypted_json_str is None:
+                return {"error": "Decryption failed (Check Key)"}
+
+            payload = json.loads(decrypted_json_str)
+
+            # 2. Run Actual Logic
+            result = logic_func(payload)
+
+            # 3. Encrypt Outgoing
+            encrypted_response = self.crypto.encrypt(json.dumps(result))
+            return {"data": encrypted_response}
+
+        except Exception as e:
+            print(f"Request Error: {e}")
+            return {"error": str(e)}
+
     # ==========================================================================
     # 3. ENDPOINTS
     # ==========================================================================
 
     @modal.fastapi_endpoint(method="POST")
     def generate(self, item: dict):
-        from PIL import Image
+        def logic(data):
+            from PIL import Image
 
-        prompt = item.get("prompt", "A luxury watch")
-        print(f"🎨 Generating: {prompt}")
+            prompt = data.get("prompt", "A luxury watch")
+            print(f"🎨 Generating: {prompt}")
+            empty = Image.new("RGB", (512, 512))
+            mask = Image.new("L", (512, 512), 255)
+            img = self.sd_pipe(
+                prompt=prompt,
+                image=empty,
+                mask_image=mask,
+                height=512,
+                width=512,
+                num_inference_steps=30,
+            ).images[0]
+            return {"status": "success", "image": self._to_base64(img)}
 
-        empty_image = Image.new("RGB", (512, 512), (0, 0, 0))
-        full_mask = Image.new("L", (512, 512), 255)
-
-        image = self.sd_pipe(
-            prompt=prompt,
-            image=empty_image,
-            mask_image=full_mask,
-            height=512,
-            width=512,
-            num_inference_steps=30,
-        ).images[0]
-
-        return {"status": "success", "image": self._to_base64(image)}
+        return self._handle_secure_request(item, logic)
 
     @modal.fastapi_endpoint(method="POST")
     def inpainting(self, item: dict):
-        """Local Stable Diffusion Inpainting"""
-        from PIL import Image, ImageFilter
-        import numpy as np
-        import scipy.ndimage
-        import torch
+        def logic(data):
+            from PIL import Image, ImageFilter
+            import numpy as np
+            import scipy.ndimage
+            import torch
 
-        user_prompt = item.get("prompt", "")
-        img_b64 = item.get("image")
-        mask_b64 = item.get("mask_image")
+            prompt = data.get("prompt", "")
+            img_b64 = data.get("image")
+            mask_b64 = data.get("mask_image")
 
-        if not img_b64 or not mask_b64:
-            return {"status": "error", "message": "Missing image or mask"}
+            clean = self._decode_base64(img_b64).convert("RGB")
+            drawn = self._decode_base64(mask_b64).convert("RGB")
 
-        # 1. Decode Images
-        raw_clean = self._decode_base64(img_b64).convert("RGB")
-        raw_drawn = self._decode_base64(mask_b64).convert("RGB")
+            clean = self._resize_to_limit(clean, 512)
+            drawn = drawn.resize(clean.size)
 
-        # 2. Resize maintaining Aspect Ratio (Max 512 for Local SD)
-        img_clean = self._resize_to_limit(raw_clean, max_dim=512)
-        # Resize drawn image to match the clean image exactly
-        img_drawn = raw_drawn.resize(img_clean.size)
+            # Robust Masking
+            clean_blur = np.array(
+                clean.filter(ImageFilter.GaussianBlur(2)), dtype=np.int16
+            )
+            drawn_blur = np.array(
+                drawn.filter(ImageFilter.GaussianBlur(2)), dtype=np.int16
+            )
+            mask_arr = np.max(np.abs(drawn_blur - clean_blur), axis=2)
+            mask = Image.fromarray(
+                (scipy.ndimage.binary_fill_holes(mask_arr > 30) * 255).astype(np.uint8)
+            ).filter(ImageFilter.MaxFilter(9))
 
-        print(f"🔍 Calculating Robust Difference Mask (Size: {img_clean.size})...")
-
-        # --- ROBUST MASKING ---
-        clean_blur = np.array(
-            img_clean.filter(ImageFilter.GaussianBlur(radius=2)), dtype=np.int16
-        )
-        drawn_blur = np.array(
-            img_drawn.filter(ImageFilter.GaussianBlur(radius=2)), dtype=np.int16
-        )
-
-        diff_arr = np.abs(drawn_blur - clean_blur)
-        mask_arr = np.max(diff_arr, axis=2)
-        mask_binary = mask_arr > 30
-
-        mask_filled = scipy.ndimage.binary_fill_holes(mask_binary)
-        mask_image = Image.fromarray((mask_filled * 255).astype(np.uint8))
-        mask_image = mask_image.filter(ImageFilter.MaxFilter(9))
-        print("✅ Mask calculated.")
-
-        # --- FLORENCE-2 CONTEXT GENERATION ---
-        generated_prompt = ""
-        if self.florence_model and self.florence_processor:
-            print("👁️ Generating context with Florence-2...")
-            try:
-                task_prompt = "<DETAILED_CAPTION>"
-                # Use img_drawn (sketch) for context analysis
-                inputs = self.florence_processor(
-                    text=task_prompt, images=[img_drawn], return_tensors="pt"
-                )
-                inputs["pixel_values"] = inputs["pixel_values"].to(
-                    self.device, torch.float16
-                )
-                inputs["input_ids"] = inputs["input_ids"].to(self.device)
-
-                generated_ids = self.florence_model.generate(
-                    input_ids=inputs["input_ids"],
-                    pixel_values=inputs["pixel_values"],
-                    max_new_tokens=128,
-                    num_beams=1,
-                    do_sample=False,
-                    use_cache=False,  # Fix for transformers crash
-                )
-
-                generated_text = self.florence_processor.batch_decode(
-                    generated_ids, skip_special_tokens=False
+            # Florence Context
+            inputs = self.florence_processor(
+                text="<DETAILED_CAPTION>", images=[drawn], return_tensors="pt"
+            )
+            inputs = {
+                k: v.to(self.device, torch.float16 if k == "pixel_values" else None)
+                for k, v in inputs.items()
+            }
+            gen_ids = self.florence_model.generate(
+                **inputs, max_new_tokens=128, num_beams=1, use_cache=False
+            )
+            context = (
+                self.florence_processor.batch_decode(
+                    gen_ids, skip_special_tokens=False
                 )[0]
-                generated_prompt = (
-                    generated_text.replace(task_prompt, "")
-                    .replace("</s>", "")
-                    .replace("<s>", "")
-                    .strip()
-                )
-                print(f"📝 Florence Generated: {generated_prompt}")
-            except Exception as e:
-                print(f"⚠️ Florence captioning failed: {e}")
+                .replace("</s>", "")
+                .replace("<s>", "")
+                .replace("<DETAILED_CAPTION>", "")
+                .strip()
+            )
 
-        final_prompt = f"{generated_prompt} {user_prompt}".strip()
-        negative_prompt = (
-            "blurry, low quality, ugly, text, watermark, bad anatomy, deformed, noisy"
-        )
+            full_prompt = f"{context} {prompt}".strip()
 
-        # --- INFERENCE ---
-        print(f"🎨 Running Inference: {final_prompt}")
-        output = self.sd_pipe(
-            prompt=final_prompt,
-            negative_prompt=negative_prompt,
-            image=img_drawn,  # Input is the SKETCH
-            mask_image=mask_image,  # Mask is where sketch differs
-            num_inference_steps=50,
-            strength=0.85,
-            guidance_scale=8.5,
-        ).images[0]
+            output = self.sd_pipe(
+                prompt=full_prompt,
+                negative_prompt="blurry, low quality, ugly, text, watermark, bad anatomy, deformed, noisy",
+                image=drawn,
+                mask_image=mask,
+                num_inference_steps=50,
+                strength=0.85,
+                guidance_scale=8.5,
+            ).images[0]
 
-        return {"status": "success", "image": self._to_base64(output)}
+            return {"status": "success", "image": self._to_base64(output)}
+
+        return self._handle_secure_request(item, logic)
 
     @modal.fastapi_endpoint(method="POST")
     def inpainting_api(self, item: dict):
-        """Fal.ai Flux Lora Fill"""
-        import fal_client
-        import requests
-        import uuid
-        import numpy as np
-        import scipy.ndimage
-        from PIL import Image, ImageFilter
+        def logic(data):
+            import fal_client, requests, uuid, scipy.ndimage
+            from PIL import Image, ImageFilter
+            import numpy as np
 
-        prompt = item.get("prompt", "A high quality image")
-        img_b64 = item.get("image")
-        mask_b64 = item.get("mask_image")
+            prompt = data.get("prompt", "High quality image")
+            img_b64 = data.get("image")
+            mask_b64 = data.get("mask_image")
 
-        if not img_b64 or not mask_b64:
-            return {"status": "error", "message": "Missing image or mask"}
+            clean = self._decode_base64(img_b64).convert("RGB")
+            drawn = self._decode_base64(mask_b64).convert("RGB")
 
-        # 1. Decode & Resize (Flux supports higher res)
-        raw_clean = self._decode_base64(img_b64).convert("RGB")
-        raw_drawn = self._decode_base64(mask_b64).convert("RGB")
+            clean = self._resize_to_limit(clean, 1024)
+            drawn = drawn.resize(clean.size)
 
-        img_clean = self._resize_to_limit(raw_clean, max_dim=1024)
-        img_drawn = raw_drawn.resize(img_clean.size)
-
-        # 2. Robust Mask Generation
-        clean_blur = np.array(
-            img_clean.filter(ImageFilter.GaussianBlur(2)), dtype=np.int16
-        )
-        drawn_blur = np.array(
-            img_drawn.filter(ImageFilter.GaussianBlur(2)), dtype=np.int16
-        )
-
-        diff_arr = np.abs(drawn_blur - clean_blur)
-        mask_arr = np.max(diff_arr, axis=2)
-        mask_binary = mask_arr > 30
-
-        mask_filled = scipy.ndimage.binary_fill_holes(mask_binary)
-        mask = Image.fromarray((mask_filled * 255).astype(np.uint8))
-        mask = mask.filter(ImageFilter.MaxFilter(9))
-
-        # 3. Save to temp files for upload
-        temp_id = str(uuid.uuid4())
-        clean_path = f"/tmp/clean_{temp_id}.png"
-        mask_path = f"/tmp/mask_{temp_id}.png"
-
-        img_clean.save(clean_path)
-        mask.save(mask_path)
-
-        try:
-            print("🚀 Uploading to Fal.ai...")
-            image_url = fal_client.upload_file(clean_path)
-            mask_url = fal_client.upload_file(mask_path)
-
-            print(f"⚡ Running Flux Dev Fill for: {prompt}")
-            handler = fal_client.submit(
-                "fal-ai/flux-lora-fill",
-                arguments={
-                    "prompt": prompt,
-                    "image_url": image_url,
-                    "mask_url": mask_url,
-                    "guidance_scale": 30,
-                    "num_inference_steps": 28,
-                    "enable_safety_checker": False,
-                },
+            # Masking
+            clean_blur = np.array(
+                clean.filter(ImageFilter.GaussianBlur(2)), dtype=np.int16
             )
-            result = handler.get()
+            drawn_blur = np.array(
+                drawn.filter(ImageFilter.GaussianBlur(2)), dtype=np.int16
+            )
+            mask = Image.fromarray(
+                (
+                    scipy.ndimage.binary_fill_holes(
+                        np.max(np.abs(drawn_blur - clean_blur), axis=2) > 30
+                    )
+                    * 255
+                ).astype(np.uint8)
+            ).filter(ImageFilter.MaxFilter(9))
 
-            if "images" in result:
-                output_url = result["images"][0]["url"]
-                response = requests.get(output_url)
-                result_img = Image.open(io.BytesIO(response.content))
-                return {"status": "success", "image": self._to_base64(result_img)}
-            else:
-                return {"status": "error", "message": "Fal.ai returned no images"}
+            clean_p, mask_p = (
+                f"/tmp/c_{uuid.uuid4()}.png",
+                f"/tmp/m_{uuid.uuid4()}.png",
+            )
+            clean.save(clean_p)
+            mask.save(mask_p)
 
-        except Exception as e:
-            print(f"❌ Fal.ai Error: {e}")
-            return {"status": "error", "message": str(e)}
-        finally:
-            if os.path.exists(clean_path):
-                os.remove(clean_path)
-            if os.path.exists(mask_path):
-                os.remove(mask_path)
+            try:
+                res = fal_client.submit(
+                    "fal-ai/flux-lora-fill",
+                    arguments={
+                        "prompt": prompt,
+                        "image_url": fal_client.upload_file(clean_p),
+                        "mask_url": fal_client.upload_file(mask_p),
+                        "guidance_scale": 30,
+                        "num_inference_steps": 28,
+                        "enable_safety_checker": False,
+                    },
+                ).get()
+
+                if "images" in res:
+                    img_resp = requests.get(res["images"][0]["url"])
+                    img = Image.open(io.BytesIO(img_resp.content))
+                    return {"status": "success", "image": self._to_base64(img)}
+                return {"status": "error", "message": "No images from Fal"}
+            finally:
+                if os.path.exists(clean_p):
+                    os.remove(clean_p)
+                if os.path.exists(mask_p):
+                    os.remove(mask_p)
+
+        return self._handle_secure_request(item, logic)
 
     @modal.fastapi_endpoint(method="POST")
     def sketch_api(self, item: dict):
-        """Sketch Text-to-Image (Flux)"""
-        import fal_client
-        import requests
-        from PIL import Image
+        def logic(data):
+            import fal_client, requests
+            from PIL import Image
 
-        prompt = item.get("prompt")
-        option = item.get("option", 1)
+            prompt = data.get("prompt", "")
+            option = int(data.get("option", 1))
 
-        if not prompt:
-            return {"status": "error", "message": "Missing prompt"}
+            enhanced_prompt = (
+                f"{prompt}, sharp focus, high definition, 4k, vector art, crisp lines"
+            )
 
-        enhanced_prompt = (
-            f"{prompt}, sharp focus, high definition, 4k, vector art, crisp lines"
-        )
+            if option == 1:
+                # Nano Banana
+                print(f"🍌 Using Nano Banana for: {prompt}")
+                model_id = "fal-ai/nano-banana"
+                arguments = {
+                    "prompt": enhanced_prompt,
+                    "num_images": 1,
+                    "aspect_ratio": "1:1",
+                    "output_format": "png",
+                }
+            else:
+                # Flux Dev
+                print(f"🚀 Using Flux Dev for: {prompt}")
+                model_id = "fal-ai/flux/dev"
+                arguments = {
+                    "image_size": "square_hd",
+                    "num_inference_steps": 28,
+                    "guidance_scale": 3.5,
+                    "safety_tolerance": "2",
+                    "enable_safety_checker": False,
+                    "prompt": enhanced_prompt,
+                }
 
-        if int(option) == 1:
-            # Nano Banana
-            print(f"🍌 Using Nano Banana for: {prompt}")
-            model_id = "fal-ai/nano-banana"
-            arguments = {
-                "prompt": enhanced_prompt,
-                "num_images": 1,
-                "aspect_ratio": "1:1",
-                "output_format": "png"
-            }
-        else:
-            # Flux Dev
-            print(f"🚀 Using Flux Dev for: {prompt}")
-            model_id = "fal-ai/flux/dev"
-            arguments = {
-                "image_size": "square_hd",
-                "num_inference_steps": 28,
-                "guidance_scale": 3.5,
-                "safety_tolerance": "2",
-                "enable_safety_checker": False,
-                "prompt": enhanced_prompt,
-            }
+            res = fal_client.submit(model_id, arguments=arguments).get()
+            if "images" in res:
+                img_resp = requests.get(res["images"][0]["url"])
+                img = Image.open(io.BytesIO(img_resp.content)).convert("RGB")
+                return {"status": "success", "image": self._to_base64(img)}
+            return {"status": "error", "message": "No images returned"}
 
-        try:
-            print(f"🚀 Running Sketch Gen ({model_id})...")
-            handler = fal_client.submit(model_id, arguments=arguments)
-            result = handler.get()
-
-            if "images" in result and len(result["images"]) > 0:
-                image_url = result["images"][0]["url"]
-                response = requests.get(image_url)
-                if response.status_code == 200:
-                    img = Image.open(io.BytesIO(response.content)).convert("RGB")
-                    return {"status": "success", "image": self._to_base64(img)}
-
-            return {"status": "error", "message": "Fal.ai returned no images"}
-        except Exception as e:
-            print(f"❌ Sketch API Error: {e}")
-            return {"status": "error", "message": str(e)}
+        return self._handle_secure_request(item, logic)
 
     @modal.fastapi_endpoint(method="POST")
     def asset(self, item: dict):
-        import torch
-        import numpy as np
-        from PIL import Image
+        def logic(data):
+            import torch, numpy as np
+            from PIL import Image
 
-        if not self.birefnet:
-            return {"status": "error", "message": "BiRefNet not loaded"}
+            img_b64 = data.get("image")
+            img = self._decode_base64(img_b64)
+            w, h = img.size
 
-        img_b64 = item.get("image")
-        image = self._decode_base64(img_b64)
-        orig_w, orig_h = image.size
+            inp = self.transform_birefnet(img).unsqueeze(0).to(self.device).half()
+            with torch.no_grad():
+                preds = self.birefnet(inp)[-1].sigmoid()
 
-        input_tensor = (
-            self.transform_birefnet(image).unsqueeze(0).to(self.device).half()
-        )
-        with torch.no_grad():
-            preds = self.birefnet(input_tensor)[-1].sigmoid()
+            import torch.nn.functional as F
 
-        res = torch.nn.functional.interpolate(
-            preds, size=(orig_h, orig_w), mode="bilinear", align_corners=True
-        )
-        mask_np = res.squeeze().cpu().numpy()
-        mask_img = Image.fromarray((mask_np * 255).astype(np.uint8))
+            res = F.interpolate(preds, size=(h, w), mode="bilinear", align_corners=True)
+            mask = Image.fromarray((res.squeeze().cpu().numpy() * 255).astype(np.uint8))
+            img.putalpha(mask)
 
-        image.putalpha(mask_img)
-        return {"status": "success", "image": self._to_base64(image)}
+            return {"status": "success", "image": self._to_base64(img)}
+
+        return self._handle_secure_request(item, logic)
 
     @modal.fastapi_endpoint(method="POST")
     def describe(self, item: dict):
-        import torch
+        def logic(data):
+            import torch
 
-        img_b64 = item.get("image")
-        prompt = item.get("prompt", "<DETAILED_CAPTION>")
+            img_b64 = data.get("image")
+            img = self._decode_base64(img_b64)
+            prompt = data.get("prompt", "<DETAILED_CAPTION>")
 
-        image = self._decode_base64(img_b64)
+            inputs = self.florence_processor(
+                text=prompt, images=img, return_tensors="pt"
+            )
+            inputs = {
+                k: v.to(self.device, torch.float16 if k == "pixel_values" else None)
+                for k, v in inputs.items()
+            }
 
-        inputs = self.florence_processor(text=prompt, images=image, return_tensors="pt")
-        inputs["pixel_values"] = inputs["pixel_values"].to(self.device, torch.float16)
-        inputs["input_ids"] = inputs["input_ids"].to(self.device)
+            gen_ids = self.florence_model.generate(
+                **inputs, max_new_tokens=1024, num_beams=3, use_cache=False
+            )
+            txt = self.florence_processor.batch_decode(
+                gen_ids, skip_special_tokens=False
+            )[0]
+            clean_txt = (
+                txt.replace("</s>", "").replace("<s>", "").replace(prompt, "").strip()
+            )
 
-        # --- FIX: Explicitly disable caching to prevent beam search crash ---
-        generated_ids = self.florence_model.generate(
-            input_ids=inputs["input_ids"],
-            pixel_values=inputs["pixel_values"],
-            max_new_tokens=1024,
-            num_beams=3,
-            use_cache=False,  # <--- CRITICAL FIX for Florence-2 on newer Transformers
-        )
+            return {"status": "success", "output": clean_txt}
 
-        text = self.florence_processor.batch_decode(
-            generated_ids, skip_special_tokens=False
-        )[0]
-        clean_text = (
-            text.replace("</s>", "").replace("<s>", "").replace(prompt, "").strip()
-        )
-
-        return {"status": "success", "output": clean_text}
+        return self._handle_secure_request(item, logic)
 
     # --- HELPERS ---
     def _decode_base64(self, b64_str):

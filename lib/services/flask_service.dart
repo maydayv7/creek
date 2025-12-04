@@ -1,15 +1,18 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:adobe/data/repos/file_repo.dart';
+import 'package:adobe/data/repos/image_repo.dart';
+import 'package:adobe/data/repos/note_repo.dart';
+import 'package:adobe/data/repos/project_repo.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:creekui/data/repos/project_repo.dart';
-import 'package:creekui/data/repos/image_repo.dart';
-import 'package:creekui/data/repos/note_repo.dart';
-import 'package:creekui/data/repos/file_repo.dart';
-import 'package:creekui/services/python_service.dart';
+import 'package:adobe/services/python_service.dart';
+import './encryption_service.dart';
 
 class FlaskService {
   // ===========================================================================
@@ -27,18 +30,21 @@ class FlaskService {
     'Content-Type': 'application/json',
   };
 
-  // --- OPTIMIZATION: Instantiate Repos once ---
+  // --- REPOSITORIES ---
   final _imageRepo = ImageRepo();
   final _noteRepo = NoteRepo();
   final _projectRepo = ProjectRepo();
   final _fileRepo = FileRepo();
   final _pythonService = PythonService();
 
+  // --- SECURITY ---
+  final _encryptionService = EncryptionService();
+
   // ===========================================================================
-  // 1. PIPELINES (Complex workflows)
+  // 1. PIPELINES
   // ===========================================================================
 
-  /// [Sketch-to-Image Pipeline]
+  // [Sketch-to-Image Pipeline]
   Future<String?> sketchToImage({
     required int projectId,
     required String sketchPath,
@@ -96,69 +102,7 @@ class FlaskService {
     return generatedImagePath;
   }
 
-  // ===========================================================================
-  // 2. GENERATION SERVICES (Returns File Path)
-  // ===========================================================================
-
-  /// [Text-to-Image]
-  Future<String?> generateAndSaveImage(String prompt) async {
-    return _performImageOperation(
-      fullUrl: _urlGenerate,
-      logPrefix: '🎨 Text-to-Image',
-      body: {'prompt': prompt},
-      filenamePrefix: 'gen',
-    );
-  }
-
-  /// [Inpainting]
-  Future<String?> inpaintImage({
-    required String imagePath,
-    required String maskPath,
-    required String prompt,
-  }) async {
-    final String? base64Image = await _encodeFile(imagePath);
-    final String? base64Mask = await _encodeFile(maskPath);
-
-    if (base64Image == null || base64Mask == null) return null;
-
-    return _performImageOperation(
-      fullUrl: _urlInpainting,
-      logPrefix: '🖌️ Inpainting',
-      body: {
-        'prompt': prompt,
-        'negative_prompt': 'blurry, bad quality, low res, ugly',
-        'image': base64Image,
-        'mask_image': base64Mask,
-      },
-      filenamePrefix: 'inpaint_$prompt',
-    );
-  }
-
-  /// [Inpainting-API]
-  Future<String?> inpaintApiImage({
-    required String imagePath,
-    required String maskPath,
-    required String prompt,
-  }) async {
-    final String? base64Image = await _encodeFile(imagePath);
-    final String? base64Mask = await _encodeFile(maskPath);
-
-    if (base64Image == null || base64Mask == null) return null;
-
-    return _performImageOperation(
-      fullUrl: _urlInpaintingApi,
-      logPrefix: '🖌️ Inpainting',
-      body: {
-        'prompt': prompt,
-        'negative_prompt': 'blurry, bad quality, low res, ugly',
-        'image': base64Image,
-        'mask_image': base64Mask,
-      },
-      filenamePrefix: 'inpaint_api$prompt',
-    );
-  }
-
-  /// [Sketch-to-Image-API]
+  // [Sketch-to-Image-API Pipeline]
   Future<String?> sketchToImageAPI({
     required int projectId,
     required String sketchPath,
@@ -168,11 +112,13 @@ class FlaskService {
   }) async {
     debugPrint("🔗 [Pipeline] Starting Sketch-to-Image-API...");
 
-    // 1. Analyze Sketch (Use cached description if available)
-    final String? sketchDescription = imageDescription ?? await describeImage(
-      imagePath: sketchPath,
-      prompt: '<MORE_DETAILED_CAPTION>',
-    );
+    // 1. Analyze Sketch
+    final String? sketchDescription =
+        imageDescription ??
+        await describeImage(
+          imagePath: sketchPath,
+          prompt: '<MORE_DETAILED_CAPTION>',
+        );
 
     if (sketchDescription == null) {
       debugPrint("❌ [Pipeline] Failed: Could not analyze sketch.");
@@ -196,20 +142,23 @@ class FlaskService {
       userPrompt: userPrompt,
     );
 
-    debugPrint("🐛 [DEBUG] 4. Magic Prompt: ${magicPrompt != null ? '(See debug_magic_prompt.txt)' : 'null'}");
-    if(magicPrompt != null) await _logToFile("debug_magic_prompt.txt", magicPrompt);
+    if (magicPrompt != null) {
+        await _logToFile("debug_magic_prompt.txt", magicPrompt);
+        debugPrint("🐛 [DEBUG] 4. Magic Prompt: $magicPrompt");
+    } else {
+        debugPrint("🐛 [DEBUG] 4. Magic Prompt: null");
+    }
 
-    final String globalPrompt = magicPrompt ?? "$userPrompt. The image features: $sketchDescription";
+    final String globalPrompt =
+        magicPrompt ?? "$userPrompt. The image features: $sketchDescription";
 
-    debugPrint("🔗 [Pipeline] Generating base image...");
+    debugPrint("🔗 [Pipeline] Generating base image via API...");
 
     final String? generatedImagePath = await _performImageOperation(
       fullUrl: _urlSketchApi,
-      logPrefix: '🖌️ Inpainting',
-      body: {
-        'prompt': globalPrompt,
-        'option': option,
-      },
+      logPrefix: '🖌️ API Sketch',
+      // The body map is the PLAINTEXT payload
+      body: {'prompt': globalPrompt, 'option': option},
       filenamePrefix: 'sketch-to-image-api_$globalPrompt',
     );
 
@@ -221,7 +170,69 @@ class FlaskService {
     return generatedImagePath;
   }
 
-  /// [Background Removal]
+  // ===========================================================================
+  // 2. GENERATION SERVICES (Returns File Path)
+  // ===========================================================================
+
+  // [Text-to-Image]
+  Future<String?> generateAndSaveImage(String prompt) async {
+    return _performImageOperation(
+      fullUrl: _urlGenerate,
+      logPrefix: '🎨 Text-to-Image',
+      body: {'prompt': prompt},
+      filenamePrefix: 'gen',
+    );
+  }
+
+  // [Inpainting]
+  Future<String?> inpaintImage({
+    required String imagePath,
+    required String maskPath,
+    required String prompt,
+  }) async {
+    final String? base64Image = await _encodeFile(imagePath);
+    final String? base64Mask = await _encodeFile(maskPath);
+
+    if (base64Image == null || base64Mask == null) return null;
+
+    return _performImageOperation(
+      fullUrl: _urlInpainting,
+      logPrefix: '🖌️ Inpainting',
+      body: {
+        'prompt': prompt,
+        'negative_prompt': 'blurry, bad quality, low res, ugly',
+        'image': base64Image,
+        'mask_image': base64Mask,
+      },
+      filenamePrefix: 'inpaint_$prompt',
+    );
+  }
+
+  // [Inpainting-API]
+  Future<String?> inpaintApiImage({
+    required String imagePath,
+    required String maskPath,
+    required String prompt,
+  }) async {
+    final String? base64Image = await _encodeFile(imagePath);
+    final String? base64Mask = await _encodeFile(maskPath);
+
+    if (base64Image == null || base64Mask == null) return null;
+
+    return _performImageOperation(
+      fullUrl: _urlInpaintingApi,
+      logPrefix: '🖌️ Inpainting API',
+      body: {
+        'prompt': prompt,
+        'negative_prompt': 'blurry, bad quality, low res, ugly',
+        'image': base64Image,
+        'mask_image': base64Mask,
+      },
+      filenamePrefix: 'inpaint_api$prompt',
+    );
+  }
+
+  // [Background Removal]
   Future<String?> generateAsset({required String imagePath}) async {
     // 1. Prepare and Upload
     final String? base64Image = await _encodeFile(imagePath);
@@ -246,11 +257,8 @@ class FlaskService {
 
       // --- CHECK 2: Is this a Note Crop? ---
       if (projectId == null) {
-        // You need a method in NoteRepo to find a note by its crop path
         final noteModel = await _noteRepo.getByCropPath(imagePath);
-
         if (noteModel != null) {
-          // Traverse up: Note -> Parent Image -> Project
           final parentImage = await _imageRepo.getById(noteModel.imageId);
           if (parentImage != null) {
             projectId = parentImage.projectId;
@@ -287,7 +295,7 @@ class FlaskService {
   // 3. ANALYSIS SERVICES
   // ===========================================================================
 
-  /// [Image Captioning]
+  // [Image Captioning]
   Future<String?> describeImage({
     required String imagePath,
     String prompt = '<MORE_DETAILED_CAPTION>',
@@ -297,16 +305,42 @@ class FlaskService {
     final String? base64Image = await _encodeFile(imagePath);
     if (base64Image == null) return null;
 
+    // Send encrypted request
     final response = await _postRequest(
       fullUrl: _urlDescribe,
       body: {'image': base64Image, 'prompt': prompt},
     );
 
     if (response != null && response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['output'] != null) {
-        debugPrint("✅ [Describe] Success: ${data['output']}");
-        return data['output'];
+      try {
+        // 1. Decode JSON Wrapper to get 'data' key
+        final jsonWrapper = jsonDecode(response.body);
+
+        if (!jsonWrapper.containsKey('data')) {
+          debugPrint("❌ [Describe] Response missing 'data' key");
+          return null;
+        }
+
+        final encryptedData = jsonWrapper['data'];
+
+        // 2. Decrypt the inner data
+        final String? decryptedBody = await _encryptionService.decrypt(
+          encryptedData,
+        );
+
+        if (decryptedBody == null) {
+          debugPrint("❌ [Describe] Decryption failed.");
+          return null;
+        }
+
+        // 3. Parse the actual result
+        final data = jsonDecode(decryptedBody);
+        if (data['output'] != null) {
+          debugPrint("✅ [Describe] Success: ${data['output']}");
+          return data['output'];
+        }
+      } catch (e) {
+        debugPrint("❌ [Describe] Error Parsing Response: $e");
       }
     }
 
@@ -315,22 +349,8 @@ class FlaskService {
   }
 
   // ===========================================================================
-  // PRIVATE HELPERS
+  // PRIVATE HELPERS (ENCRYPTION AWARE)
   // ===========================================================================
-
-  // LOG TO FILE HELPER
-  // Use following command to see logs:
-  // adb -d shell "run-as com.creek.ui cat /data/user/0/com.creek.ui/app_flutter/debug_magic_prompt.txt"
-  Future<void> _logToFile(String filename, String content) async {
-    try {
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/$filename');
-      await file.writeAsString(content);
-      debugPrint("📄 [LOG] Saved full content to: ${file.path}");
-    } catch (e) {
-      debugPrint("❌ Failed to log to file: $e");
-    }
-  }
 
   Future<String?> _performImageOperation({
     required String fullUrl,
@@ -352,6 +372,7 @@ class FlaskService {
     return null;
   }
 
+  // Encrypts the body, wraps it in {"data": ...}, and sends POST
   Future<http.Response?> _postRequest({
     required String fullUrl,
     required Map<String, dynamic> body,
@@ -361,24 +382,25 @@ class FlaskService {
         debugPrint("❌ Config Error: URL is missing in .env");
         return null;
       }
+
+      // 1. Encrypt the PLAINTEXT JSON body
+      final String plaintextJson = jsonEncode(body);
+      final String encryptedString = await _encryptionService.encrypt(
+        plaintextJson,
+      );
+
+      // 2. Package the encrypted string into the Flask wrapper format
+      final Map<String, String> encryptedBody = {'data': encryptedString};
+
       return await http.post(
         Uri.parse(fullUrl),
         headers: _headers,
-        body: jsonEncode(body),
+        body: jsonEncode(encryptedBody),
       );
     } catch (e) {
-      debugPrint("❌ Network Error ($fullUrl): $e");
+      debugPrint("❌ Network/Encryption Error ($fullUrl): $e");
       return null;
     }
-  }
-
-  Future<String?> _encodeFile(String path) async {
-    final file = File(path);
-    if (!file.existsSync()) {
-      debugPrint("❌ File not found: $path");
-      return null;
-    }
-    return base64Encode(await file.readAsBytes());
   }
 
   Future<String?> _saveImageFromResponse(
@@ -386,8 +408,36 @@ class FlaskService {
     String prefix,
   ) async {
     try {
-      final data = jsonDecode(response.body);
-      if (data['image'] == null) return null;
+      // 1. Decode the outer JSON wrapper (Flask returns { "data": "..." })
+      final jsonWrapper = jsonDecode(response.body);
+
+      if (!jsonWrapper.containsKey('data')) {
+        debugPrint("❌ [SaveImage] Response missing 'data' key");
+        // Fallback: If server failed encryption, it might send raw error
+        if (jsonWrapper.containsKey('error'))
+          debugPrint("Server Error: ${jsonWrapper['error']}");
+        return null;
+      }
+
+      final encryptedData = jsonWrapper['data'];
+
+      // 2. Decrypt the inner content
+      final String? decryptedBody = await _encryptionService.decrypt(
+        encryptedData,
+      );
+
+      if (decryptedBody == null) {
+        debugPrint("❌ [SaveImage] Decryption failed.");
+        return null;
+      }
+
+      // 3. Parse the decrypted JSON (Should contain { "image": "BASE64..." })
+      final data = jsonDecode(decryptedBody);
+
+      if (data['image'] == null) {
+        debugPrint("❌ [SaveImage] Decrypted data missing 'image' field.");
+        return null;
+      }
 
       final Uint8List imageBytes = base64Decode(data['image']);
 
@@ -414,8 +464,28 @@ class FlaskService {
       debugPrint("✅ Image saved: $filePath");
       return filePath;
     } catch (e) {
-      debugPrint("❌ Error saving image: $e");
+      debugPrint("❌ Error saving or decoding image: $e");
       return null;
     }
+  }
+
+  Future<void> _logToFile(String filename, String content) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/$filename');
+      await file.writeAsString(content);
+      debugPrint("📄 [LOG] Saved content to: ${file.path}");
+    } catch (e) {
+      debugPrint("❌ Failed to log to file: $e");
+    }
+  }
+
+  Future<String?> _encodeFile(String path) async {
+    final file = File(path);
+    if (!file.existsSync()) {
+      debugPrint("❌ File not found: $path");
+      return null;
+    }
+    return base64Encode(await file.readAsBytes());
   }
 }

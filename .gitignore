@@ -49,5 +49,5 @@ __pycache__
 .vscode/
 
 # .env Files
-#.env
+.env
 flask/.env
