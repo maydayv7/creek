@@ -21,7 +21,7 @@ Ensure that all these programs with the correct versions are installed on your s
 
 ### 1. Download Models
 
-Download all the models from [here](https://drive.google.com/drive/folders/1b2cEsZao5miX7WxYmp160XkKd_lfBmPN) and place them inside the `assets` directory
+Download all the models from [here](https://drive.google.com/drive/folders/1b2cEsZao5miX7WxYmp160XkKd_lfBmPN) and place them inside the [`assets`](./assets) directory
 
 ### 2. Setup Python
 

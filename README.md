@@ -1,4 +1,6 @@
-# CreekUI — Re-Imagining Photoshop (The AI Editor of 2030)
+# TEAM 33 | CreekUI | Re-Imagining Photoshop (The AI Editor of 2030)
+
+## See the [Demo Video](https://drive.google.com/file/d/1bvroGCCosPUEP54q06nFWq1LhNB4PiAf/view?usp=sharing)
 
 CreekUI is a lightweight, intent-driven mobile image editor designed to shift the creative workflow from manual pixel manipulation to semantic, AI-assisted design. It separates creativity into structured phases that prioritize **semantic understanding**, **energy efficiency**, and **selective use of heavy compute**.
 
@@ -7,6 +9,27 @@ This repository contains the full analysis pipeline, style synthesis logic, and 
 > [!NOTE]
 > For installation and setup instructions, refer to [INSTALL.md](./INSTALL.md).  
 > For model details, check out the [models](./models) directory.
+
+# Deliverables
+
+The following is an overview of the [Deliverables](./Deliverables/) structure:
+
+```
+┌── (A) Task 1
+│   ├── Screen Mockups
+│   └── Design Rationale
+│
+├── (B) Task 2
+│   └── Editing Ecosystem Analysis
+│
+└── (C) Task 3
+    ├── Technical Report (containing documentation and model/dataset details)
+    ├── README -> This file
+    ├── Source Repository -> This Repository
+    └── Demo Video -> https://drive.google.com/file/d/1bvroGCCosPUEP54q06nFWq1LhNB4PiAf/view?usp=sharing
+```
+
+Optional Creative Artefacts -> https://drive.google.com/file/d/1kSpf-y0LhQCn9-fF2gMLyodV8R3NkQeR/view?usp=sharing
 
 ---
 
