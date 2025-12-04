@@ -410,7 +410,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
     });
   }
 
-  // --- ADD NOTE INPUT DIALOG (FIXED KEYBOARD/MARGIN) ---
+  // --- ADD NOTE INPUT DIALOG ---
   void _showAddNoteInputDialog() {
     final TextEditingController newNoteController = TextEditingController();
     // Default to the first tag or 'Compositions', ensure it exists in the list to prevent crashes
@@ -738,7 +738,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
     final isSelectionModeActive = _isDrawMode || _isResizing;
 
     return Scaffold(
-      // FIX: Prevents the main screen from pushing up when the keyboard opens
+      // Prevents the main screen from pushing up when the keyboard opens
       resizeToAvoidBottomInset: false,
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -1412,14 +1412,14 @@ class NoteModalOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Note: modalMinHeight is kept only for potential use with MaxHeight, but is not enforced as a minimum.
+    // Note: modalMinHeight is kept only for potential use with MaxHeight, but is not enforced as a minimum
     final mq = MediaQuery.of(context);
     final keyboardHeight = mq.viewInsets.bottom;
     final systemBottomPadding = mq.padding.bottom;
 
     return Align(
       alignment: Alignment.bottomCenter,
-      // FIX 1: Use AnimatedPadding on the outside to correctly handle keyboard elevation smoothly.
+      // Use AnimatedPadding on the outside to correctly handle keyboard elevation smoothly
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
@@ -1427,13 +1427,10 @@ class NoteModalOverlay extends StatelessWidget {
           bottom: keyboardHeight, // Moves modal up to avoid keyboard
         ),
         child: ConstrainedBox(
-          // FIX 2: Removed minHeight constraint entirely. The Column inside uses mainAxisSize.min,
-          // allowing the dialog to shrink to fit content and preventing it from sitting "too high".
           constraints: BoxConstraints(maxHeight: screenSize.height),
           child: Material(
-            // Using Material to provide the background, border radius, and shadow.
             color: Colors.white,
-            elevation: 10, // Replicating the box shadow for visual style.
+            elevation: 10,
             shadowColor: Colors.black26,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             clipBehavior: Clip.antiAlias,

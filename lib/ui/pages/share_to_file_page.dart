@@ -244,7 +244,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                 width: width,
                 height: height,
                 existingFile: file,
-                injectedMedia: widget.sharedImage, // 🔥 THIS IS THE FIX
+                injectedMedia: widget.sharedImage,
               ),
         ),
       );

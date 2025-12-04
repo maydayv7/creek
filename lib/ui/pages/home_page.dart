@@ -191,6 +191,130 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // Rename Project Logic
+  Future<void> _renameProject(ProjectModel project) async {
+    final controller = TextEditingController(text: project.title);
+    final theme = Theme.of(context);
+
+    final didRename = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.cardColor,
+        title: Text(
+          'Rename Project',
+          style: TextStyle(
+            fontFamily: 'GeneralSans',
+            fontSize: 18,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: TextStyle(fontFamily: 'GeneralSans', color: theme.colorScheme.onSurface),
+          decoration: InputDecoration(
+            hintText: 'Enter new name',
+            hintStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5)),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: theme.colorScheme.primary),
+            ),
+          ),
+          textCapitalization: TextCapitalization.sentences,
+        ),
+        actions: [
+          TextButton(
+            child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7))),
+            onPressed: () => Navigator.pop(ctx, false),
+          ),
+          TextButton(
+            child: Text('Save', style: TextStyle(color: theme.colorScheme.primary)),
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                Navigator.pop(ctx, true);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+
+    if (didRename == true && project.id != null) {
+      setState(() => _isLoading = true);
+      try {
+        await _projectService.updateProjectDetails(project.id!, title: controller.text.trim());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Project renamed')),
+          );
+        }
+        _loadData();
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error renaming: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  // Delete Project Logic
+  Future<void> _deleteProject(ProjectModel project) async {
+    final theme = Theme.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.cardColor,
+        title: Text(
+          'Delete Project',
+          style: TextStyle(
+            fontFamily: 'GeneralSans',
+            fontSize: 18,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${project.title}"? This cannot be undone.',
+          style: TextStyle(fontFamily: 'GeneralSans', color: theme.colorScheme.onSurface.withValues(alpha: 0.8)),
+        ),
+        actions: [
+          TextButton(
+            child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7))),
+            onPressed: () => Navigator.pop(ctx, false),
+          ),
+          TextButton(
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && project.id != null) {
+      setState(() => _isLoading = true);
+      try {
+        await _projectService.deleteProject(project.id!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Project deleted successfully')),
+          );
+        }
+        _loadData();
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting project: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _openFile(FileModel file) async {
     double width = 1080;
     double height = 1920;
@@ -247,6 +371,8 @@ class _HomePageState extends State<HomePage> {
               imageRepo: _imageRepo,
               onProjectTap: _openProject,
               onFileTap: _openFile,
+              onProjectDelete: _deleteProject,
+              onProjectRename: _renameProject,
             ),
       ),
     ).then((_) => _loadData());
@@ -446,6 +572,8 @@ class _HomePageState extends State<HomePage> {
                                         previewImages:
                                             _projectPreviews[p.id] ?? [],
                                         onTap: () => _openProject(p),
+                                        onRename: () => _renameProject(p),
+                                        onDelete: () => _deleteProject(p),
                                         isHorizontal: false,
                                         showGrid: false, 
                                       ),
@@ -568,6 +696,8 @@ class _HomePageState extends State<HomePage> {
                                                     _projectPreviews[project.id] ??
                                                     [],
                                                 onTap: () => _openProject(project),
+                                                onRename: () => _renameProject(project),
+                                                onDelete: () => _deleteProject(project),
                                                 showGrid: false,
                                               ),
                                             );
@@ -700,7 +830,7 @@ class _HomePageState extends State<HomePage> {
     ];
 
     return SizedBox(
-      height: 140, // Reduced
+      height: 140,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: templates.length,
@@ -709,7 +839,7 @@ class _HomePageState extends State<HomePage> {
           return GestureDetector(
             onTap: _showComingSoon,
             child: Container(
-              width: 100, // Reduced
+              width: 100,
               margin: const EdgeInsets.only(right: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -959,6 +1089,8 @@ class _ProjectCard extends StatelessWidget {
   final bool isDark;
   final List<String> previewImages;
   final VoidCallback onTap;
+  final VoidCallback? onRename;
+  final VoidCallback? onDelete;
   final bool isHorizontal;
   final bool showGrid;
 
@@ -968,6 +1100,8 @@ class _ProjectCard extends StatelessWidget {
     required this.isDark,
     required this.previewImages,
     required this.onTap,
+    this.onRename,
+    this.onDelete,
     this.isHorizontal = true,
     this.showGrid = false,
   });
@@ -1045,10 +1179,49 @@ class _ProjectCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  Icon(
-                    Icons.more_vert,
-                    size: 16,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.more_vert,
+                        size: 16,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      onSelected: (value) {
+                        if (value == 'rename' && onRename != null) {
+                          onRename!();
+                        } else if (value == 'delete' && onDelete != null) {
+                          onDelete!();
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'rename',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 18),
+                              SizedBox(width: 12),
+                              Text('Rename', style: TextStyle(fontFamily: 'GeneralSans')),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                              SizedBox(width: 12),
+                              Text('Delete', style: TextStyle(fontFamily: 'GeneralSans', color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1131,6 +1304,8 @@ class _SeeAllPage extends StatefulWidget {
   final ImageRepo imageRepo;
   final Function(ProjectModel) onProjectTap;
   final Function(FileModel) onFileTap;
+  final Function(ProjectModel) onProjectRename;
+  final Function(ProjectModel) onProjectDelete;
 
   const _SeeAllPage({
     required this.title,
@@ -1140,6 +1315,8 @@ class _SeeAllPage extends StatefulWidget {
     required this.imageRepo,
     required this.onProjectTap,
     required this.onFileTap,
+    required this.onProjectRename,
+    required this.onProjectDelete,
   });
 
   @override
@@ -1291,8 +1468,17 @@ class _SeeAllPageState extends State<_SeeAllPage> {
                           isDark: isDark,
                           previewImages: _projectPreviews[project.id] ?? [],
                           onTap: () => widget.onProjectTap(project),
+                          // Chain callbacks, reload data on completion
+                          onRename: () async {
+                            await widget.onProjectRename(project);
+                            _fetchData();
+                          },
+                          onDelete: () async {
+                            await widget.onProjectDelete(project);
+                            _fetchData();
+                          },
                           isHorizontal: false,
-                          showGrid: true, // Show Grid for Projects here
+                          showGrid: true,
                         );
                       },
                     )

@@ -87,8 +87,6 @@ class _ImageSavePageState extends State<ImageSavePage> {
   // Resizing state
   DragHandle _activeHandle = DragHandle.none;
   Offset? _startDragLocalOffset; // Used for moving the entire rect
-
-  // FIXED: Store render size per image index
   final Map<int, Size> _imageRenderSizes = {};
 
   final List<String> _availableTags = [
@@ -194,8 +192,6 @@ class _ImageSavePageState extends State<ImageSavePage> {
     final RenderBox? box =
         currentKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return null;
-
-    // FIXED: Store the render size for this specific image
     _imageRenderSizes[_currentImageIndex] = box.size;
 
     // Convert global to local
@@ -740,7 +736,6 @@ class _ImageSavePageState extends State<ImageSavePage> {
     final isPageLocked = _isDrawMode || _isResizing;
 
     return Scaffold(
-      // FIX: Prevents the main screen/image from pushing up when the keyboard opens.
       resizeToAvoidBottomInset: false,
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -1221,9 +1216,9 @@ class _ImageSavePageState extends State<ImageSavePage> {
   }
 }
 
-// -----------------------------------------------------------------------------
-// --- NEW HELPER CLASSES FOR CUSTOM HALF-PAGE MODAL OVERLAY ---
-// -----------------------------------------------------------------------------
+// ---------------------------------------------------------
+// --- HELPER CLASSES FOR CUSTOM HALF-PAGE MODAL OVERLAY ---
+// ---------------------------------------------------------
 
 class NoteModalOverlay extends StatelessWidget {
   final Widget modalContent;
@@ -1244,7 +1239,6 @@ class NoteModalOverlay extends StatelessWidget {
 
     return Align(
       alignment: Alignment.bottomCenter,
-      // FIX 1: Use AnimatedPadding for smooth keyboard elevation.
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
@@ -1252,8 +1246,6 @@ class NoteModalOverlay extends StatelessWidget {
           bottom: keyboardHeight, // Moves modal up to avoid keyboard
         ),
         child: ConstrainedBox(
-          // FIX 2: Remove fixed minHeight to let the modal shrink to fit its content,
-          // addressing the "gets up too high" issue.
           constraints: BoxConstraints(maxHeight: screenSize.height),
           child: Material(
             // Using Material to provide the background, border radius, and shadow.

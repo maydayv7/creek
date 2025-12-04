@@ -315,7 +315,7 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                             color: Variables.surfaceSubtle,
                             border: Border.all(color: Variables.borderSubtle),
                           ),
-                          // FIX: Explicitly clip image to border radius
+                          // Explicitly clip image to border radius
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: Stack(

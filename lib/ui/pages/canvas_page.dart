@@ -319,7 +319,7 @@ class _CanvasPageState extends State<CanvasPage> {
   }
 
   // --- UNDO/REDO ---
-  // --- MAGIC DRAW UNDO/REDO (NEW) ---
+  // --- MAGIC DRAW UNDO/REDO ---
   void _recordMagicChange(List<DrawingPath> oldMagicPaths) {
     final newMagicPaths = List<DrawingPath>.from(_magicPaths);
     _magicDrawChangeStack.add(
@@ -813,7 +813,7 @@ class _CanvasPageState extends State<CanvasPage> {
             } else {
               _paths = [];
             }
-            // [FIX] LOAD CANVAS DIMENSIONS & RESET VIEW INIT
+            // LOAD CANVAS DIMENSIONS & RESET VIEW INIT
             if (decoded['width'] != null && decoded['height'] != null) {
               _canvasSize = Size(
                 (decoded['width'] as num).toDouble(),
@@ -921,7 +921,7 @@ class _CanvasPageState extends State<CanvasPage> {
     context,
   ).showSnackBar(const SnackBar(content: Text('Coming soon')));
 
-  // [UPDATED] New Bottom Sheet for Assets
+  // Bottom Sheet for Assets
   void _openStylesheet() {
     showModalBottomSheet(
       context: context,

@@ -8,14 +8,14 @@ class FileRepo {
     await db.insert('files', file.toMap());
   }
 
-  // New method: Gets all files, regardless of project ID, ordered by last_updated
+  // Gets all files, regardless of project ID, ordered by last_updated
   Future<List<FileModel>> getAllFiles() async {
     final db = await AppDatabase.db;
     final res = await db.query('files', orderBy: 'last_updated DESC');
     return res.map((e) => FileModel.fromMap(e)).toList();
   }
 
-  // New method: Gets the most recent files across all projects, capped by limit
+  // Gets the most recent files across all projects, capped by limit
   Future<List<FileModel>> getRecentFiles({int limit = 10}) async {
     final db = await AppDatabase.db;
     final res = await db.query(

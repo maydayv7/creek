@@ -8,7 +8,7 @@ class ImageModel {
   final List<String> tags;
   final String? analysisData;
   final DateTime createdAt;
-  final String status; // NEW: 'pending', 'analyzing', 'completed', 'failed'
+  final String status; // 'pending', 'analyzing', 'completed', 'failed'
 
   ImageModel({
     required this.id,

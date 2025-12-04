@@ -84,7 +84,6 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
             MaterialPageRoute(
               builder:
                   (_) => ShareToFilePage(
-                    // FIX: Use 'sharedImage' instead of 'file' to match ShareToFilePage constructor
                     sharedImage: tempFiles.first,
                   ),
             ),
