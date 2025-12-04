@@ -1,17 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:adobe/data/repos/file_repo.dart';
-import 'package:adobe/data/repos/image_repo.dart';
-import 'package:adobe/data/repos/note_repo.dart';
-import 'package:adobe/data/repos/project_repo.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
-import 'package:path/path.dart' as p;
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:adobe/services/python_service.dart';
+import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as p;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:creekui/data/repos/file_repo.dart';
+import 'package:creekui/data/repos/image_repo.dart';
+import 'package:creekui/data/repos/note_repo.dart';
+import 'package:creekui/data/repos/project_repo.dart';
+import './python_service.dart';
 import './encryption_service.dart';
 
 class FlaskService {

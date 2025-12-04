@@ -3,7 +3,7 @@ import 'package:path/path.dart';
 
 class AppDatabase {
   static Database? _db;
-  static const String _dbName = 'database_v6.db';
+  static const String _dbName = 'database_v7.db';
 
   static Future<Database> get db async {
     if (_db != null) return _db!;

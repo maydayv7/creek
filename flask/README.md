@@ -31,5 +31,14 @@ modal setup
 modal deploy modal_app.py
 ```
 
+## Environment Variables
+
+Ensure that a `.env` file is present in this directory containing the following contents:
+
+```dotenv
+FAL_KEY=<Fal.ai API Key>
+SHARED_SECRET_KEY=<Base64 Security Key>
+```
+
 > [!NOTE]
 > You must update the root `.env` file for the app to recognize the deployed backend

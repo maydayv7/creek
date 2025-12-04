@@ -37,7 +37,21 @@ Download from [python.org](https://www.python.org/downloads/release/python-3810/
 python -m venv python_env
 ```
 
-### 3. Build the APK
+### 3. Create .env
+
+Create the `.env` file in the root directory containing the following:
+
+```dotenv
+URL_ASSET=<Background Removal Backend Endpoint>
+URL_DESCRIBE=<Florence-v2 Description Backend Endpoint>
+URL_GENERATE=<Stable Diffusion Image Generation Backend Endpoint>
+URL_INPAINTING=<Stable Diffusion Inpainting Backend Endpoint>
+URL_INPAINTING_API=<Fal.ai Inpainting Backend Endpoint>
+URL_SKETCH_API=<Sketch to Image Backend Endpoint>
+SHARED_SECRET_KEY=<Base64 Security Key>
+```
+
+### 4. Build the APK
 
 ```bash
 flutter clean

@@ -52,7 +52,7 @@ app = modal.App("creekui", image=image)
 # 2. THE BACKEND SERVER CLASS
 # ==============================================================================
 @app.cls(
-    gpu="any",
+    gpu="A10G",
     scaledown_window=300,
     secrets=[modal.Secret.from_name("creek-secrets")],
 )
