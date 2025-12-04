@@ -1,3 +1,0 @@
-local_inpainting_model/** filter=lfs diff=lfs merge=lfs -text
-Florence-2-4bit-Quantized/** filter=lfs diff=lfs merge=lfs -text
-BiRefNet/** filter=lfs diff=lfs merge=lfs -text

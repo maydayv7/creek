@@ -1,3 +1,5 @@
+.env
+
 # Miscellaneous
 ~*
 *.class
@@ -40,14 +42,13 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# VS Code
+.vscode
+
 # Python
 venv
 python_env/
 __pycache__
 
-# VS Code
-.vscode/
-
-# .env Files
-.env
-flask/.env
+# Models
+*onnx*

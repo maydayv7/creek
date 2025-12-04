@@ -31,6 +31,12 @@ modal setup
 modal deploy modal_app.py
 ```
 
+# Setup
+
+## Models
+
+Download all the models from [here](https://drive.google.com/drive/folders/143A296pgkTiUGqffE4xG8ADPPEGOY-W2) and place them inside this directory
+
 ## Environment Variables
 
 Ensure that a `.env` file is present in this directory containing the following contents:

@@ -1,0 +1,6 @@
+.env
+
+# Models
+BiRefNet
+Florence-2-4bit-Quantized
+local_inpainting_model
