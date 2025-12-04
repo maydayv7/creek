@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../services/image_service.dart';
-import '../../services/note_service.dart';
+import 'package:creekui/services/image_service.dart';
+import 'package:creekui/services/note_service.dart';
 import 'project_board_page.dart';
 
 // --- HELPER CLASS FOR TEMPORARY NOTES ---

@@ -1,5 +1,3 @@
-// lib/utils/clip_image_processor.dart
-
 import 'dart:typed_data';
 import 'dart:io';
 import 'package:image/image.dart' as img;

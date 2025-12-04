@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:adobe/services/analyze/image_analyzer.dart';
-import '../styles/variables.dart';
+import 'package:creekui/services/analyze/image_analyzer.dart';
+import 'package:creekui/styles/variables.dart';
 
 class ImageAnalysisPage extends StatefulWidget {
   const ImageAnalysisPage({super.key});

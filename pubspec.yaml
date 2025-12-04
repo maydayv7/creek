@@ -1,4 +1,4 @@
-name: adobe
+name: creekui
 description: "AI-based image editor"
 publish_to: "none"
 version: 1.0.0+1
@@ -32,6 +32,7 @@ dependencies:
   dotted_border: ^2.0.0
   share_plus: ^12.0.1
   flutter_dotenv: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -77,3 +78,8 @@ flutter:
           weight: 500
         - asset: assets/fonts/GeneralSans-Semibold.otf
           weight: 600
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/app_icon.png"

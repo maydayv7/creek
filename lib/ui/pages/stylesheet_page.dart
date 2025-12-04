@@ -6,14 +6,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:adobe/ui/styles/variables.dart';
-import 'package:adobe/ui/widgets/bottom_bar.dart';
-import 'package:adobe/ui/widgets/top_bar.dart';
-import 'package:adobe/data/repos/project_repo.dart';
-import 'package:adobe/data/repos/image_repo.dart';
-import 'package:adobe/data/repos/note_repo.dart';
-import 'package:adobe/services/stylesheet_service.dart';
-import 'package:adobe/services/python_service.dart';
+import 'package:creekui/data/repos/project_repo.dart';
+import 'package:creekui/data/repos/image_repo.dart';
+import 'package:creekui/data/repos/note_repo.dart';
+import 'package:creekui/services/stylesheet_service.dart';
+import 'package:creekui/services/python_service.dart';
+import 'package:creekui/ui/widgets/bottom_bar.dart';
+import 'package:creekui/ui/widgets/top_bar.dart';
+import 'package:creekui/ui/styles/variables.dart';
 
 class StylesheetPage extends StatefulWidget {
   final int projectId;

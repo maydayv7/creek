@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:onnxruntime/onnxruntime.dart';
-import 'package:adobe/utils/image_utils.dart';
-import 'package:adobe/utils/clip_image_processor.dart';
+import 'package:creekui/utils/image_utils.dart';
+import 'package:creekui/utils/clip_image_processor.dart';
 
 class EmbeddingAnalyzerService {
   OrtSession? _session;

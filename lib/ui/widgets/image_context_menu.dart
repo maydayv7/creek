@@ -1,9 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../../data/models/image_model.dart';
-import '../../utils/image_actions_helper.dart';
-import '../styles/variables.dart';
+import 'package:creekui/data/models/image_model.dart';
+import 'package:creekui/utils/image_actions_helper.dart';
+import 'package:creekui/ui/styles/variables.dart';
 
 class ImageContextMenu extends StatelessWidget {
   final ImageModel image;

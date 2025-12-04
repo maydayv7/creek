@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../../data/models/project_model.dart';
-import '../../data/models/image_model.dart';
-import '../../data/repos/project_repo.dart';
-import '../../data/repos/image_repo.dart';
-import '../../services/project_service.dart';
+import 'package:creekui/data/models/project_model.dart';
+import 'package:creekui/data/models/image_model.dart';
+import 'package:creekui/data/repos/project_repo.dart';
+import 'package:creekui/data/repos/image_repo.dart';
+import 'package:creekui/services/project_service.dart';
 import 'project_board_page.dart';
 import 'stylesheet_page.dart';
 import 'project_file_page.dart';

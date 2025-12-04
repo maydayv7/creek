@@ -4,8 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
-import '../data/repos/image_repo.dart';
-import '../data/models/image_model.dart';
+import 'package:creekui/data/repos/image_repo.dart';
+import 'package:creekui/data/models/image_model.dart';
 import 'analysis_queue_manager.dart';
 
 class ImageService {

@@ -1,18 +1,16 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-
-import '../../data/models/file_model.dart';
-import '../../data/models/project_model.dart';
-import '../../services/file_service.dart';
-import '../../data/repos/project_repo.dart';
-import '../widgets/bottom_bar.dart';
-import 'create_file_page.dart';
-import 'canvas_board_page.dart';
-import '../widgets/top_bar.dart';
-
 import 'package:image/image.dart' as img;
+import 'package:intl/intl.dart';
+import 'package:creekui/data/models/file_model.dart';
+import 'package:creekui/data/models/project_model.dart';
+import 'package:creekui/services/file_service.dart';
+import 'package:creekui/data/repos/project_repo.dart';
+import 'package:creekui/ui/widgets/top_bar.dart';
+import 'package:creekui/ui/widgets/bottom_bar.dart';
+import 'create_file_page.dart';
+import 'canvas_page.dart';
 
 class ProjectFilePage extends StatefulWidget {
   final int projectId;
@@ -138,7 +136,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
       context,
       MaterialPageRoute(
         builder:
-            (_) => CanvasBoardPage(
+            (_) => CanvasPage(
               projectId: file.projectId,
               width: 1080,
               height: 1920,

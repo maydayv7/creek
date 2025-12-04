@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
-import 'package:adobe/utils/image_utils.dart';
+import 'package:creekui/utils/image_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:onnxruntime/onnxruntime.dart';

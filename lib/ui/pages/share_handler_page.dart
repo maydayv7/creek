@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:adobe/services/download_service.dart';
-import 'package:adobe/services/instagram_download_service.dart';
-import 'package:adobe/services/image_service.dart';
-import 'package:adobe/ui/pages/share_to_moodboard_page.dart';
-import 'package:adobe/ui/pages/share_to_file_page.dart';
+import 'package:creekui/services/download_service.dart';
+import 'package:creekui/services/instagram_download_service.dart';
+import 'package:creekui/services/image_service.dart';
+import 'share_to_moodboard_page.dart';
+import 'share_to_file_page.dart';
 
 class ShareHandlerPage extends StatefulWidget {
   final String sharedText;

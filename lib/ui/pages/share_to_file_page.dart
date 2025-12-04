@@ -1,15 +1,13 @@
 import 'dart:io';
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
-
-import '../../services/file_service.dart';
-import '../../services/project_service.dart';
-import '../../data/models/file_model.dart';
-import '../../data/models/project_model.dart';
+import 'package:creekui/services/file_service.dart';
+import 'package:creekui/services/project_service.dart';
+import 'package:creekui/data/models/file_model.dart';
+import 'package:creekui/data/models/project_model.dart';
 import 'create_file_page.dart';
-import 'canvas_board_page.dart';
+import 'canvas_page.dart';
 
 class ShareToFilePage extends StatefulWidget {
   final File sharedImage;
@@ -241,7 +239,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
         context,
         MaterialPageRoute(
           builder:
-              (context) => CanvasBoardPage(
+              (context) => CanvasPage(
                 projectId: file.projectId,
                 width: width,
                 height: height,

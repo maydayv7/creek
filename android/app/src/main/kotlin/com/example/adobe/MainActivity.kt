@@ -1,4 +1,4 @@
-package com.example.adobe
+package com.creek.ui
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 import android.content.Intent
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.adobe/methods"
+    private val CHANNEL = "com.creek.ui/methods"
     private val scope = CoroutineScope(Dispatchers.Default)
 
     override fun onNewIntent(intent: Intent) {

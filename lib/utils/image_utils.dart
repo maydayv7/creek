@@ -1,5 +1,3 @@
-// lib/utils/image_utils.dart
-
 import 'dart:math';
 
 List<double> l2Normalize(List<double> vec) {

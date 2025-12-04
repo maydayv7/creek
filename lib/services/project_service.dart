@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/rendering.dart';
 
-import '../data/repos/project_repo.dart';
-import '../data/repos/image_repo.dart';
-import '../data/repos/file_repo.dart';
-import '../data/models/project_model.dart';
+import 'package:creekui/data/repos/project_repo.dart';
+import 'package:creekui/data/repos/image_repo.dart';
+import 'package:creekui/data/repos/file_repo.dart';
+import 'package:creekui/data/models/project_model.dart';
 
 class ProjectService {
   final _projectRepo = ProjectRepo();

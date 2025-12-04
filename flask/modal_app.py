@@ -43,7 +43,7 @@ image = (
     .add_local_dir("BiRefNet", remote_path="/root/BiRefNet")
 )
 
-app = modal.App("adobe-flask", image=image)
+app = modal.App("creekui-flask", image=image)
 
 
 # ==============================================================================

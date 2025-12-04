@@ -1,16 +1,16 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:adobe/data/models/project_model.dart';
-import 'package:adobe/data/models/file_model.dart';
-import 'package:adobe/data/repos/project_repo.dart';
-import 'package:adobe/data/repos/image_repo.dart';
-import 'package:adobe/data/repos/file_repo.dart';
-import 'package:adobe/services/project_service.dart';
 import 'package:image/image.dart' as img;
+import 'package:creekui/data/models/project_model.dart';
+import 'package:creekui/data/models/file_model.dart';
+import 'package:creekui/data/repos/project_repo.dart';
+import 'package:creekui/data/repos/image_repo.dart';
+import 'package:creekui/data/repos/file_repo.dart';
+import 'package:creekui/services/project_service.dart';
 import 'project_detail_page.dart';
 import 'define_brand_page.dart';
-import 'canvas_board_page.dart';
+import 'canvas_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -223,7 +223,7 @@ class _HomePageState extends State<HomePage> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => CanvasBoardPage(
+          builder: (_) => CanvasPage(
             projectId: file.projectId,
             width: width,
             height: height,

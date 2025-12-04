@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
-import '../data/models/image_model.dart';
-import '../services/image_service.dart';
-import '../ui/pages/share_to_file_page.dart';
-import '../ui/styles/variables.dart';
+import 'package:creekui/data/models/image_model.dart';
+import 'package:creekui/services/image_service.dart';
+import 'package:creekui/ui/pages/share_to_file_page.dart';
+import 'package:creekui/ui/styles/variables.dart';
 
 class ImageActionsHelper {
   static Future<void> shareImage(BuildContext context, String filePath) async {

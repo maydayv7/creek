@@ -1,4 +1,4 @@
-# adobe
+# CreekUI
 
 A Flutter project with AI-based image analysis
 

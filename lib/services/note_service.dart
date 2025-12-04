@@ -1,5 +1,5 @@
-import '../data/repos/note_repo.dart';
-import '../data/models/note_model.dart';
+import 'package:creekui/data/repos/note_repo.dart';
+import 'package:creekui/data/models/note_model.dart';
 import 'analysis_queue_manager.dart';
 
 class NoteService {

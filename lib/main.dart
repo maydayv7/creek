@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-import 'package:adobe/services/theme_service.dart';
-import 'package:adobe/ui/pages/share_handler_page.dart';
-import 'package:adobe/ui/pages/home_page.dart';
-import 'package:adobe/services/analysis_queue_manager.dart';
+import 'package:creekui/services/theme_service.dart';
+import 'package:creekui/ui/pages/share_handler_page.dart';
+import 'package:creekui/ui/pages/home_page.dart';
+import 'package:creekui/services/analysis_queue_manager.dart';
 import 'package:flutter/services.dart';
 
 void main() async {
@@ -77,7 +77,7 @@ class _MyAppState extends State<MyApp> {
     // 1. Determine destination (Files vs Moodboards)
     String shareDestination = 'moodboards'; // Default
     try {
-      const platform = MethodChannel('com.example.adobe/methods');
+      const platform = MethodChannel('com.creek.ui/methods');
       final result = await platform.invokeMethod<String>('getShareSource');
       if (result != null) shareDestination = result;
     } catch (e) {

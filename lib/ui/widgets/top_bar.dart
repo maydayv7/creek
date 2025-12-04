@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:adobe/data/models/project_model.dart';
-import 'package:adobe/data/repos/project_repo.dart';
-import '../styles/variables.dart';
+import 'package:creekui/data/models/project_model.dart';
+import 'package:creekui/data/repos/project_repo.dart';
+import 'package:creekui/ui/styles/variables.dart';
 
 class TopBar extends StatefulWidget implements PreferredSizeWidget {
   final int currentProjectId;

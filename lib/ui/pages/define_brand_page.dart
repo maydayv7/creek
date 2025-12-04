@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:adobe/ui/styles/variables.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../../services/project_service.dart';
+import 'package:creekui/services/project_service.dart';
+import 'package:creekui/ui/styles/variables.dart';
 import 'project_detail_page.dart';
 
 class DefineBrandPage extends StatefulWidget {

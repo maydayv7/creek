@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 
 class PythonService {
   static const MethodChannel _channel = MethodChannel(
-    'com.example.adobe/methods',
+    'com.creek.ui/methods',
   );
 
   // 1. Layout Analysis (OpenCV)

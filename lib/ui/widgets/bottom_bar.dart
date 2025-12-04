@@ -1,10 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:adobe/ui/styles/variables.dart';
-import 'package:adobe/ui/pages/project_board_page.dart';
-import 'package:adobe/ui/pages/stylesheet_page.dart';
-import 'package:adobe/ui/pages/project_file_page.dart';
+import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/pages/project_board_page.dart';
+import 'package:creekui/ui/pages/stylesheet_page.dart';
+import 'package:creekui/ui/pages/project_file_page.dart';
 
 enum BottomBarItem { moodboard, stylesheet, files }
 

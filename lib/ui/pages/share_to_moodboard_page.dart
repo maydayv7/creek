@@ -1,16 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-
-// Models & Repos
-import '../../data/models/project_model.dart';
-import '../../data/repos/project_repo.dart';
-import '../../data/repos/image_repo.dart';
-
-// Services
-import '../../services/project_service.dart';
-
-// Pages
+import 'package:creekui/data/models/project_model.dart';
+import 'package:creekui/data/repos/project_repo.dart';
+import 'package:creekui/data/repos/image_repo.dart';
+import 'package:creekui/services/project_service.dart';
 import 'image_save_page.dart';
 
 // --- VIEW MODELS ---

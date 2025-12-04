@@ -1,15 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'canvas_board_page.dart';
+import 'package:creekui/services/project_service.dart';
+import 'package:creekui/services/image_service.dart';
+import 'package:creekui/data/models/project_model.dart';
+import 'canvas_page.dart';
 import 'define_brand_page.dart';
-
-// Services
-import '../../services/project_service.dart';
-import '../../services/image_service.dart';
-
-// Models
-import '../../data/models/project_model.dart';
 
 class CreateFilePage extends StatefulWidget {
   final File? file;
@@ -172,7 +168,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
       context,
       MaterialPageRoute(
         builder:
-            (_) => CanvasBoardPage(
+            (_) => CanvasPage(
               projectId: _selectedProjectId!, // ⭐ use selected project
               width: width.toDouble(),
               height: height.toDouble(),

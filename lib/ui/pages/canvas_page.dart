@@ -14,13 +14,13 @@ import 'package:undo/undo.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
+import 'package:creekui/data/repos/project_repo.dart';
+import 'package:creekui/data/models/file_model.dart';
+import 'package:creekui/services/stylesheet_service.dart';
+import 'package:creekui/services/file_service.dart';
+import 'package:creekui/services/flask_service.dart';
 import './canvas_toolbar/magic_draw_overlay.dart';
 import './canvas_toolbar/text_tools_overlay.dart';
-import '../../data/repos/project_repo.dart';
-import '../../data/models/file_model.dart';
-import '../../services/stylesheet_service.dart';
-import '../../services/file_service.dart';
-import '../../services/flask_service.dart';
 import 'project_file_page.dart';
 
 // --- MODELS WITH JSON SUPPORT ---
@@ -80,7 +80,7 @@ class CanvasState {
   CanvasState(this.elements, this.paths);
 }
 
-class CanvasBoardPage extends StatefulWidget {
+class CanvasPage extends StatefulWidget {
   final int projectId;
   final double width;
   final double height;
@@ -88,7 +88,7 @@ class CanvasBoardPage extends StatefulWidget {
   final FileModel? existingFile;
   final File? injectedMedia;
 
-  const CanvasBoardPage({
+  const CanvasPage({
     super.key,
     required this.projectId,
     required this.width,
@@ -99,10 +99,10 @@ class CanvasBoardPage extends StatefulWidget {
   });
 
   @override
-  State<CanvasBoardPage> createState() => _CanvasBoardPageState();
+  State<CanvasPage> createState() => _CanvasPageState();
 }
 
-class _CanvasBoardPageState extends State<CanvasBoardPage> {
+class _CanvasPageState extends State<CanvasPage> {
   // --- SERVICES ---
   final FileService _fileService = FileService();
   final ChangeStack _changeStack = ChangeStack();
@@ -582,7 +582,7 @@ class _CanvasBoardPageState extends State<CanvasBoardPage> {
       // This allows the user to "Save to Device", "Share to Instagram", etc.
       await Share.shareXFiles([
         XFile(filePath, mimeType: 'image/jpeg'),
-      ], text: 'Check out my design created with Adobe Clone!');
+      ], text: 'Check out my design created with CreekUI!');
     } catch (e) {
       debugPrint("Export Error: $e");
       ScaffoldMessenger.of(

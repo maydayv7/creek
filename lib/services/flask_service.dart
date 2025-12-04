@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:adobe/data/repos/file_repo.dart';
-import 'package:adobe/data/repos/image_repo.dart';
-import 'package:adobe/data/repos/note_repo.dart';
-import 'package:adobe/data/repos/project_repo.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:adobe/services/python_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:creekui/data/repos/project_repo.dart';
+import 'package:creekui/data/repos/image_repo.dart';
+import 'package:creekui/data/repos/note_repo.dart';
+import 'package:creekui/data/repos/file_repo.dart';
+import 'package:creekui/services/python_service.dart';
 
 class FlaskService {
   // ===========================================================================
@@ -320,7 +320,7 @@ class FlaskService {
 
   // LOG TO FILE HELPER
   // Use following command to see logs:
-  // adb -d shell "run-as com.example.adobe cat /data/user/0/com.example.adobe/app_flutter/debug_magic_prompt.txt"
+  // adb -d shell "run-as com.creek.ui cat /data/user/0/com.creek.ui/app_flutter/debug_magic_prompt.txt"
   Future<void> _logToFile(String filename, String content) async {
     try {
       final dir = await getApplicationDocumentsDirectory();

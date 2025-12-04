@@ -71,23 +71,23 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
 
   // --- 1. LIST FOR INPAINTING (When Image Exists) ---
   final List<AIModelOption> _inpaintingModels = [
-    AIModelOption(id: 'inpaint_api', name: 'FLUX LoRa Fill', badge: null),
     AIModelOption(
       id: 'inpaint_standard',
       name: 'Stable Diffusion Inpainting',
       badge: "Recommended",
     ),
+    AIModelOption(id: 'inpaint_api', name: 'FLUX LoRa Fill', badge: null),
   ];
 
   // --- 2. LIST FOR SKETCH TO IMAGE (When No Image Exists) ---
   final List<AIModelOption> _sketchModels = [
-    AIModelOption(id: 'sketch_fusion', name: 'Stable Diffusion v1.5', badge: null),
-    AIModelOption(id: 'sketch_creative', name: 'FLUX Dev', badge: 'Fast'),
     AIModelOption(
       id: 'sketch_advanced',
       name: 'Nano Banana',
       badge: 'Premium',
     ),
+    AIModelOption(id: 'sketch_fusion', name: 'Stable Diffusion v1.5', badge: null),
+    AIModelOption(id: 'sketch_creative', name: 'FLUX Dev', badge: 'Fast'),
   ];
 
   @override

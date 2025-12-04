@@ -3,10 +3,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
-import '../data/models/image_model.dart';
-import '../data/models/note_model.dart';
-import '../data/repos/image_repo.dart';
-import '../data/repos/note_repo.dart';
+import 'package:creekui/data/models/image_model.dart';
+import 'package:creekui/data/models/note_model.dart';
+import 'package:creekui/data/repos/image_repo.dart';
+import 'package:creekui/data/repos/note_repo.dart';
 import 'analyze/image_analyzer.dart';
 import 'package:path/path.dart' as p;
 

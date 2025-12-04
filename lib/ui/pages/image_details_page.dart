@@ -2,11 +2,11 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../../services/image_service.dart';
-import '../../services/note_service.dart';
-import '../../data/models/note_model.dart';
-import '../../data/models/image_model.dart';
-import '../../utils/image_actions_helper.dart';
+import 'package:creekui/services/image_service.dart';
+import 'package:creekui/services/note_service.dart';
+import 'package:creekui/data/models/note_model.dart';
+import 'package:creekui/data/models/image_model.dart';
+import 'package:creekui/utils/image_actions_helper.dart';
 
 // --- STATE MACHINE FOR SELECTION MODE ---
 enum DragHandle {

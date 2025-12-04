@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:adobe/ui/styles/variables.dart';
-import '../../data/models/image_model.dart';
-import '../../data/repos/image_repo.dart';
+import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/data/models/image_model.dart';
+import 'package:creekui/data/repos/image_repo.dart';
+import 'package:creekui/ui/widgets/image_context_menu.dart';
 import 'image_details_page.dart';
-import '../widgets/image_context_menu.dart';
 
 class ProjectBoardPageAlternate extends StatefulWidget {
   final int projectId;

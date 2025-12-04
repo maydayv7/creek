@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
-import '../data/repos/file_repo.dart';
-import '../data/models/file_model.dart';
+import 'package:creekui/data/repos/file_repo.dart';
+import 'package:creekui/data/models/file_model.dart';
 
 class FileService {
   final _repo = FileRepo();

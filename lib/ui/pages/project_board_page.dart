@@ -1,20 +1,20 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:adobe/ui/styles/variables.dart';
-import 'package:adobe/ui/widgets/top_bar.dart';
-import 'package:adobe/ui/widgets/bottom_bar.dart';
-import '../../data/models/project_model.dart';
-import '../../data/models/image_model.dart';
-import '../../data/repos/project_repo.dart';
-import '../../data/repos/note_repo.dart';
-import '../../data/repos/image_repo.dart';
+import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/top_bar.dart';
+import 'package:creekui/ui/widgets/bottom_bar.dart';
+import 'package:creekui/data/models/project_model.dart';
+import 'package:creekui/data/models/image_model.dart';
+import 'package:creekui/data/repos/project_repo.dart';
+import 'package:creekui/data/repos/note_repo.dart';
+import 'package:creekui/data/repos/image_repo.dart';
+import 'package:creekui/ui/widgets/image_context_menu.dart';
 import 'project_tag_page.dart';
 import 'project_board_page_alternate.dart';
 import 'image_save_page.dart';
 import 'image_details_page.dart';
 import 'stylesheet_page.dart';
-import '../widgets/image_context_menu.dart';
 
 class ProjectBoardPage extends StatefulWidget {
   final int projectId;
