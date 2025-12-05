@@ -68,7 +68,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
   }
 
   // ---------------------------------------
-  // LOAD METADATA (Like HomePage)
+  // LOAD METADATA
   // ---------------------------------------
   Future<void> _loadMetadata(List<FileModel> list) async {
     for (final file in list) {
@@ -293,11 +293,10 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
           border: Border.all(color: const Color(0xFFE4E4E7)),
         ),
 
-        // ❗ NO padding here — keeps left flush
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ---------- THUMBNAIL (FLUSH) ----------
+            // ---------- THUMBNAIL ----------
             ClipRRect(
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
@@ -318,7 +317,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
               ),
             ),
 
-            // ---------- SPACING ----------
             const SizedBox(width: 12),
 
             // ---------- RIGHT SIDE TEXT ----------
@@ -391,7 +389,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
               icon: const Icon(Icons.more_vert, size: 20),
             ),
 
-            const SizedBox(width: 4), // slight right breathing space
+            const SizedBox(width: 4),
           ],
         ),
       ),
@@ -696,14 +694,14 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
   }
 
   // ---------------------------------------
-  // DROPDOWN (ONLY — add event removed)
+  // DROPDOWN
   // ---------------------------------------
   Widget _buildEventDropdown() {
     return Container(
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFE4E4E7), // subtle grey
+        color: const Color(0xFFE4E4E7),
         borderRadius: BorderRadius.circular(8),
       ),
       child: DropdownButton<ProjectModel>(

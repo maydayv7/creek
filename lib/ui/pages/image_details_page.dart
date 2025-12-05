@@ -547,7 +547,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                           ),
                           const SizedBox(width: 12),
 
-                          // Send Button with YOUR Logic
+                          // Send Button
                           Container(
                             margin: const EdgeInsets.only(bottom: 2),
                             child: IconButton(
@@ -555,7 +555,6 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                               color: Colors.black87,
                               iconSize: 28,
                               onPressed: () async {
-                                // --- YOUR ORIGINAL SAVE LOGIC ---
                                 if (newNoteController.text.isNotEmpty &&
                                     _finalSelectionRect != null &&
                                     _imageRenderSize != null) {

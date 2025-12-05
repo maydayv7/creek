@@ -4,6 +4,7 @@ import os
 import json
 from pathlib import Path
 
+
 def download_instagram_image(url, output_dir):
     """
     Downloads all images from an Instagram post.
@@ -14,9 +15,9 @@ def download_instagram_image(url, output_dir):
         # Initialize Instaloader
         L = instaloader.Instaloader(
             download_pictures=True,
-            download_videos=False, 
+            download_videos=False,
             download_video_thumbnails=False,
-            download_geotags=False, 
+            download_geotags=False,
             download_comments=False,
             save_metadata=False,
             compress_json=False,
@@ -24,12 +25,14 @@ def download_instagram_image(url, output_dir):
         L.filename_pattern = "{shortcode}"
 
         # Extract shortcode from URL
-        shortcode_match = re.search(r'instagram\.com/(?:p|reel|tv)/([^/?#&]+)', url)
+        shortcode_match = re.search(r"instagram\.com/(?:p|reel|tv)/([^/?#&]+)", url)
         if not shortcode_match:
-            return json.dumps({
-                "success": False,
-                "error": "Could not extract shortcode. Use format: https://instagram.com/p/ShortCode/"
-            })
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": "Could not extract shortcode. Use format: https://instagram.com/p/ShortCode/",
+                }
+            )
         shortcode = shortcode_match.group(1)
 
         # Download post
@@ -37,7 +40,7 @@ def download_instagram_image(url, output_dir):
         L.download_post(post, target=Path(output_dir))
 
         found_files = []
-        extensions = ['jpg', 'png', 'webp', 'jpeg']
+        extensions = ["jpg", "png", "webp", "jpeg"]
         patterns = [f"{shortcode}.{{ext}}", f"{shortcode}_*.{{ext}}"]
 
         output_path = Path(output_dir)
@@ -50,25 +53,19 @@ def download_instagram_image(url, output_dir):
         found_files = sorted(list(set(found_files)))
 
         if found_files:
-            return json.dumps({
-                "success": True,
-                "file_paths": found_files,
-                "shortcode": shortcode
-            })
+            return json.dumps(
+                {"success": True, "file_paths": found_files, "shortcode": shortcode}
+            )
         else:
             all_files = [f.name for f in output_path.glob("*")]
-            return json.dumps({
-                "success": False,
-                "error": f"Downloaded but no images found. Files in dir: {all_files}"
-            })
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": f"Downloaded but no images found. Files in dir: {all_files}",
+                }
+            )
 
     except instaloader.exceptions.InstaloaderException as e:
-        return json.dumps({
-            "success": False,
-            "error": f"Instaloader error: {str(e)}"
-        })
+        return json.dumps({"success": False, "error": f"Instaloader error: {str(e)}"})
     except Exception as e:
-        return json.dumps({
-            "success": False,
-            "error": f"Python error: {str(e)}"
-        })
+        return json.dumps({"success": False, "error": f"Python error: {str(e)}"})

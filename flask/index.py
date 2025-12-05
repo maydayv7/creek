@@ -19,7 +19,9 @@ import time
 import uuid
 from Crypto.Cipher import AES
 from dotenv import load_dotenv
+
 load_dotenv()
+
 
 class CryptoManager:
     def __init__(self, key_base64):
@@ -34,13 +36,13 @@ class CryptoManager:
         cipher = AES.new(self.key, AES.MODE_GCM, nonce=nonce)
 
         # 3. Encrypt and get Tag (MAC)
-        ciphertext, tag = cipher.encrypt_and_digest(plain_text.encode('utf-8'))
+        ciphertext, tag = cipher.encrypt_and_digest(plain_text.encode("utf-8"))
 
         # 4. Pack: Nonce + Ciphertext + Tag
         combined = nonce + ciphertext + tag
 
         # 5. Return as Base64 string
-        return base64.b64encode(combined).decode('utf-8')
+        return base64.b64encode(combined).decode("utf-8")
 
     def decrypt(self, encrypted_b64):
         try:
@@ -55,10 +57,11 @@ class CryptoManager:
             # 3. Decrypt
             cipher = AES.new(self.key, AES.MODE_GCM, nonce=nonce)
             decrypted_data = cipher.decrypt_and_verify(ciphertext, tag)
-            return decrypted_data.decode('utf-8')
+            return decrypted_data.decode("utf-8")
         except Exception as e:
             print(f"Decryption failed: {e}")
             return None
+
 
 # Setup Secret Key
 SHARED_SECRET_KEY = os.getenv("SHARED_SECRET_KEY")
@@ -67,6 +70,7 @@ if not SHARED_SECRET_KEY:
     sys.exit(1)
 
 crypto = CryptoManager(SHARED_SECRET_KEY)
+
 
 # ==============================================================================
 # SECURITY DECORATOR (Middleware)
@@ -78,10 +82,17 @@ def secure_endpoint(f):
         try:
             # Expecting JSON format: { "data": "BASE64_ENCRYPTED_STRING" }
             incoming = request.get_json(silent=True)
-            if not incoming or 'data' not in incoming:
-                return jsonify({"error": "Invalid format. Expected {'data': 'encrypted_string'}"}), 400
+            if not incoming or "data" not in incoming:
+                return (
+                    jsonify(
+                        {
+                            "error": "Invalid format. Expected {'data': 'encrypted_string'}"
+                        }
+                    ),
+                    400,
+                )
 
-            encrypted_b64 = incoming['data']
+            encrypted_b64 = incoming["data"]
             decrypted_json_str = crypto.decrypt(encrypted_b64)
 
             if decrypted_json_str is None:
@@ -106,10 +117,11 @@ def secure_endpoint(f):
             status_code = 200
             if isinstance(response, tuple):
                 resp_obj = response[0]
-                if len(response) > 1: status_code = response[1]
+                if len(response) > 1:
+                    status_code = response[1]
 
             # Extract the plain JSON data from the Response object
-            if hasattr(resp_obj, 'get_json'):
+            if hasattr(resp_obj, "get_json"):
                 plain_data = resp_obj.get_json()
             else:
                 # Fallback if it's not a response object yet
@@ -127,9 +139,11 @@ def secure_endpoint(f):
 
     return decorated_function
 
+
 # --- FAL.AI IMPORTS ---
 try:
     import fal_client
+
     # SETUP API KEY
     if os.getenv("FAL_KEY"):
         os.environ["FAL_KEY"] = os.getenv("FAL_KEY")
@@ -147,9 +161,12 @@ try:
     from transformers import AutoModelForCausalLM, AutoProcessor, BitsAndBytesConfig
     import transformers.dynamic_module_utils
     import torch.nn as nn
+
     FLORENCE_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️ Florence-2 Disabled: {e} (Ensure 'bitsandbytes' and 'transformers' are installed)")
+    print(
+        f"⚠️ Florence-2 Disabled: {e} (Ensure 'bitsandbytes' and 'transformers' are installed)"
+    )
     FLORENCE_AVAILABLE = False
 except Exception as e:
     print(f"⚠️ Florence-2 Disabled: Unexpected initialization error: {e}")
@@ -168,15 +185,19 @@ else:
 
 try:
     from models.birefnet import BiRefNet
+
     print("✅ BiRefNet imported successfully.")
 except ImportError as e:
     print(f"⚠️ Import Error: {e}")
     try:
         import BiRefNet.models.birefnet as brn
+
         BiRefNet = brn.BiRefNet
         print("✅ BiRefNet imported via package path.")
     except ImportError:
-         print("❌ Failed to import BiRefNet. Ensure 'BiRefNet/models/birefnet.py' exists.")
+        print(
+            "❌ Failed to import BiRefNet. Ensure 'BiRefNet/models/birefnet.py' exists."
+        )
 
 # --- IMPORT STABLE DIFFUSION ---
 try:
@@ -189,7 +210,7 @@ except ImportError:
 app = Flask(__name__)
 CORS(app)
 
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"🚀 Running on device: {DEVICE}")
 
 # ==============================================================================
@@ -199,15 +220,19 @@ print("⏳ Loading Stable Diffusion (Inpainting)...")
 sd_pipe = None
 try:
     if StableDiffusionInpaintPipeline:
-        SD_MODEL_ID = "./local_inpainting_model" if os.path.exists("./local_inpainting_model") else "runwayml/stable-diffusion-inpainting"
-        
+        SD_MODEL_ID = (
+            "./local_inpainting_model"
+            if os.path.exists("./local_inpainting_model")
+            else "runwayml/stable-diffusion-inpainting"
+        )
+
         sd_pipe = StableDiffusionInpaintPipeline.from_pretrained(
             SD_MODEL_ID,
-            torch_dtype=torch.float16 if DEVICE == 'cuda' else torch.float32,
+            torch_dtype=torch.float16 if DEVICE == "cuda" else torch.float32,
             use_safetensors=True,
         ).to(DEVICE)
         sd_pipe.enable_attention_slicing()
-        sd_pipe.enable_model_cpu_offload() 
+        sd_pipe.enable_model_cpu_offload()
         print("✅ Stable Diffusion Loaded!")
 except Exception as e:
     print(f"❌ Failed to load SD: {e}")
@@ -221,12 +246,12 @@ BIREFNET_WEIGHTS = "./BiRefNet/birefnet_fp16.pt"
 BIREFNET_SIZE = (1024, 1024)
 
 try:
-    if 'BiRefNet' in locals() and os.path.exists(BIREFNET_WEIGHTS):
+    if "BiRefNet" in locals() and os.path.exists(BIREFNET_WEIGHTS):
         birefnet_model = BiRefNet(bb_pretrained=False)
         state_dict = torch.load(BIREFNET_WEIGHTS, map_location=DEVICE)
         birefnet_model.load_state_dict(state_dict)
         birefnet_model.to(DEVICE)
-        if DEVICE == 'cuda':
+        if DEVICE == "cuda":
             birefnet_model.half()
         birefnet_model.eval()
         print("✅ BiRefNet Weights Loaded!")
@@ -235,11 +260,13 @@ try:
 except Exception as e:
     print(f"❌ Failed to load BiRefNet: {e}")
 
-transform_birefnet = transforms.Compose([
-    transforms.Resize(BIREFNET_SIZE),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
+transform_birefnet = transforms.Compose(
+    [
+        transforms.Resize(BIREFNET_SIZE),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ]
+)
 
 # ==============================================================================
 # 3. LOAD FLORENCE-2 (QUANTIZED)
@@ -251,36 +278,44 @@ FLORENCE_PATH = os.path.join(current_dir, "Florence-2-4bit-Quantized")
 
 if FLORENCE_AVAILABLE:
     try:
-        def check_imports_fixed(filename): return []
+
+        def check_imports_fixed(filename):
+            return []
+
         transformers.dynamic_module_utils.check_imports = check_imports_fixed
 
         _old_getattr = nn.Module.__getattr__
+
         def _fixed_getattr(self, name):
             if name == "_supports_sdpa":
                 return False
             return _old_getattr(self, name)
+
         nn.Module.__getattr__ = _fixed_getattr
 
         if os.path.exists(FLORENCE_PATH):
             bnb_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.float16
+                bnb_4bit_compute_dtype=torch.float16,
             )
-            
+
             florence_model = AutoModelForCausalLM.from_pretrained(
                 FLORENCE_PATH,
                 quantization_config=bnb_config,
                 trust_remote_code=True,
-                device_map="cuda" if DEVICE == 'cuda' else 'cpu',
-                local_files_only=True
+                device_map="cuda" if DEVICE == "cuda" else "cpu",
+                local_files_only=True,
             )
-            florence_processor = AutoProcessor.from_pretrained(FLORENCE_PATH, trust_remote_code=True)
+            florence_processor = AutoProcessor.from_pretrained(
+                FLORENCE_PATH, trust_remote_code=True
+            )
             print("✅ Florence-2 Loaded Successfully!")
         else:
             print(f"⚠️ Florence-2 folder not found at: {FLORENCE_PATH}")
     except Exception as e:
         print(f"❌ Failed to load Florence-2: {e}")
+
 
 # ==============================================================================
 # HELPER FUNCTIONS
@@ -290,19 +325,22 @@ def decode_base64_image(b64_str):
         b64_str = b64_str.split(",")[1]
     image_data = base64.b64decode(b64_str)
     img = Image.open(io.BytesIO(image_data))
-    
-    if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
-        background = Image.new('RGB', img.size, (255, 255, 255))
-        if img.mode == 'P': img = img.convert('RGBA')
+
+    if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+        background = Image.new("RGB", img.size, (255, 255, 255))
+        if img.mode == "P":
+            img = img.convert("RGBA")
         background.paste(img, mask=img.split()[3])
         return background
     else:
         return img.convert("RGB")
 
+
 def encode_image_to_base64(pil_img):
     buffered = io.BytesIO()
     pil_img.save(buffered, format="PNG")
-    return base64.b64encode(buffered.getvalue()).decode('utf-8')
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
 
 def process_birefnet_output(preds, original_size):
     if isinstance(preds, (list, tuple)):
@@ -312,14 +350,15 @@ def process_birefnet_output(preds, original_size):
 
     pred_tensor = pred_tensor.sigmoid().cpu()
     mask_np = pred_tensor.squeeze().numpy().astype(np.float32)
-    
+
     if len(mask_np.shape) > 2:
         mask_np = mask_np[0]
 
     mask_resized = cv2.resize(mask_np, original_size, interpolation=cv2.INTER_LINEAR)
     mask = (mask_resized > 0.5).astype(np.uint8) * 255
-    
+
     return Image.fromarray(mask)
+
 
 def resize_to_limit(img, max_dim=1024, multiple=8):
     w, h = img.size
@@ -328,60 +367,78 @@ def resize_to_limit(img, max_dim=1024, multiple=8):
     new_h = int(h * ratio)
     new_w = new_w - (new_w % multiple)
     new_h = new_h - (new_h % multiple)
-    if new_w < multiple: new_w = multiple
-    if new_h < multiple: new_h = multiple
+    if new_w < multiple:
+        new_w = multiple
+    if new_h < multiple:
+        new_h = multiple
     return img.resize((new_w, new_h), Image.LANCZOS)
+
 
 # ==============================================================================
 # ROUTES
 # ==============================================================================
 
-@app.route('/')
+
+@app.route("/")
 def index():
     return "Image Processing API is running."
 
-@app.route('/test-encrypt', methods=['POST'])
+
+@app.route("/test-encrypt", methods=["POST"])
 def test_encrypt():
     # Helper route to debug encryption/decryption
     try:
         data = request.get_json()
-        plain_text = data.get('text', 'Hello, World!')
+        plain_text = data.get("text", "Hello, World!")
         encrypted = crypto.encrypt(plain_text)
         decrypted = crypto.decrypt(encrypted)
-        return jsonify({
-            "original": plain_text,
-            "encrypted": encrypted,
-            "decrypted": decrypted
-        })
+        return jsonify(
+            {"original": plain_text, "encrypted": encrypted, "decrypted": decrypted}
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/generate', methods=['POST'])
+
+@app.route("/generate", methods=["POST"])
 @secure_endpoint
 def generate_image():
-    if not sd_pipe: return jsonify({"error": "SD Model not loaded"}), 500
+    if not sd_pipe:
+        return jsonify({"error": "SD Model not loaded"}), 500
     try:
         data = request.get_json()
-        prompt = data.get('prompt', 'The image shows a river running through a lush green valley surrounded by trees, plants, grass, and poles. In the background, the sky is filled with clouds, creating a peaceful atmosphere.')
+        prompt = data.get(
+            "prompt",
+            "The image shows a river running through a lush green valley surrounded by trees, plants, grass, and poles. In the background, the sky is filled with clouds, creating a peaceful atmosphere.",
+        )
         empty_image = Image.new("RGB", (512, 512), (0, 0, 0))
         full_mask = Image.new("L", (512, 512), 255)
         print(f"🎨 Generating: {prompt}")
-        image = sd_pipe(prompt=prompt, image=empty_image, mask_image=full_mask, height=512, width=512, num_inference_steps=30).images[0]
+        image = sd_pipe(
+            prompt=prompt,
+            image=empty_image,
+            mask_image=full_mask,
+            height=512,
+            width=512,
+            num_inference_steps=30,
+        ).images[0]
         return jsonify({"status": "success", "image": encode_image_to_base64(image)})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/inpainting', methods=['POST'])
+
+@app.route("/inpainting", methods=["POST"])
 @secure_endpoint
 def inpaint_image():
-    if not sd_pipe: return jsonify({"error": "SD Model not loaded"}), 500
+    if not sd_pipe:
+        return jsonify({"error": "SD Model not loaded"}), 500
     try:
         data = request.get_json()
-        user_prompt = data.get('prompt', '')
-        clean_b64 = data.get('image')
-        drawn_b64 = data.get('mask_image')
+        user_prompt = data.get("prompt", "")
+        clean_b64 = data.get("image")
+        drawn_b64 = data.get("mask_image")
 
-        if not clean_b64 or not drawn_b64: return jsonify({"error": "Missing image or mask"}), 400
+        if not clean_b64 or not drawn_b64:
+            return jsonify({"error": "Missing image or mask"}), 400
 
         # 1. Decode Images
         raw_clean = decode_base64_image(clean_b64).convert("RGB")
@@ -393,11 +450,15 @@ def inpaint_image():
         img_drawn = raw_drawn.resize(img_clean.size)
 
         print(f"🔍 Calculating Robust Difference Mask (Size: {img_clean.size})...")
-        clean_blur = np.array(img_clean.filter(ImageFilter.GaussianBlur(radius=2)), dtype=np.int16)
-        drawn_blur = np.array(img_drawn.filter(ImageFilter.GaussianBlur(radius=2)), dtype=np.int16)
+        clean_blur = np.array(
+            img_clean.filter(ImageFilter.GaussianBlur(radius=2)), dtype=np.int16
+        )
+        drawn_blur = np.array(
+            img_drawn.filter(ImageFilter.GaussianBlur(radius=2)), dtype=np.int16
+        )
         diff_arr = np.abs(drawn_blur - clean_blur)
         mask_arr = np.max(diff_arr, axis=2)
-        mask_binary = mask_arr > 30 
+        mask_binary = mask_arr > 30
         mask_filled = scipy.ndimage.binary_fill_holes(mask_binary)
         mask_image = Image.fromarray((mask_filled * 255).astype(np.uint8))
         mask_image = mask_image.filter(ImageFilter.MaxFilter(9))
@@ -407,9 +468,13 @@ def inpaint_image():
         if florence_model and florence_processor:
             print("👁️ Generating context with Florence-2...")
             try:
-                task_prompt = '<DETAILED_CAPTION>'
-                inputs = florence_processor(text=task_prompt, images=[img_drawn], return_tensors="pt")
-                inputs["pixel_values"] = inputs["pixel_values"].to(DEVICE, torch.float16)
+                task_prompt = "<DETAILED_CAPTION>"
+                inputs = florence_processor(
+                    text=task_prompt, images=[img_drawn], return_tensors="pt"
+                )
+                inputs["pixel_values"] = inputs["pixel_values"].to(
+                    DEVICE, torch.float16
+                )
                 inputs["input_ids"] = inputs["input_ids"].to(DEVICE)
 
                 generated_ids = florence_model.generate(
@@ -418,17 +483,26 @@ def inpaint_image():
                     max_new_tokens=128,
                     num_beams=1,
                     do_sample=False,
-                    use_cache=False
+                    use_cache=False,
                 )
 
-                generated_text = florence_processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
-                generated_prompt = generated_text.replace(task_prompt, "").replace("</s>", "").replace("<s>", "").strip()
+                generated_text = florence_processor.batch_decode(
+                    generated_ids, skip_special_tokens=False
+                )[0]
+                generated_prompt = (
+                    generated_text.replace(task_prompt, "")
+                    .replace("</s>", "")
+                    .replace("<s>", "")
+                    .strip()
+                )
                 print(f"📝 Florence Generated: {generated_prompt}")
             except Exception as e:
                 print(f"⚠️ Florence captioning failed: {e}")
-        
+
         final_prompt = f"{generated_prompt} {user_prompt}".strip()
-        negative_prompt = "blurry, low quality, ugly, text, watermark, bad anatomy, deformed, noisy"
+        negative_prompt = (
+            "blurry, low quality, ugly, text, watermark, bad anatomy, deformed, noisy"
+        )
         print(f"✨ Final Inpaint Prompt: {final_prompt}")
 
         save_dir = "input_data"
@@ -440,19 +514,19 @@ def inpaint_image():
 
         print(f"🎨 Running Inference with strength=0.85...")
         image = sd_pipe(
-            prompt=final_prompt, 
+            prompt=final_prompt,
             negative_prompt=negative_prompt,
             image=img_drawn,
             mask_image=mask_image,
-            num_inference_steps=50, 
+            num_inference_steps=50,
             strength=0.85,
-            guidance_scale=8.5
+            guidance_scale=8.5,
         ).images[0]
 
         final_image_path = os.path.join(save_dir, f"result_{timestamp}.png")
         image.save(final_image_path)
         print(f"💾 Saved output to {final_image_path}")
-        
+
         return jsonify({"status": "success", "image": encode_image_to_base64(image)})
 
     except Exception as e:
@@ -460,21 +534,23 @@ def inpaint_image():
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/asset', methods=['POST'])
+
+@app.route("/asset", methods=["POST"])
 @secure_endpoint
 def remove_background():
-    if not birefnet_model: 
+    if not birefnet_model:
         return jsonify({"error": "BiRefNet not loaded"}), 500
     try:
         data = request.get_json()
-        image_b64 = data.get('image')
-        if not image_b64: return jsonify({"error": "No image provided"}), 400
+        image_b64 = data.get("image")
+        if not image_b64:
+            return jsonify({"error": "No image provided"}), 400
 
         original_image = decode_base64_image(image_b64)
         orig_w, orig_h = original_image.size
-        
+
         input_tensor = transform_birefnet(original_image).unsqueeze(0).to(DEVICE)
-        if DEVICE == 'cuda':
+        if DEVICE == "cuda":
             input_tensor = input_tensor.half()
 
         print("✂️ Removing background...")
@@ -484,28 +560,34 @@ def remove_background():
         mask_pil = process_birefnet_output(preds, (orig_w, orig_h))
         original_image.putalpha(mask_pil)
 
-        return jsonify({"status": "success", "image": encode_image_to_base64(original_image)})
+        return jsonify(
+            {"status": "success", "image": encode_image_to_base64(original_image)}
+        )
     except Exception as e:
         print(f"❌ Error: {e}")
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/describe', methods=['POST'])
+
+@app.route("/describe", methods=["POST"])
 @secure_endpoint
 def describe_image():
     if not florence_model or not florence_processor:
         return jsonify({"error": "Florence-2 not loaded"}), 500
     try:
         data = request.get_json()
-        image_b64 = data.get('image')
-        prompt_type = data.get('prompt', '<DETAILED_CAPTION>')
+        image_b64 = data.get("image")
+        prompt_type = data.get("prompt", "<DETAILED_CAPTION>")
 
-        if not image_b64: return jsonify({"error": "No image provided"}), 400
+        if not image_b64:
+            return jsonify({"error": "No image provided"}), 400
 
         image = decode_base64_image(image_b64)
         print(f"👁️ Analyzing image with Florence-2...")
 
-        inputs = florence_processor(text=prompt_type, images=[image], return_tensors="pt")
+        inputs = florence_processor(
+            text=prompt_type, images=[image], return_tensors="pt"
+        )
         inputs["pixel_values"] = inputs["pixel_values"].to(DEVICE, torch.float16)
         inputs["input_ids"] = inputs["input_ids"].to(DEVICE)
 
@@ -515,49 +597,60 @@ def describe_image():
             max_new_tokens=128,
             num_beams=1,
             do_sample=False,
-            use_cache=False
+            use_cache=False,
         )
 
-        generated_text = florence_processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
-        cleaned_text = generated_text.replace(prompt_type, "").replace("</s>", "").replace("<s>", "").strip()
+        generated_text = florence_processor.batch_decode(
+            generated_ids, skip_special_tokens=False
+        )[0]
+        cleaned_text = (
+            generated_text.replace(prompt_type, "")
+            .replace("</s>", "")
+            .replace("<s>", "")
+            .strip()
+        )
 
-        if cleaned_text and cleaned_text[-1] not in ['.', '!', '?']:
-            last_dot = cleaned_text.rfind('.')
-            last_excl = cleaned_text.rfind('!')
-            last_ques = cleaned_text.rfind('?')
+        if cleaned_text and cleaned_text[-1] not in [".", "!", "?"]:
+            last_dot = cleaned_text.rfind(".")
+            last_excl = cleaned_text.rfind("!")
+            last_ques = cleaned_text.rfind("?")
             cut_off = max(last_dot, last_excl, last_ques)
             if cut_off != -1:
-                cleaned_text = cleaned_text[:cut_off+1]
-        
+                cleaned_text = cleaned_text[: cut_off + 1]
+
         final_answer = cleaned_text
         print(final_answer)
 
         if "<loc_" in cleaned_text or "<poly_" in cleaned_text:
             try:
                 parsed = florence_processor.post_process_generation(
-                    generated_text, 
-                    task=prompt_type, 
-                    image_size=(image.width, image.height)
+                    generated_text,
+                    task=prompt_type,
+                    image_size=(image.width, image.height),
                 )
                 if isinstance(parsed, dict) and prompt_type in parsed:
                     final_answer = parsed[prompt_type]
                 else:
                     final_answer = parsed
             except Exception:
+
                 def parse_loc_manually(text, w, h):
-                    locs = re.findall(r'<loc_(\d+)>', text)
+                    locs = re.findall(r"<loc_(\d+)>", text)
                     if locs and len(locs) % 4 == 0:
                         bboxes = []
                         for i in range(0, len(locs), 4):
                             x1 = int(int(locs[i]) / 1000 * w)
-                            y1 = int(int(locs[i+1]) / 1000 * h)
-                            x2 = int(int(locs[i+2]) / 1000 * w)
-                            y2 = int(int(locs[i+3]) / 1000 * h)
+                            y1 = int(int(locs[i + 1]) / 1000 * h)
+                            x2 = int(int(locs[i + 2]) / 1000 * w)
+                            y2 = int(int(locs[i + 3]) / 1000 * h)
                             bboxes.append([x1, y1, x2, y2])
-                        clean_text = re.sub(r'<loc_\d+>', '', text).strip()
+                        clean_text = re.sub(r"<loc_\d+>", "", text).strip()
                         return {"text": clean_text, "bboxes": bboxes}
                     return text
-                final_answer = parse_loc_manually(cleaned_text, image.width, image.height)
+
+                final_answer = parse_loc_manually(
+                    cleaned_text, image.width, image.height
+                )
 
         return jsonify({"status": "success", "output": final_answer})
 
@@ -566,21 +659,28 @@ def describe_image():
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/inpainting-api', methods=['POST'])
+
+@app.route("/inpainting-api", methods=["POST"])
 @secure_endpoint
 def inpainting_api_fal():
     if not FAL_AVAILABLE:
         return jsonify({"error": "Fal.ai client not installed or API Key missing"}), 500
-    
+
     try:
         data = request.get_json()
-        
-        clean_b64 = data.get('image')       
-        drawn_b64 = data.get('mask_image')  
-        prompt = data.get('prompt', "The image shows a river running through a lush green valley surrounded by trees, plants, grass, and poles. In the background, the sky is filled with clouds, creating a peaceful atmosphere.")
-        
+
+        clean_b64 = data.get("image")
+        drawn_b64 = data.get("mask_image")
+        prompt = data.get(
+            "prompt",
+            "The image shows a river running through a lush green valley surrounded by trees, plants, grass, and poles. In the background, the sky is filled with clouds, creating a peaceful atmosphere.",
+        )
+
         if not clean_b64 or not drawn_b64:
-            return jsonify({"error": "Missing 'image' (clean) or 'mask_image' (drawn)"}), 400
+            return (
+                jsonify({"error": "Missing 'image' (clean) or 'mask_image' (drawn)"}),
+                400,
+            )
 
         print(f"📥 Received Request: Prompt='{prompt}'")
 
@@ -592,23 +692,27 @@ def inpainting_api_fal():
         img_clean = resize_to_limit(raw_clean, max_dim=1024)
         # Resize drawn to match exactly
         img_drawn = raw_drawn.resize(img_clean.size)
-        
+
         # 3. Setup Debug Directory
         debug_dir = "debug_fal"
         os.makedirs(debug_dir, exist_ok=True)
         unique_id = str(int(time.time()))
-        
+
         clean_path = os.path.join(debug_dir, f"fal_clean_{unique_id}.png")
         mask_path = os.path.join(debug_dir, f"fal_mask_{unique_id}.png")
         fal_result_path = os.path.join(debug_dir, f"fal_result_{unique_id}.png")
 
         # 4. Mask Generation
         print(f"🛠️ Generating mask (Size: {img_clean.size})...")
-        clean_blur = np.array(img_clean.filter(ImageFilter.GaussianBlur(2)), dtype=np.int16)
-        drawn_blur = np.array(img_drawn.filter(ImageFilter.GaussianBlur(2)), dtype=np.int16)
+        clean_blur = np.array(
+            img_clean.filter(ImageFilter.GaussianBlur(2)), dtype=np.int16
+        )
+        drawn_blur = np.array(
+            img_drawn.filter(ImageFilter.GaussianBlur(2)), dtype=np.int16
+        )
 
         diff_arr = np.abs(drawn_blur - clean_blur)
-        mask_arr = np.max(diff_arr, axis=2) 
+        mask_arr = np.max(diff_arr, axis=2)
         mask_binary = mask_arr > 30
 
         white_pixels = np.sum(mask_binary)
@@ -618,7 +722,7 @@ def inpainting_api_fal():
 
         mask_filled = scipy.ndimage.binary_fill_holes(mask_binary)
         mask = Image.fromarray((mask_filled * 255).astype(np.uint8))
-        mask = mask.filter(ImageFilter.MaxFilter(9)) 
+        mask = mask.filter(ImageFilter.MaxFilter(9))
 
         # 5. Save Inputs for Inspection
         mask.save(mask_path)
@@ -629,49 +733,66 @@ def inpainting_api_fal():
         print("🚀 Uploading images to Fal.ai...")
         image_url = fal_client.upload_file(clean_path)
         mask_url = fal_client.upload_file(mask_path)
-        
+
         print("⚡ Running Flux Dev Fill...")
         handler = fal_client.submit(
-            "fal-ai/flux-lora-fill", 
+            "fal-ai/flux-lora-fill",
             arguments={
                 "prompt": prompt,
                 "image_url": image_url,
                 "mask_url": mask_url,
-                "guidance_scale": 30, 
+                "guidance_scale": 30,
                 "num_inference_steps": 28,
-                "enable_safety_checker": False
-            }
+                "enable_safety_checker": False,
+            },
         )
-        
+
         result = handler.get()
         print("📡 Fal Response:", result)
 
-        if 'images' in result and len(result['images']) > 0:
-            output_url = result['images'][0]['url']
+        if "images" in result and len(result["images"]) > 0:
+            output_url = result["images"][0]["url"]
             print(f"✨ Downloading Result: {output_url}")
-            
+
             response = requests.get(output_url)
             if response.status_code == 200:
                 result_img = Image.open(io.BytesIO(response.content)).convert("RGB")
-                
+
                 # Save Debug Output
                 result_img.save(fal_result_path)
                 print(f"💾 Saved final output to {fal_result_path}")
 
-                return jsonify({"status": "success", "image": encode_image_to_base64(result_img)})
+                return jsonify(
+                    {"status": "success", "image": encode_image_to_base64(result_img)}
+                )
             else:
                 print(f"❌ Failed to download image. Status: {response.status_code}")
-                return jsonify({"status": "error", "message": "Failed to download Fal output"}), 500
+                return (
+                    jsonify(
+                        {"status": "error", "message": "Failed to download Fal output"}
+                    ),
+                    500,
+                )
         else:
             print("❌ API returned no images.")
-            return jsonify({"status": "error", "message": "Fal.ai returned no images", "details": result}), 500
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": "Fal.ai returned no images",
+                        "details": result,
+                    }
+                ),
+                500,
+            )
 
     except Exception as e:
         print(f"❌ Error in /inpainting-api: {e}")
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/sketch-api', methods=['POST'])
+
+@app.route("/sketch-api", methods=["POST"])
 @secure_endpoint
 def sketch_api():
     if not FAL_AVAILABLE:
@@ -679,14 +800,16 @@ def sketch_api():
 
     try:
         data = request.get_json()
-        prompt = data.get('prompt')
-        option = data.get('option', 1) 
+        prompt = data.get("prompt")
+        option = data.get("option", 1)
 
-        if not prompt: 
+        if not prompt:
             return jsonify({"error": "Missing prompt"}), 400
 
         # --- ENFORCE SHARPNESS IN PROMPT ---
-        enhanced_prompt = f"{prompt}, sharp focus, high definition, 4k, vector art, crisp lines"
+        enhanced_prompt = (
+            f"{prompt}, sharp focus, high definition, 4k, vector art, crisp lines"
+        )
 
         if int(option) == 1:
             # Nano Banana
@@ -696,7 +819,7 @@ def sketch_api():
                 "prompt": enhanced_prompt,
                 "num_images": 1,
                 "aspect_ratio": "1:1",
-                "output_format": "png"
+                "output_format": "png",
             }
         elif int(option) == 2:
             # Flux Dev
@@ -704,40 +827,56 @@ def sketch_api():
             model_id = "fal-ai/flux/dev"
             arguments = {
                 "image_size": "square_hd",
-                "num_inference_steps": 28, 
-                "guidance_scale": 3.5,     
-                "safety_tolerance": "2",   
+                "num_inference_steps": 28,
+                "guidance_scale": 3.5,
+                "safety_tolerance": "2",
                 "enable_safety_checker": False,
-                "prompt": enhanced_prompt
+                "prompt": enhanced_prompt,
             }
         else:
-            return jsonify({"error": "Invalid option. Use 1 for Nano Banana, 2 for Flux Dev."}), 400
+            return (
+                jsonify(
+                    {"error": "Invalid option. Use 1 for Nano Banana, 2 for Flux Dev."}
+                ),
+                400,
+            )
 
         # Execute request
-        handler = fal_client.submit(
-            model_id,
-            arguments=arguments
-        )
+        handler = fal_client.submit(model_id, arguments=arguments)
         result = handler.get()
         print("📡 Fal Response:", result)
 
-        if 'images' in result and len(result['images']) > 0:
-            image_url = result['images'][0]['url']
+        if "images" in result and len(result["images"]) > 0:
+            image_url = result["images"][0]["url"]
             print(f"✨ Success! Image generated: {image_url}")
 
             response = requests.get(image_url)
             if response.status_code == 200:
                 img = Image.open(io.BytesIO(response.content)).convert("RGB")
-                return jsonify({"status": "success", "image": encode_image_to_base64(img)})
+                return jsonify(
+                    {"status": "success", "image": encode_image_to_base64(img)}
+                )
             else:
-                return jsonify({"status": "error", "message": "Failed to download image from Fal"}), 500
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "message": "Failed to download image from Fal",
+                        }
+                    ),
+                    500,
+                )
         else:
-            return jsonify({"status": "error", "message": "No images returned from Fal"}), 500
+            return (
+                jsonify({"status": "error", "message": "No images returned from Fal"}),
+                500,
+            )
 
     except Exception as e:
         print(f"❌ Error in /sketch-api: {e}")
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host="0.0.0.0", port=5000)

@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+Stylesheet & Prompt Generation
+Original file: https://colab.research.google.com/drive/1eZLWqhB0KKFLhCA0E3qDHXpdvEIH44yE
+"""
+
+## Stylesheet Generation
+
 import json
 import math
 import re
@@ -6,17 +14,11 @@ from collections import defaultdict
 from typing import List, Dict, Tuple, Any, Optional
 from sklearn.cluster import KMeans
 
-# ==========================================
-#  HYPERPARAMETERS
-# ==========================================
-RANK_DECAY_FACTOR = 0.85  # Priority drops for lower-ranked tags
-MIN_CONSENSUS_THRESHOLD = 0.05  # Filter out noise
-PALETTE_SIZE = 5  # Number of colors in final palette
+RANK_DECAY_FACTOR = 0.85
+MIN_CONSENSUS_THRESHOLD = 0.05
+PALETTE_SIZE = 5
 
 
-# ==========================================
-#  HELPER: COLOR MATH
-# ==========================================
 def hex_to_rgb(hex_str: str) -> List[int]:
     """Converts '#FF5733' to [255, 87, 51] for math operations."""
     try:
@@ -33,9 +35,6 @@ def rgb_to_hex(rgb: List[int]) -> str:
     return "#{:02x}{:02x}{:02x}".format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
 
 
-# ==========================================
-#  KNOWLEDGE BASE: FONTS
-# ==========================================
 class FontClusterEngine:
     def __init__(self):
         self.full_font_map = {
@@ -698,12 +697,9 @@ class FontClusterEngine:
         clean = raw_name.lower().split("-")[0].strip()
         if clean in self.full_font_map:
             return self.full_font_map[clean]
-        return "Display/Other"  # Default fallback
+        return "Display/Other"
 
 
-# ==========================================
-#  UNIFIED CONSENSUS ENGINE
-# ==========================================
 class UnifiedStyleEngine:
     def __init__(self):
         self.feature_registry = defaultdict(lambda: defaultdict(list))
@@ -746,10 +742,8 @@ class UnifiedStyleEngine:
         try:
             self.doc_counter += 1
 
-            # 1. Unwrapping logic to find "results"
             source_data = {}
             if "data" in data and isinstance(data["data"], dict):
-                # Check for nested "results" inside "data"
                 if "results" in data["data"]:
                     source_data = data["data"]["results"]
                 else:
@@ -759,35 +753,28 @@ class UnifiedStyleEngine:
             else:
                 source_data = data
 
-            # 2. Iterate through categories
             for category, payload in source_data.items():
                 if category in ["filename", "meta"]:
                     continue
 
-                # Map "Font" -> "Typography", etc.
                 std_category = self.aliases.get(category, category)
 
-                # PATH A: COLOR PALETTE
-                # NOTE: We intentionally SKIP processing 'scores' (moods) here
                 if std_category == "Color Palette":
                     if isinstance(payload, dict) and "palette" in payload:
                         for hex_code in payload["palette"]:
                             if isinstance(hex_code, str) and hex_code.startswith("#"):
                                 self.color_pool.append(hex_to_rgb(hex_code))
-                    # Fallback: if payload is just a list of hex strings
                     elif isinstance(payload, list):
                         for item in payload:
                             if isinstance(item, str) and item.startswith("#"):
                                 self.color_pool.append(hex_to_rgb(item))
 
-                # PATH B: TYPOGRAPHY
                 elif std_category == "Typography":
                     if isinstance(payload, dict) and "scores" in payload:
                         payload = payload["scores"]
                     vectors = self._normalize(payload)
 
                     for rank, (font_name, score) in enumerate(vectors):
-                        # Skip "No Text Detected"
                         if "no text" in font_name.lower():
                             continue
 
@@ -799,7 +786,6 @@ class UnifiedStyleEngine:
                         if font_name not in self.font_members[cluster]:
                             self.font_members[cluster].append(font_name)
 
-                # PATH C: OTHER TAGS
                 else:
                     if isinstance(payload, dict) and "scores" in payload:
                         payload = payload["scores"]
@@ -821,7 +807,6 @@ class UnifiedStyleEngine:
         if isinstance(payload, dict):
             clean_items = []
             for k, v in payload.items():
-                # Only accept numeric values as scores
                 if isinstance(v, (int, float)):
                     clean_items.append((k, float(v)))
             return sorted(clean_items, key=lambda x: x[1], reverse=True)
@@ -835,7 +820,6 @@ class UnifiedStyleEngine:
                     except (ValueError, TypeError):
                         score = 0.0
 
-                    # Try 'label' or 'tag'
                     label = item.get("label", item.get("tag", "unknown"))
                     if not isinstance(label, str):
                         label = str(label)
@@ -849,11 +833,9 @@ class UnifiedStyleEngine:
     def compute_final_stylesheet(self) -> Dict:
         final_json = {"results": {}}
 
-        # 1. Process Standard Tags
         for category, tags_map in self.feature_registry.items():
             candidates = []
             for tag, occurrences in tags_map.items():
-                # Weighted Sum
                 w_sum = sum(
                     obs["raw_score"] * math.pow(RANK_DECAY_FACTOR, obs["rank"])
                     for obs in occurrences
@@ -867,19 +849,16 @@ class UnifiedStyleEngine:
             if candidates:
                 final_json["results"][category] = candidates[:5]
 
-        # 1.5 Split Texture into 'Background/Texture' and 'Material Look'
         if "Background/Texture" in final_json["results"]:
             textures = []
             materials = []
 
             for item in final_json["results"]["Background/Texture"]:
                 label = item["label"].lower().replace("_", " ").replace("-", " ")
-                # Check if label or parts of it match material keywords
                 is_material = False
                 if item["label"] in self.material_filter:
                     is_material = True
                 else:
-                    # Partial matching (e.g. "wood grain" -> wood)
                     for mat in self.material_filter:
                         if mat in label:
                             is_material = True
@@ -893,11 +872,9 @@ class UnifiedStyleEngine:
             if textures:
                 final_json["results"]["Background/Texture"] = textures
             else:
-                # Remove empty key if all moved to material
                 del final_json["results"]["Background/Texture"]
 
             if materials:
-                # Merge with existing Material Look if present
                 if "Material Look" in final_json["results"]:
                     final_json["results"]["Material Look"].extend(materials)
                     final_json["results"]["Material Look"].sort(
@@ -906,7 +883,6 @@ class UnifiedStyleEngine:
                 else:
                     final_json["results"]["Material Look"] = materials
 
-        # 2. Process Typography
         if self.font_family_scores:
             best_fam, _ = sorted(
                 self.font_family_scores.items(), key=lambda x: x[1], reverse=True
@@ -922,13 +898,10 @@ class UnifiedStyleEngine:
             final_json["results"]["Typography"] = typo_output
             final_json["results"]["Typography_Family"] = best_fam
 
-        # 3. Process Color Palette
         if len(self.color_pool) > 0:
             try:
-                # If we have very few colors, just use all of them
                 k_clusters = min(len(self.color_pool), PALETTE_SIZE)
 
-                # FIX: n_init='auto' crashes on older sklearn. Used n_init=1.
                 kmeans = KMeans(n_clusters=k_clusters, n_init=1, random_state=42)
                 kmeans.fit(self.color_pool)
                 centers = sorted(kmeans.cluster_centers_.astype(int).tolist(), key=sum)
@@ -946,9 +919,6 @@ class UnifiedStyleEngine:
         return final_json
 
 
-# ==========================================
-#  ENTRY POINT
-# ==========================================
 def generate_stylesheet(json_strings_list: Any) -> str:
     """
     Entry point
@@ -970,7 +940,6 @@ def generate_stylesheet(json_strings_list: Any) -> str:
                 continue
 
     except AttributeError:
-        # Fallback for standard Python list (For testing)
         for json_str in json_strings_list:
             if not json_str:
                 continue
@@ -984,9 +953,7 @@ def generate_stylesheet(json_strings_list: Any) -> str:
     return json.dumps(final_output)
 
 
-# ==========================================
-#  PROMPT GENERATION LOGIC
-# ==========================================
+##  Prompt Generation
 
 DEFAULT_OPTIONS = {
     "width": 1024,
@@ -1006,11 +973,7 @@ def normalize_sheet(sheet: Dict[str, Any]) -> Dict[str, Dict[str, List[str]]]:
     norm: Dict[str, Dict[str, List[str]]] = {}
 
     for cat, val in results.items():
-        if cat in (
-            "filename",
-            "meta",
-            "Color Palette",
-        ):  # Explicitly ignore Palette here if desired, or later
+        if cat in ("filename", "meta", "Color Palette"):
             continue
 
         items = []
@@ -1087,7 +1050,6 @@ def remove_style_words(caption: str) -> str:
     if not caption:
         return caption
     clean = style_words_regex.sub(" ", caption)
-    # Collapse multiple spaces into one
     clean = re.sub(r"\s{2,}", " ", clean).strip()
     return clean
 
@@ -1118,7 +1080,6 @@ def pick_style_phrases(
         "Material Look",
         "Typography",
     ]
-    # Mappings for cleaner prompt text
     key_map = {
         "Style": "art style",
         "Background/Texture": "background texture",
@@ -1144,7 +1105,6 @@ def pick_style_phrases(
             if s and len(chosen) < (1 + max_secondaries):
                 chosen.append(s)
         if chosen:
-            # Format: "art style: Bauhaus, minimalist"
             out.append(f"{key_map.get(cat, cat)}: {', '.join(chosen)}")
     return out
 
@@ -1161,38 +1121,27 @@ def style_to_tone(primary: str) -> str:
     return "high detail, sharp focus"
 
 
-# ==========================================
-#  ENTRY POINT FOR PROMPT GENERATION
-# ==========================================
 def generate_magic_prompt(
     stylesheet_json_str: str, caption: str, user_prompt: str
 ) -> str:
     try:
         sheet = json.loads(stylesheet_json_str)
     except Exception as e:
-        # Fallback if parsing fails
         return f"{user_prompt}. The image features: {caption}"
 
-    # 1. CLEAN CAPTION: Remove "Style" words, but KEEP "Color" words.
-    # We do NOT run any color removal function here.
     cleaned_caption = remove_style_words(caption)
 
-    # 2. NORMALIZE SHEET: Get the structure from JSON
     norm = normalize_sheet(sheet)
     subject = extract_subject(cleaned_caption)
 
-    # 3. EXTRACT STYLESHEET FEATURES (Ignoring Color)
     style_phrases = pick_style_phrases(norm)
 
-    # 4. INFER TONE
     style_primary = (norm.get("Style") or {}).get("Primary", "")
     tone_hint = style_to_tone(style_primary)
 
-    # 5. CONSTRUCT PROMPT
     style_instruction = ""
     if style_phrases:
         style_instruction = "Style elements: " + "; ".join(style_phrases)
-        # Note: We deliberately do NOT add color palette here.
 
     prompt_lines: List[str] = [
         f"Main subject: {subject}.",
@@ -1221,5 +1170,4 @@ def generate_magic_prompt(
         "weights": {"caption": 0.7, "style_sheet": 0.2, "user": 0.1},
     }
 
-    # Return concatenated prompt and payload as string
     return prompt + " " + json.dumps(payload)

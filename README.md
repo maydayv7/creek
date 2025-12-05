@@ -1,53 +1,16 @@
-# TEAM 33 | CreekUI | Re-Imagining Photoshop (The AI Editor of 2030)
-
-## See the [Demo Video](https://drive.google.com/file/d/1bvroGCCosPUEP54q06nFWq1LhNB4PiAf/view?usp=sharing)
+# CreekUI | Re-Imagining Photoshop | The AI Editor of 2030
 
 CreekUI is a lightweight, intent-driven mobile image editor designed to shift the creative workflow from manual pixel manipulation to semantic, AI-assisted design. It separates creativity into structured phases that prioritize **semantic understanding**, **energy efficiency**, and **selective use of heavy compute**.
 
 This repository contains the full analysis pipeline, style synthesis logic, and generation workflow that together simulate how a future (circa 2030) mobile NPU might function in creative applications.
 
+### See the [Demo Video](https://drive.google.com/file/d/1bvroGCCosPUEP54q06nFWq1LhNB4PiAf/view?usp=sharing)
+
 > [!NOTE]
-> For installation and setup instructions, refer to [INSTALL.md](./INSTALL.md).  
-> For model details, check out the [models](./models) directory.
-
-# Deliverables
-
-The following is an overview of the [Deliverables](./Deliverables/) structure:
-
-```
-┌── (A) Task 1
-│   ├── Screen Mockups
-│   └── Design Rationale
-│
-├── (B) Task 2
-│   └── Editing Ecosystem Analysis
-│
-└── (C) Task 3
-    ├── Technical Report (containing documentation and model/dataset details)
-    ├── README -> This file
-    ├── Source Repository -> This Repository
-    └── Demo Video -> https://drive.google.com/file/d/1bvroGCCosPUEP54q06nFWq1LhNB4PiAf/view?usp=sharing
-```
-
-Optional Creative Artefacts -> https://drive.google.com/file/d/1kSpf-y0LhQCn9-fF2gMLyodV8R3NkQeR/view?usp=sharing
-
----
-
-<details>
-<summary><b>DATASETS</b></summary>
-
-- DIS5K-TR Dataset
-- FANnet Dataset
-- EasyOCR Dataset
-- LAION-5B Dataset (_Stable Diffusion v1.5_)
-- LAION-AESTHETICS V2 4.5 (_Stable Diffusion v1.5 inpainting_)
-
-</details>
-
----
-
-> [!IMPORTANT]
-> This architecture makes use of models provided by [Fal.ai](https://fal.ai/) API.
+>
+> - Check out the project [Deliverables](./Deliverables/README.md)
+> - For installation and setup instructions, refer to [INSTALL.md](./INSTALL.md)
+> - For model details, see the [models](./models) directory
 
 ---
 
@@ -174,9 +137,12 @@ Depending on context:
 - **Sketch-to-Image** uses lightweight or high-quality external backends (Nano Banana, Flux).
 - **Inpainting** performs localized edits using Stable Diffusion with a mask derived from canvas stroke differences, or FLUX LoRa Fill.
 
-## Local generation is prioritized for privacy-sensitive edits; API generation is used for high fidelity or speed when allowed.
+> Local generation is prioritized for privacy-sensitive edits; API generation is used for high fidelity or speed when allowed.
 
 # 4. Compute Profile
+
+> [!IMPORTANT]
+> Models provided by [Fal.ai](https://fal.ai/) API are used
 
 Approximate characteristics of each model in its quantized / optimized configuration:
 
@@ -194,6 +160,19 @@ Approximate characteristics of each model in its quantized / optimized configura
 | Stable Diffusion v1.5                     | 6 seconds      | 983 million          | 3.6 GB     | 2.5 GB    |
 | Flux LoRa Fill API                        | 7 seconds      | -                    | -          | -         |
 | Stable Diffusion v1.5 Inpainting          | 7 seconds      | 860 million          | 4 GB       | 2.7 GB    |
+
+---
+
+<details>
+<summary><b>DATASETS</b></summary>
+
+- DIS5K-TR Dataset
+- FANnet Dataset
+- EasyOCR Dataset
+- LAION-5B Dataset (_Stable Diffusion v1.5_)
+- LAION-AESTHETICS V2 4.5 (_Stable Diffusion v1.5 inpainting_)
+
+</details>
 
 ---
 

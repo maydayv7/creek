@@ -617,7 +617,6 @@ class _ImageSavePageState extends State<ImageSavePage> {
           },
         );
 
-        // Return your custom overlay wrapper with the stateful content inside
         return NoteModalOverlay(
           modalContent: modalContent,
           screenSize: mediaQuery.size,
@@ -1263,8 +1262,6 @@ class NoteModalOverlay extends StatelessWidget {
     );
   }
 }
-
-// [NoteModalPainter class removed as requested to remove the dimming shadow]
 
 // --- EXTENSION TO NORMALIZE RECT ---
 extension on Rect {

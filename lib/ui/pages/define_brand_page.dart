@@ -215,7 +215,6 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Project Name (required, first field)
                         _buildFormField(
                           label: 'Project Name',
                           hintText: 'Enter project name',
@@ -223,8 +222,6 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                           required: true,
                         ),
                         const SizedBox(height: 16),
-
-                        // What do you want & who is it for
                         _buildFormField(
                           label: 'What do you want & who is it for.',
                           hintText: 'Describe your work and your audience.',
@@ -233,8 +230,6 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                           required: false,
                         ),
                         const SizedBox(height: 16),
-
-                        // What problem you solve
                         _buildFormField(
                           label: 'What problem you solve.',
                           hintText:
@@ -244,8 +239,6 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                           required: false,
                         ),
                         const SizedBox(height: 16),
-
-                        // Long-term goal
                         _buildFormField(
                           label: 'Long-term goal for the brand.',
                           hintText: 'E.g. - Improving food availability...',
@@ -253,18 +246,10 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                           required: false,
                         ),
                         const SizedBox(height: 32),
-
-                        // Keywords Section
                         _buildKeywordsSection(),
-
                         const SizedBox(height: 32),
-
-                        // Competitor Brands Section
                         _buildCompetitorBrandsSection(),
-
                         const SizedBox(height: 32),
-
-                        // Where will the brand appear
                         _buildFormField(
                           label: 'Where will the brand appear',
                           hintText: 'Banners, Posters, Instagram..',
@@ -273,7 +258,6 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 100), // Space for bottom button
                   ],
                 ),

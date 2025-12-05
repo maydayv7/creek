@@ -51,8 +51,6 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
   Future<void> _fetchFiles() async {
     setState(() => _isLoading = true);
     try {
-      // Using service-style API: fetch all files and recent files
-      // If your FileService has different method names, adapt them here.
       final List<FileModel> files = await _fileService.getAllFiles();
       final List<FileModel> recent = await _fileService.getRecentFiles(
         limit: 10,
@@ -389,7 +387,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Recent Files (UI like screenshot)
+                          // Recent Files
                           if (_recentFiles.isNotEmpty &&
                               _searchQuery.isEmpty) ...[
                             const Padding(
@@ -501,7 +499,6 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
         ),
         child: Row(
           children: [
-            // ---- FLUSH LEFT THUMBNAIL ----
             ClipRRect(
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
@@ -524,7 +521,6 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
 
             const SizedBox(width: 12),
 
-            // ---- TEXT ----
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -586,7 +582,6 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
         ),
         child: Row(
           children: [
-            // ---- FLUSH LEFT THUMBNAIL ----
             ClipRRect(
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
