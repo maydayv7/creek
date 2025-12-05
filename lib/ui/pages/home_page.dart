@@ -40,7 +40,7 @@ class _HomePageState extends State<HomePage> {
   final Map<int, List<String>> _projectPreviews = {};
   Map<String, Map<String, String>> _fileMetadata = {};
   bool _isLoading = true;
-  final String _userName = "Alex";
+  final String _userName = "Alex"; // TODO
 
   @override
   void initState() {
@@ -619,7 +619,7 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                     );
                                   }).toList()),
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: 12),
                                 ],
                                 SectionHeader(
                                   title: 'Projects',

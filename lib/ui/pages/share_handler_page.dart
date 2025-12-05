@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:creekui/services/download_service.dart';
 import 'package:creekui/services/instagram_download_service.dart';
 import 'package:creekui/services/image_service.dart';
+import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/primary_button.dart';
 import 'share_to_moodboard_page.dart';
 import 'share_to_file_page.dart';
 
@@ -21,12 +23,10 @@ class ShareHandlerPage extends StatefulWidget {
 }
 
 class _ShareHandlerPageState extends State<ShareHandlerPage> {
-  // Services
   final _downloadService = DownloadService();
   final _instagramService = InstagramDownloadService();
   final _imageService = ImageService();
 
-  // State
   bool _hasError = false;
   String? _errorMessage;
 
@@ -41,18 +41,17 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
     List<File> tempFiles = [];
 
     try {
-      // CASE A: It's a Local File Path
+      // CASE A: Local File Path
       if (await File(sharedContent).exists()) {
         tempFiles.add(File(sharedContent));
       }
-      // CASE B: It's a URL
+      // CASE B: URL
       else {
         final urlRegExp = RegExp(r'(https?://\S+)');
         final match = urlRegExp.firstMatch(sharedContent);
 
         if (match != null) {
           final url = match.group(0)!;
-
           if (url.contains('instagram.com')) {
             // Instagram Logic
             final downloadedPaths = await _instagramService
@@ -72,13 +71,11 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
         }
       }
 
-      // SUCCESS: Route based on Destination
+      // Success: Route based on Destination
       if (tempFiles.isNotEmpty) {
         if (!mounted) return;
-
-        // CHECK DESTINATION
         if (widget.destination == 'files') {
-          // --- ROUTE TO FILES ---
+          // Files
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -86,22 +83,15 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
             ),
           );
         } else {
-          // --- ROUTE TO MOODBOARDS (Default) ---
+          // Moodboard
           List<File> permanentFiles = [];
-
           for (var file in tempFiles) {
-            final id = await _imageService.saveImage(
-              file,
-              0, // Project 0 = Inbox
-              tags: [],
-            );
-
+            final id = await _imageService.saveImage(file, 0, tags: []);
             final savedImage = await _imageService.getImage(id);
             if (savedImage != null) {
               permanentFiles.add(File(savedImage.filePath));
             }
           }
-
           if (mounted) {
             Navigator.pushReplacement(
               context,
@@ -146,7 +136,7 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
                       const SizedBox(height: 16),
                       Text(
                         "Error processing media",
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: Variables.headerStyle.copyWith(fontSize: 18),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -155,9 +145,12 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
                         style: const TextStyle(color: Colors.grey),
                       ),
                       const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text("Close"),
+                      SizedBox(
+                        width: 200,
+                        child: PrimaryButton(
+                          text: "Close",
+                          onPressed: () => Navigator.pop(context),
+                        ),
                       ),
                     ],
                   ),

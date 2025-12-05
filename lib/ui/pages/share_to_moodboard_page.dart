@@ -5,17 +5,16 @@ import 'package:creekui/data/models/project_model.dart';
 import 'package:creekui/data/repos/project_repo.dart';
 import 'package:creekui/data/repos/image_repo.dart';
 import 'package:creekui/services/project_service.dart';
+import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/search_bar.dart';
+import 'package:creekui/ui/widgets/section_header.dart';
 import 'image_save_page.dart';
-
-// --- VIEW MODELS ---
 
 class ProjectItemViewModel {
   final ProjectModel item;
   final String? parentTitle;
   final String? coverPath;
-
   ProjectItemViewModel({required this.item, this.parentTitle, this.coverPath});
-
   String get title => item.title;
   bool get isEvent => item.isEvent;
   int get id => item.id!;
@@ -26,7 +25,6 @@ class ProjectGroup {
   final List<ProjectItemViewModel> events;
   final String? coverPath;
   bool isExpanded;
-
   ProjectGroup({
     required this.project,
     this.events = const [],
@@ -35,11 +33,8 @@ class ProjectGroup {
   });
 }
 
-// --- WIDGET ---
-
 class ShareToMoodboardPage extends StatefulWidget {
   final List<File> imageFiles;
-
   const ShareToMoodboardPage({super.key, required this.imageFiles});
 
   @override
@@ -74,12 +69,8 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
   Future<String?> _getProjectCover(int projectId) async {
     try {
       final images = await _imageRepo.getImages(projectId);
-      if (images.isNotEmpty) {
-        return images.first.filePath;
-      }
-    } catch (e) {
-      debugPrint("Error fetching cover for project $projectId: $e");
-    }
+      if (images.isNotEmpty) return images.first.filePath;
+    } catch (_) {}
     return null;
   }
 
@@ -98,9 +89,7 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
         final parent = await _projectRepo.getProjectById(item.parentId!);
         parentTitle = parent?.title;
       }
-
       final cover = await _getProjectCover(item.id!);
-
       recents.add(
         ProjectItemViewModel(
           item: item,
@@ -120,15 +109,12 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
         final eCover = await _getProjectCover(e.id!);
         eventVMs.add(ProjectItemViewModel(item: e, coverPath: eCover));
       }
-
       final pCover = await _getProjectCover(p.id!);
-
       groups.add(ProjectGroup(project: p, events: eventVMs, coverPath: pCover));
     }
 
     _groupedProjects = groups;
     _filteredGroupedProjects = groups;
-
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -144,7 +130,6 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
           final projectMatch = g.project.title.toLowerCase().contains(q);
           final matchingEvents =
               g.events.where((e) => e.title.toLowerCase().contains(q)).toList();
-
           if (projectMatch) {
             filtered.add(
               ProjectGroup(
@@ -210,7 +195,6 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
   }) {
     _projectService.openProject(projectId);
     ReceiveSharingIntent.instance.reset();
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -237,15 +221,9 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           "MoodBoards",
-          style: TextStyle(
-            color: Color(0xFF27272A),
-            fontFamily: 'GeneralSans',
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
-          ),
+          style: Variables.headerStyle.copyWith(fontSize: 20),
         ),
         actions: [
           IconButton(
@@ -260,70 +238,18 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
               ? const Center(child: CircularProgressIndicator())
               : Column(
                 children: [
-                  // --- Search Bar ---
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: SizedBox(
-                      height: 42,
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: _filterProjects,
-                        style: const TextStyle(
-                          fontFamily: "GeneralSans",
-                          fontSize: 16,
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF71717B),
-                          height: 1.4,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: "Search",
-                          hintStyle: const TextStyle(
-                            fontFamily: "GeneralSans",
-                            fontSize: 16,
-                            fontWeight: FontWeight.w400,
-                            color: Color(0xFF71717B),
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.search,
-                            size: 20,
-                            color: Color(0xFF9F9FA9),
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFE4E4E7),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                            horizontal: 16,
-                          ),
-                          suffixIcon:
-                              _searchQuery.isNotEmpty
-                                  ? IconButton(
-                                    icon: const Icon(
-                                      Icons.clear,
-                                      size: 20,
-                                      color: Color(0xFF9F9FA9),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      _filterProjects("");
-                                    },
-                                  )
-                                  : null,
-                        ),
-                      ),
+                    child: CommonSearchBar(
+                      controller: _searchController,
+                      onChanged: _filterProjects,
                     ),
                   ),
-
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // --- RECENT SECTION ---
                           if (_searchQuery.isEmpty &&
                               _recentViewModels.isNotEmpty) ...[
                             const Padding(
@@ -331,15 +257,8 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
                                 horizontal: 20,
                                 vertical: 8,
                               ),
-                              child: Text(
-                                "Recent Projects/Events",
-                                style: TextStyle(
-                                  fontFamily: 'GeneralSans',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400,
-                                  color: Color(0xFF27272A),
-                                  height: 1.43,
-                                ),
+                              child: SectionHeader(
+                                title: "Recent Projects/Events",
                               ),
                             ),
                             Padding(
@@ -355,24 +274,16 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
                             ),
                             const SizedBox(height: 24),
                           ],
-
-                          // --- ALL PROJECTS SECTION ---
                           Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
                               vertical: 8,
                             ),
-                            child: Text(
-                              _searchQuery.isEmpty
-                                  ? "All Projects/Events"
-                                  : "Search Results",
-                              style: const TextStyle(
-                                fontFamily: 'GeneralSans',
-                                fontSize: 14,
-                                fontWeight: FontWeight.w400,
-                                color: Color(0xFF27272A),
-                                height: 1.43,
-                              ),
+                            child: SectionHeader(
+                              title:
+                                  _searchQuery.isEmpty
+                                      ? "All Projects/Events"
+                                      : "Search Results",
                             ),
                           ),
                           Padding(
@@ -397,11 +308,10 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
     );
   }
 
-  // --- WIDGETS ---
-
+  // Wrappers for consistent UI
   Widget _buildRecentItem(ProjectItemViewModel vm) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8), // Reduced spacing
+      margin: const EdgeInsets.only(bottom: 8),
       child: InkWell(
         onTap:
             () => _navigateToSavePage(
@@ -411,15 +321,11 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
             ),
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          // padding: 4px 0 4px 4px
           padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
           decoration: BoxDecoration(
-            color: Colors.white, // #FAFAFA
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0xFFE4E4E7),
-              width: 1,
-            ), // #E4E4E7
+            border: Border.all(color: Variables.borderSubtle, width: 1),
           ),
           child: Row(
             children: [
@@ -428,7 +334,7 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFAFAFA),
+                  color: Variables.surfaceSubtle,
                   borderRadius: BorderRadius.circular(8),
                   image:
                       vm.coverPath != null
@@ -443,35 +349,24 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
                         ? Icon(Icons.image, color: Colors.grey[400], size: 28)
                         : null,
               ),
-              const SizedBox(width: 10), // 10px Gap
-              // Text Content
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (vm.isEvent && vm.parentTitle != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Text(
-                          vm.parentTitle!,
-                          style: const TextStyle(
-                            fontFamily: 'GeneralSans',
-                            fontSize: 12,
-                            color: Color(0xFF27272A),
-                            fontWeight: FontWeight.w400,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      Text(
+                        vm.parentTitle!,
+                        style: Variables.captionStyle.copyWith(fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     Text(
                       vm.title,
-                      style: const TextStyle(
-                        fontFamily: 'GeneralSans',
-                        fontSize: 16,
+                      style: Variables.bodyStyle.copyWith(
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF27272A), // Same black as event
+                        fontSize: 16,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -495,10 +390,8 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12), // Match recent radius
-        border: Border.all(
-          color: const Color(0xFFE4E4E7),
-        ), // Match recent border
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Variables.borderSubtle),
       ),
       child: Column(
         children: [
@@ -512,8 +405,8 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 4,
-            ), // Reduced vertical padding
-            visualDensity: VisualDensity.compact, // Reduce height
+            ),
+            visualDensity: VisualDensity.compact,
             leading: Container(
               width: 48,
               height: 48,
@@ -535,11 +428,9 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
             ),
             title: Text(
               project.title,
-              style: const TextStyle(
-                fontFamily: 'GeneralSans',
+              style: Variables.bodyStyle.copyWith(
+                fontWeight: FontWeight.w500,
                 fontSize: 16,
-                fontWeight: FontWeight.w500, // Matched with Recent
-                color: Color(0xFF27272A),
               ),
             ),
             trailing:
@@ -551,9 +442,8 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
                             : Icons.keyboard_arrow_down,
                         color: Colors.grey[600],
                       ),
-                      onPressed: () {
-                        setState(() => g.isExpanded = !g.isExpanded);
-                      },
+                      onPressed:
+                          () => setState(() => g.isExpanded = !g.isExpanded),
                     )
                     : null,
           ),
@@ -564,7 +454,7 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
               firstChild: const SizedBox.shrink(),
               secondChild: Container(
                 width: double.infinity,
-                color: const Color(0xFFF9FAFB),
+                color: Variables.surfaceSubtle,
                 child: Column(
                   children:
                       g.events.map((e) {
@@ -573,7 +463,7 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 24,
                             vertical: 2,
-                          ), // Reduced vertical padding
+                          ),
                           visualDensity: VisualDensity.compact,
                           leading: Container(
                             width: 40,
@@ -601,11 +491,9 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
                           ),
                           title: Text(
                             e.title,
-                            style: const TextStyle(
-                              fontFamily: 'GeneralSans',
+                            style: Variables.bodyStyle.copyWith(
                               fontSize: 15,
-                              fontWeight: FontWeight.w500, // Matched
-                              color: Color(0xFF27272A),
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         );

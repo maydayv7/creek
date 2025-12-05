@@ -6,6 +6,11 @@ import 'package:creekui/services/file_service.dart';
 import 'package:creekui/services/project_service.dart';
 import 'package:creekui/data/models/file_model.dart';
 import 'package:creekui/data/models/project_model.dart';
+import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/search_bar.dart';
+import 'package:creekui/ui/widgets/file_card.dart';
+import 'package:creekui/ui/widgets/empty_state.dart';
+import 'package:creekui/ui/widgets/section_header.dart';
 import 'create_file_page.dart';
 import 'canvas_page.dart';
 
@@ -20,17 +25,14 @@ class ShareToFilePage extends StatefulWidget {
 class _ShareToFilePageState extends State<ShareToFilePage> {
   final FileService _fileService = FileService();
   final ProjectService _projectService = ProjectService();
-
   final TextEditingController _searchController = TextEditingController();
 
   List<FileModel> _allFiles = [];
   List<FileModel> _filteredFiles = [];
   List<FileModel> _recentFiles = [];
-
-  // file.id -> { 'preview': path, 'dimensions': str }
   Map<String, Map<String, String>> _fileMetadata = {};
 
-  // project cache to avoid repeated fetches
+  // Avoid repeated fetches
   final Map<int, ProjectModel> _projectCache = {};
 
   bool _isLoading = true;
@@ -64,29 +66,23 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
       _filteredFiles = List.from(files);
       _recentFiles = recent.take(3).toList();
 
-      // Load metadata for files (previews, dimensions)
       await _loadFileMetadata(files);
-
       setState(() => _isLoading = false);
     } catch (e) {
-      debugPrint('Error fetching files in ShareToFilePage: $e');
+      debugPrint('Error fetching files: $e');
       setState(() => _isLoading = false);
     }
   }
 
   Future<void> _loadFileMetadata(List<FileModel> files) async {
     final Map<String, Map<String, String>> meta = {};
-
     for (final fmodel in files) {
       try {
         final f = File(fmodel.filePath);
-        if (!await f.exists()) {
-          // skip if disk file missing
-          continue;
-        }
+        if (!await f.exists()) continue;
 
         if (fmodel.filePath.toLowerCase().endsWith('.json')) {
-          // Canvas JSON - attempt to parse preview_path, width/height
+          // File JSON
           try {
             final content = await f.readAsString();
             final data = jsonDecode(content);
@@ -94,8 +90,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
             String dims = 'Unknown';
 
             if (data is Map) {
-              if (data['preview_path'] != null &&
-                  data['preview_path'].toString().isNotEmpty) {
+              if (data['preview_path'] != null) {
                 preview = data['preview_path'].toString();
                 // If preview is relative, try to resolve relative to JSON file
                 if (!File(preview).existsSync()) {
@@ -104,35 +99,24 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                   if (candidate.existsSync()) preview = candidate.path;
                 }
               }
-
               if (data['width'] != null && data['height'] != null) {
-                final w = (data['width'] as num).toInt();
-                final h = (data['height'] as num).toInt();
-                dims = '$w x $h px';
+                dims = '${data['width']} x ${data['height']} px';
               }
             }
-
             meta[fmodel.id] = {'preview': preview, 'dimensions': dims};
-          } catch (e) {
-            debugPrint('Error parsing canvas json for ${fmodel.id}: $e');
-          }
+          } catch (_) {}
         } else {
-          // Regular image file - assign path and try to get dims
+          // Regular image file - assign path and try
           String dims = 'Unknown';
           try {
             final bytes = await f.readAsBytes();
             final image = img.decodeImage(bytes);
             if (image != null) dims = '${image.width} x ${image.height} px';
-          } catch (_) {
-            // ignore
-          }
+          } catch (_) {}
           meta[fmodel.id] = {'preview': fmodel.filePath, 'dimensions': dims};
         }
-      } catch (e) {
-        debugPrint('Error while loading metadata for ${fmodel.id}: $e');
-      }
+      } catch (_) {}
     }
-
     _fileMetadata = meta;
   }
 
@@ -147,8 +131,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
             _allFiles.where((file) {
               final nameMatch = file.name.toLowerCase().contains(q);
               final breadcrumb = _getProjectBreadcrumbSync(file).toLowerCase();
-              final projectMatch = breadcrumb.contains(q);
-              return nameMatch || projectMatch;
+              return nameMatch || breadcrumb.contains(q);
             }).toList();
       }
     });
@@ -167,69 +150,40 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
 
   // Async breadcrumb loader that fetches projects into cache as needed
   Future<String> _getProjectEventLabel(FileModel file) async {
-    // load file.projectId
     if (!_projectCache.containsKey(file.projectId)) {
       try {
         final p = await _projectService.getProjectById(file.projectId);
         if (p != null) _projectCache[file.projectId] = p;
-      } catch (e) {
-        debugPrint('Project load failed for ${file.projectId}: $e');
-      }
+      } catch (_) {}
     }
-
     final project = _projectCache[file.projectId];
     if (project == null) return "Unknown";
+    if (project.parentId == null) return project.title;
 
-    if (project.parentId == null) {
-      return project.title;
-    }
-
-    final parentId = project.parentId!;
-    if (!_projectCache.containsKey(parentId)) {
+    if (!_projectCache.containsKey(project.parentId!)) {
       try {
-        final parent = await _projectService.getProjectById(parentId);
-        if (parent != null) _projectCache[parentId] = parent;
-      } catch (e) {
-        debugPrint('Parent project load failed for $parentId: $e');
-      }
+        final parent = await _projectService.getProjectById(project.parentId!);
+        if (parent != null) _projectCache[project.parentId!] = parent;
+      } catch (_) {}
     }
-
-    final parentProject = _projectCache[parentId];
-    if (parentProject == null) return project.title;
-    return "${parentProject.title} / ${project.title}";
-  }
-
-  void _onAddPressed() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CreateFilePage(file: widget.sharedImage),
-      ),
-    );
+    final parent = _projectCache[project.parentId];
+    return parent == null
+        ? project.title
+        : "${parent.title} / ${project.title}";
   }
 
   void _onFileSelected(FileModel file) async {
     try {
       final f = File(file.filePath);
-      if (!await f.exists()) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("File not found")));
-        return;
-      }
+      if (!await f.exists()) return;
 
-      double width = 1080;
-      double height = 1080;
-
+      double width = 1080, height = 1080;
       if (file.filePath.toLowerCase().endsWith('.json')) {
         final content = await f.readAsString();
         final data = jsonDecode(content);
-
-        if (data is Map) {
-          if (data['width'] != null && data['height'] != null) {
-            width = (data['width'] as num).toDouble();
-            height = (data['height'] as num).toDouble();
-          }
+        if (data is Map && data['width'] != null) {
+          width = (data['width'] as num).toDouble();
+          height = (data['height'] as num).toDouble();
         }
       }
 
@@ -237,7 +191,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
         context,
         MaterialPageRoute(
           builder:
-              (context) => CanvasPage(
+              (_) => CanvasPage(
                 projectId: file.projectId,
                 width: width,
                 height: height,
@@ -252,68 +206,38 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
   }
 
   String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final diff = now.difference(date);
+    final diff = DateTime.now().difference(date);
     if (diff.inDays == 0) return 'Today';
     if (diff.inDays == 1) return 'Yesterday';
     if (diff.inDays < 7) return '${diff.inDays} days ago';
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  // Resolve preview path; if empty or missing, fallback to original filePath
-  String _resolvePreviewPath(FileModel file) {
-    final meta = _fileMetadata[file.id];
-    if (meta == null) return file.filePath;
-    final preview = meta['preview'] ?? '';
-    if (preview.isNotEmpty && File(preview).existsSync()) return preview;
-    // fallback: if file is json and has no preview, return placeholder or file.path
-    if (file.filePath.toLowerCase().endsWith('.json')) {
-      // attempt to find PNG/JPG sibling in same folder with same base name
-      final f = File(file.filePath);
-      final base = f.uri.pathSegments.last;
-      final nameWithoutExt = base.split('.').first;
-      final parent = f.parent;
-      final candidates = [
-        '${parent.path}/$nameWithoutExt.png',
-        '${parent.path}/$nameWithoutExt.jpg',
-        '${parent.path}/preview_$nameWithoutExt.png',
-      ];
-      for (final c in candidates) {
-        if (File(c).existsSync()) return c;
-      }
-    }
-    if (File(file.filePath).existsSync()) return file.filePath;
-    return '';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Variables.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Variables.background,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Files',
-          style: TextStyle(
-            color: Color(0xFF27272A),
-            fontFamily: 'GeneralSans',
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
-          ),
+          style: Variables.headerStyle.copyWith(fontSize: 20),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.add, color: Colors.black, size: 28),
-            onPressed: _onAddPressed,
-            tooltip: "Create New File",
+            onPressed:
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CreateFilePage(file: widget.sharedImage),
+                  ),
+                ),
           ),
         ],
       ),
@@ -321,130 +245,61 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _allFiles.isEmpty
-              ? _buildEmptyState()
+              ? const EmptyState(
+                icon: Icons.folder_open,
+                title: "No files yet",
+                subtitle: "Tap + to create your first file",
+              )
               : Column(
                 children: [
-                  // Search bar
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: SizedBox(
-                      height: 42,
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: _filterFiles,
-                        style: const TextStyle(
-                          fontFamily: "GeneralSans",
-                          fontSize: 16,
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF71717B),
-                          height: 1.4,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: "Search",
-                          hintStyle: const TextStyle(
-                            fontFamily: "GeneralSans",
-                            fontSize: 16,
-                            fontWeight: FontWeight.w400,
-                            color: Color(0xFF71717B),
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.search,
-                            size: 20,
-                            color: Color(0xFF9F9FA9),
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFE4E4E7),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                            horizontal: 16,
-                          ),
-                          suffixIcon:
-                              _searchQuery.isNotEmpty
-                                  ? IconButton(
-                                    icon: const Icon(
-                                      Icons.clear,
-                                      size: 20,
-                                      color: Color(0xFF9F9FA9),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      _filterFiles('');
-                                    },
-                                  )
-                                  : null,
-                        ),
-                      ),
+                    child: CommonSearchBar(
+                      controller: _searchController,
+                      onChanged: _filterFiles,
                     ),
                   ),
-
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Recent Files
                           if (_recentFiles.isNotEmpty &&
                               _searchQuery.isEmpty) ...[
                             const Padding(
                               padding: EdgeInsets.symmetric(
-                                horizontal: 20,
+                                horizontal: 16,
                                 vertical: 8,
                               ),
-                              child: Text(
-                                "Recent Files",
-                                style: TextStyle(
-                                  fontFamily: 'GeneralSans',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400,
-                                  color: Color(0xFF27272A),
-                                  height: 1.43,
-                                ),
-                              ),
+                              child: SectionHeader(title: "Recent Files"),
                             ),
                             Padding(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
+                                horizontal: 16,
                               ),
                               child: Column(
                                 children:
                                     _recentFiles
-                                        .map(
-                                          (file) => _buildRecentFileItem(file),
-                                        )
+                                        .map((file) => _buildFileCard(file))
                                         .toList(),
                               ),
                             ),
                             const SizedBox(height: 24),
                           ],
-
-                          // All files header
                           Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
+                              horizontal: 16,
                               vertical: 8,
                             ),
-                            child: Text(
-                              _searchQuery.isEmpty
-                                  ? "All Files"
-                                  : "Search Results",
-                              style: const TextStyle(
-                                fontFamily: 'GeneralSans',
-                                fontSize: 14,
-                                fontWeight: FontWeight.w400,
-                                color: Color(0xFF27272A),
-                                height: 1.43,
-                              ),
+                            child: SectionHeader(
+                              title:
+                                  _searchQuery.isEmpty
+                                      ? "All Files"
+                                      : "Search Results",
                             ),
                           ),
-
-                          // All files list
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: ListView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
@@ -464,202 +319,26 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.folder_open, size: 80, color: Colors.grey[300]),
-          const SizedBox(height: 16),
-          Text(
-            "No files yet",
-            style: TextStyle(color: Colors.grey[500], fontSize: 16),
+  Widget _buildFileCard(FileModel file) {
+    return FutureBuilder<String>(
+      future: _getProjectEventLabel(file),
+      builder: (context, snapshot) {
+        final meta = _fileMetadata[file.id] ?? {};
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: FileCard(
+            file: file,
+            breadcrumb: snapshot.data ?? "",
+            dimensions: meta['dimensions'] ?? "Unknown",
+            previewPath: meta['preview'] ?? "",
+            timeAgo: _formatDate(file.lastUpdated),
+            onTap: () => _onFileSelected(file),
+            onMenuAction: null,
           ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: _onAddPressed,
-            child: const Text("Create your first file"),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildRecentFileItem(FileModel file) {
-    final preview = _resolvePreviewPath(file);
-
-    return InkWell(
-      onTap: () => _onFileSelected(file),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Color(0xFFE4E4E7)),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-              ),
-              child: Image.file(
-                File(preview),
-                width: 120,
-                height: 120,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, __, ___) => Container(
-                      width: 120,
-                      height: 120,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.image),
-                    ),
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    FutureBuilder<String>(
-                      future: _getProjectEventLabel(file),
-                      builder:
-                          (_, s) => Text(
-                            s.data ?? "",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF71717B),
-                              fontFamily: "GeneralSans",
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      file.name,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: "GeneralSans",
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _formatDate(file.lastUpdated),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF71717B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFileItem(FileModel file) {
-    final preview = _resolvePreviewPath(file);
-
-    return InkWell(
-      onTap: () => _onFileSelected(file),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Color(0xFFE4E4E7)),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-              ),
-              child: Image.file(
-                File(preview),
-                width: 120,
-                height: 120,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, __, ___) => Container(
-                      width: 120,
-                      height: 120,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.image),
-                    ),
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    FutureBuilder<String>(
-                      future: _getProjectEventLabel(file),
-                      builder:
-                          (_, s) => Text(
-                            s.data ?? "",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF71717B),
-                              fontFamily: "GeneralSans",
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    Text(
-                      file.name,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF27272A),
-                        fontFamily: "GeneralSans",
-                      ),
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    Text(
-                      _formatDate(file.lastUpdated),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF71717B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _placeholderIcon() {
-    return Container(
-      color: Colors.grey[200],
-      child: Icon(Icons.image, size: 28, color: Colors.grey[400]),
-    );
-  }
+  Widget _buildFileItem(FileModel file) => _buildFileCard(file);
 }

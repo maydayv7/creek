@@ -12,7 +12,6 @@ class FileCard extends StatelessWidget {
   final VoidCallback onTap;
 
   // Optional actions for the context menu.
-  // If null, the menu icon is hidden or disabled.
   final Function(String)? onMenuAction;
 
   const FileCard({
@@ -28,9 +27,6 @@ class FileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     // Resolve valid image path
     final bool hasPreview =
         previewPath.isNotEmpty && File(previewPath).existsSync();
@@ -40,175 +36,119 @@ class FileCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(Variables.radiusSmall),
-          // Optional: Add subtle border if needed to match FilePage style
-          border: Border.all(
-            color: isDark ? Variables.borderDark : Colors.transparent,
-          ),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE4E4E7)),
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Thumbnail
-            SizedBox(
-              width: 88,
-              height: 88,
-              child: Center(
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color:
-                        isDark
-                            ? Variables.surfaceDark
-                            : Variables.surfaceSubtle,
-                    borderRadius: BorderRadius.circular(Variables.radiusSmall),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(Variables.radiusSmall),
-                    child:
-                        hasPreview
-                            ? Image(
-                              image: imageProvider!,
-                              fit: BoxFit.cover,
-                              errorBuilder:
-                                  (_, __, ___) => _buildPlaceholder(theme),
-                            )
-                            : _buildPlaceholder(theme),
-                  ),
-                ),
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+              ),
+              child: SizedBox(
+                width: 120,
+                height: 120,
+                child:
+                    hasPreview
+                        ? Image(
+                          image: imageProvider!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                        )
+                        : _buildPlaceholder(),
               ),
             ),
-            const SizedBox(width: 16),
+
+            const SizedBox(width: 12),
+
             // Info Column
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (breadcrumb.isNotEmpty)
-                                Text(
-                                  breadcrumb,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                    fontFamily: 'GeneralSans',
-                                    color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.6),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              const SizedBox(height: 4),
-                              Text(
-                                file.name,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: 'GeneralSans',
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
+                    if (breadcrumb.isNotEmpty)
+                      Text(
+                        breadcrumb,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF71717B),
+                          fontFamily: 'GeneralSans',
                         ),
-                        const SizedBox(width: 8),
-                        // Menu
-                        if (onMenuAction != null)
-                          PopupMenuButton<String>(
-                            padding: EdgeInsets.zero,
-                            icon: Icon(
-                              Icons.more_vert,
-                              size: 20,
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: 0.6,
-                              ),
-                            ),
-                            onSelected: onMenuAction,
-                            itemBuilder:
-                                (_) => const [
-                                  PopupMenuItem(
-                                    value: "open",
-                                    child: Text("Open"),
-                                  ),
-                                  PopupMenuItem(
-                                    value: "rename",
-                                    child: Text("Rename"),
-                                  ),
-                                  PopupMenuItem(
-                                    value: "delete",
-                                    child: Text("Delete"),
-                                  ),
-                                ],
-                          )
-                        else
-                          Icon(
-                            Icons.more_vert,
-                            size: 20,
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
-                            ),
-                          ),
-                      ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      file.name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'GeneralSans',
+                        color: Color(0xFF27272A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
                     Text(
                       dimensions,
-                      style: TextStyle(
-                        fontSize: 11,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF71717B),
                         fontFamily: 'GeneralSans',
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       timeAgo,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
+                        color: const Color(0xFF71717B).withValues(alpha: 0.8),
                         fontFamily: 'GeneralSans',
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.4,
-                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+
+            // Menu
+            if (onMenuAction != null)
+              PopupMenuButton<String>(
+                onSelected: onMenuAction,
+                itemBuilder:
+                    (_) => const [
+                      PopupMenuItem(value: "open", child: Text("Open")),
+                      PopupMenuItem(value: "rename", child: Text("Rename")),
+                      PopupMenuItem(value: "delete", child: Text("Delete")),
+                    ],
+                icon: const Icon(
+                  Icons.more_vert,
+                  size: 20,
+                  color: Color(0xFF71717B),
+                ),
+              )
+            else
+              const SizedBox(width: 40),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPlaceholder(ThemeData theme) {
-    return Center(
-      child: Icon(
-        Icons.image,
-        size: 24,
-        color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+  Widget _buildPlaceholder() {
+    return Container(
+      color: Colors.grey[300],
+      child: const Center(
+        child: Icon(Icons.image, size: 32, color: Colors.white),
       ),
     );
   }

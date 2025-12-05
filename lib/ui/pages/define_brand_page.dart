@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:creekui/services/project_service.dart';
 import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/text_field.dart';
+import 'package:creekui/ui/widgets/primary_button.dart';
 import 'project_detail_page.dart';
 
 class DefineBrandPage extends StatefulWidget {
@@ -18,10 +20,7 @@ class DefineBrandPage extends StatefulWidget {
 }
 
 class _DefineBrandPageState extends State<DefineBrandPage> {
-  // Service
   final ProjectService _projectService = ProjectService();
-
-  // Controllers
   final _projectNameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _problemController = TextEditingController();
@@ -29,7 +28,6 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
   final _whereWillAppearController = TextEditingController();
   final _competitorInputController = TextEditingController();
 
-  // State
   bool _isLoading = false;
   final List<String> _keywords = ['Colour', 'Fonts', 'Composition'];
   final List<Map<String, String>> _competitorBrands = [
@@ -68,16 +66,14 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       // 2. Prepare data
       final String title = _projectNameController.text.trim();
       final String description = _descriptionController.text.trim();
 
-      // 3. Call the Service and capture the NEW ID
+      // 3. Call service and capture new ID
       final int newId = await _projectService.createProject(
         title,
         description: description.isEmpty ? null : description,
@@ -103,11 +99,7 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -125,7 +117,7 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: Variables.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -142,8 +134,6 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                       color: Variables.textSecondary,
                     ),
                     onPressed: () => Navigator.pop(context),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),
@@ -178,87 +168,51 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
-                    // Title and Subtitle
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Define Your Brand',
-                          style: TextStyle(
-                            fontFamily: 'GeneralSans',
-                            fontSize: 20,
-                            fontWeight: FontWeight.w500,
-                            color: Variables.textPrimary,
-                            height: 24 / 20,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Answer a few quick questions to help us craft your unique style guide.',
-                          style: TextStyle(
-                            fontFamily: 'GeneralSans',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
-                            color: Variables.textSecondary,
-                            height: 20 / 14,
-                          ),
-                        ),
-                      ],
+                    Text('Define Your Brand', style: Variables.headerStyle),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Answer a few quick questions to help us craft your unique style guide.',
+                      style: Variables.captionStyle.copyWith(fontSize: 14),
                     ),
-
                     const SizedBox(height: 32),
-
-                    // Form Fields
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFormField(
-                          label: 'Project Name',
-                          hintText: 'Enter project name',
-                          controller: _projectNameController,
-                          required: true,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildFormField(
-                          label: 'What do you want & who is it for.',
-                          hintText: 'Describe your work and your audience.',
-                          controller: _descriptionController,
-                          maxLines: 3,
-                          required: false,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildFormField(
-                          label: 'What problem you solve.',
-                          hintText:
-                              'Explain the main issue your brand addresses.',
-                          controller: _problemController,
-                          maxLines: 3,
-                          required: false,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildFormField(
-                          label: 'Long-term goal for the brand.',
-                          hintText: 'E.g. - Improving food availability...',
-                          controller: _goalController,
-                          required: false,
-                        ),
-                        const SizedBox(height: 32),
-                        _buildKeywordsSection(),
-                        const SizedBox(height: 32),
-                        _buildCompetitorBrandsSection(),
-                        const SizedBox(height: 32),
-                        _buildFormField(
-                          label: 'Where will the brand appear',
-                          hintText: 'Banners, Posters, Instagram..',
-                          controller: _whereWillAppearController,
-                          required: false,
-                        ),
-                      ],
+                    CommonTextField(
+                      label: 'Project Name',
+                      hintText: 'Enter project name',
+                      controller: _projectNameController,
+                      isRequired: true,
                     ),
-                    const SizedBox(height: 100), // Space for bottom button
+                    const SizedBox(height: 16),
+                    CommonTextField(
+                      label: 'What do you want & who is it for.',
+                      hintText: 'Describe your work and your audience.',
+                      controller: _descriptionController,
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 16),
+                    CommonTextField(
+                      label: 'What problem you solve.',
+                      hintText: 'Explain the main issue your brand addresses.',
+                      controller: _problemController,
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 16),
+                    CommonTextField(
+                      label: 'Long-term goal for the brand.',
+                      hintText: 'E.g. - Improving food availability...',
+                      controller: _goalController,
+                    ),
+                    const SizedBox(height: 32),
+                    _buildKeywordsSection(),
+                    const SizedBox(height: 32),
+                    _buildCompetitorBrandsSection(),
+                    const SizedBox(height: 32),
+                    CommonTextField(
+                      label: 'Where will the brand appear',
+                      hintText: 'Banners, Posters, Instagram..',
+                      controller: _whereWillAppearController,
+                    ),
+                    const SizedBox(height: 100),
                   ],
                 ),
               ),
@@ -271,141 +225,24 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         decoration: BoxDecoration(
-          color: const Color(0xFFFAFAFA),
+          color: Variables.background,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
           ],
         ),
         child: SafeArea(
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _handleFinish,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Variables.textPrimary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(112),
-                ),
-                elevation: 0,
-              ),
-              child:
-                  _isLoading
-                      ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                      : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Create Project',
-                            style: TextStyle(
-                              fontFamily: 'GeneralSans',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          SvgPicture.asset(
-                            'assets/icons/generate_icon.svg',
-                            width: 18,
-                            height: 18,
-                            colorFilter: const ColorFilter.mode(
-                              Colors.white,
-                              BlendMode.srcIn,
-                            ),
-                          ),
-                        ],
-                      ),
-            ),
+          child: PrimaryButton(
+            text: 'Create Project',
+            isLoading: _isLoading,
+            onPressed: _handleFinish,
+            iconPath: 'assets/icons/generate_icon.svg',
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildFormField({
-    required String label,
-    required String hintText,
-    required TextEditingController controller,
-    int maxLines = 1,
-    bool required = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Variables.textPrimary,
-                height: 20 / 14,
-              ),
-            ),
-            if (required)
-              Text(
-                '*',
-                style: TextStyle(
-                  fontFamily: 'GeneralSans',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF4F39F6),
-                  height: 16 / 12,
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFE4E4E7),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: TextField(
-            controller: controller,
-            maxLines: maxLines,
-            style: TextStyle(
-              fontFamily: 'GeneralSans',
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: Variables.textPrimary,
-              height: 20 / 14,
-            ),
-            decoration: InputDecoration(
-              hintText: hintText,
-              hintStyle: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                color: Variables.textSecondary,
-                height: 20 / 14,
-              ),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -417,22 +254,13 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
           children: [
             Text(
               '2-3 vibe keywords',
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Variables.textPrimary,
-                height: 20 / 14,
-              ),
+              style: Variables.bodyStyle.copyWith(fontWeight: FontWeight.w500),
             ),
             Text(
               '*',
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+              style: Variables.bodyStyle.copyWith(
                 color: const Color(0xFF4F39F6),
-                height: 16 / 12,
+                fontSize: 12,
               ),
             ),
           ],
@@ -457,21 +285,14 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                   children: [
                     Text(
                       keyword,
-                      style: TextStyle(
-                        fontFamily: 'GeneralSans',
+                      style: Variables.captionStyle.copyWith(
                         fontSize: 12,
-                        fontWeight: FontWeight.w400,
                         color: Variables.textPrimary,
-                        height: 16 / 12,
                       ),
                     ),
                     const SizedBox(width: 8),
                     GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _keywords.remove(keyword);
-                        });
-                      },
+                      onTap: () => setState(() => _keywords.remove(keyword)),
                       child: Icon(
                         Icons.close,
                         size: 16,
@@ -489,7 +310,7 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFE4E4E7), width: 1),
+                  border: Border.all(color: Variables.borderSubtle),
                   borderRadius: BorderRadius.circular(48),
                 ),
                 child: Row(
@@ -497,12 +318,9 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                   children: [
                     Text(
                       'Add More',
-                      style: TextStyle(
-                        fontFamily: 'GeneralSans',
+                      style: Variables.captionStyle.copyWith(
                         fontSize: 12,
-                        fontWeight: FontWeight.w400,
                         color: Variables.textPrimary,
-                        height: 16 / 12,
                       ),
                     ),
                     const SizedBox(width: 4),
@@ -525,60 +343,23 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
           children: [
             Text(
               '2-3 reference/competitor brands.',
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Variables.textPrimary,
-                height: 20 / 14,
-              ),
+              style: Variables.bodyStyle.copyWith(fontWeight: FontWeight.w500),
             ),
             Text(
               '*',
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+              style: Variables.bodyStyle.copyWith(
                 color: const Color(0xFF4F39F6),
-                height: 16 / 12,
+                fontSize: 12,
               ),
             ),
           ],
         ),
         const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFE4E4E7),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: TextField(
-            controller: _competitorInputController,
-            onSubmitted: (_) => _addCompetitorBrand(),
-            style: TextStyle(
-              fontFamily: 'GeneralSans',
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: Variables.textPrimary,
-              height: 20 / 14,
-            ),
-            decoration: InputDecoration(
-              hintText: 'Type the name of brands here...',
-              hintStyle: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                color: Variables.textSecondary,
-                height: 20 / 14,
-              ),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-            ),
-          ),
+        CommonTextField(
+          label: '',
+          hintText: 'Type the name of brands here...',
+          controller: _competitorInputController,
+          onSubmitted: (_) => _addCompetitorBrand(),
         ),
         if (_competitorBrands.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -596,11 +377,8 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFAFAFA),
-                    border: Border.all(
-                      color: const Color(0xFFE4E4E7),
-                      width: 1,
-                    ),
+                    color: Variables.surfaceSubtle,
+                    border: Border.all(color: Variables.borderSubtle),
                     borderRadius: BorderRadius.circular(64),
                   ),
                   child: Row(
@@ -609,40 +387,28 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                       Container(
                         width: 30,
                         height: 30,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
                         ),
                         child: Center(
                           child: Text(
                             brand['initial'] ?? '',
-                            style: TextStyle(
-                              fontFamily: 'GeneralSans',
+                            style: Variables.captionStyle.copyWith(
+                              fontWeight: FontWeight.bold,
                               fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Variables.textPrimary,
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        brand['name'] ?? '',
-                        style: TextStyle(
-                          fontFamily: 'GeneralSans',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          color: Variables.textSecondary,
-                          height: 20 / 14,
-                        ),
-                      ),
+                      Text(brand['name'] ?? '', style: Variables.bodyStyle),
                       const SizedBox(width: 8),
                       GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _competitorBrands.removeAt(index);
-                          });
-                        },
+                        onTap:
+                            () => setState(
+                              () => _competitorBrands.removeAt(index),
+                            ),
                         child: Icon(
                           Icons.close,
                           size: 16,
@@ -680,11 +446,8 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
               ElevatedButton(
                 onPressed: () {
                   final val = controller.text.trim();
-                  if (val.isNotEmpty && !_keywords.contains(val)) {
-                    setState(() {
-                      _keywords.add(val);
-                    });
-                  }
+                  if (val.isNotEmpty && !_keywords.contains(val))
+                    setState(() => _keywords.add(val));
                   Navigator.pop(context);
                 },
                 child: const Text('Add'),

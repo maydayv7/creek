@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:creekui/services/analyze/image_analyzer.dart';
-import 'package:creekui/styles/variables.dart';
+import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/empty_state.dart';
 
 class ImageAnalysisPage extends StatefulWidget {
   const ImageAnalysisPage({super.key});
@@ -53,7 +54,6 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = sourcePath.split('/').last;
       final targetPath = '${appDir.path}/$fileName';
-
       final file = File(sourcePath);
       await file.copy(targetPath);
 
@@ -126,7 +126,6 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -136,13 +135,9 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           "Image Analysis",
-          style: TextStyle(
-            color: Colors.black,
-            fontFamily: 'GeneralSans',
-            fontWeight: FontWeight.bold,
-          ),
+          style: Variables.headerStyle.copyWith(fontSize: 20),
         ),
         actions: [
           if (_selectedImage != null)
@@ -164,11 +159,11 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                 width: double.infinity,
                 height: 250,
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: Variables.borderSubtle,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
+                      color: Colors.black.withOpacity(0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -182,23 +177,10 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                       if (_selectedImage != null)
                         Image.file(_selectedImage!, fit: BoxFit.contain)
                       else
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.bug_report_outlined,
-                              size: 48,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              "Select image to test full suite",
-                              style: TextStyle(
-                                fontFamily: 'GeneralSans',
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
+                        const EmptyState(
+                          icon: Icons.bug_report_outlined,
+                          title: "No image selected",
+                          subtitle: "Select an image to test full suite",
                         ),
                       if (_isAnalyzing)
                         Container(
@@ -237,13 +219,9 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
 
             // Raw JSON Result
             if (_analysisResult != null) ...[
-              const Text(
+              Text(
                 "Results",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'GeneralSans',
-                ),
+                style: Variables.headerStyle.copyWith(fontSize: 18),
               ),
               const SizedBox(height: 12),
               _buildJsonViewer(_analysisResult!),
@@ -254,8 +232,8 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showSourceSelector,
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
+        backgroundColor: Variables.textPrimary,
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add_photo_alternate),
         label: Text(
           _selectedImage == null ? "Select Image" : "Change Image",
@@ -268,7 +246,6 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
   Widget _buildJsonViewer(Map<String, dynamic> data) {
     const encoder = JsonEncoder.withIndent('  ');
     final String prettyJson = encoder.convert(data);
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
