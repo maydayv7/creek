@@ -16,6 +16,14 @@ class Variables {
   static const Color backgroundDark = Color(0xFF18181B);
   static const Color borderDark = Color(0xFF3F3F46);
 
+  // Canvas Specific
+  static const Color canvasBackground = Color(0xFFE0E0E0);
+  static const Color selectionBorder = Color(0xFFB44CFF);
+  static const Color accentMagic = Color(0xFFD8705D);
+  static const Color defaultBrush = Color(0xFFFF4081);
+  static const Color iconActive = Color(0xFF27272A);
+  static const Color iconInactive = Color(0xFF9F9FA9);
+
   // Dimensions
   static const double fontSizeHeader = 20.0;
   static const double lineHeightHeader = 24.0;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import '../../styles/variables.dart';
 
 class TextToolsOverlay extends StatelessWidget {
   final bool isActive;
@@ -53,7 +54,10 @@ class TextToolsOverlay extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.check_circle, color: Colors.black87),
+                  icon: const Icon(
+                    Icons.check_circle,
+                    color: Variables.textPrimary,
+                  ),
                   onPressed: onClose,
                   tooltip: "Done",
                 ),
@@ -63,7 +67,7 @@ class TextToolsOverlay extends StatelessWidget {
                 IconButton(
                   icon: const Icon(
                     Icons.add_circle_outline,
-                    color: Colors.black87,
+                    color: Variables.textPrimary,
                   ),
                   onPressed: onAddText,
                   tooltip: "Add Text",
@@ -87,7 +91,7 @@ class TextToolsOverlay extends StatelessWidget {
                         thumbShape: const RoundSliderThumbShape(
                           enabledThumbRadius: 6,
                         ),
-                        activeTrackColor: Colors.black87,
+                        activeTrackColor: Variables.textPrimary,
                         inactiveTrackColor: Colors.grey[200],
                         thumbColor: Colors.black,
                         overlayShape: SliderComponentShape.noOverlay,

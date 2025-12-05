@@ -686,7 +686,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
             },
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
       ],
     );
   }
