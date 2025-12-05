@@ -3,6 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:creekui/data/models/project_model.dart';
 import 'package:creekui/data/repos/project_repo.dart';
 import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/pages/settings_page.dart';
+import 'package:creekui/ui/pages/home_page.dart';
 
 class TopBar extends StatefulWidget implements PreferredSizeWidget {
   final int currentProjectId;
@@ -70,7 +72,7 @@ class _TopBarState extends State<TopBar> {
         widget.currentProjectId,
       );
       if (current == null) {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
         return;
       }
 
@@ -98,43 +100,69 @@ class _TopBarState extends State<TopBar> {
       }
     } catch (e) {
       debugPrint("TopBar Error: $e");
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _handleSafeBack() {
+    if (widget.onBack != null) {
+      widget.onBack!();
+      return;
+    }
+
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      // Fallback: Go to HomePage to prevent app exit/crash
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
+    }
+  }
+
+  void _openSettings() {
+    if (widget.onSettingsPressed != null) {
+      widget.onSettingsPressed!();
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SettingsPage()),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final textScaler = MediaQuery.of(context).textScaler;
     return Container(
-      color: Colors.white, // White background
+      color: Colors.white,
       child: SafeArea(
         bottom: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // First Row: Title and Settings
+            // Row 1: Title and Settings
             Container(
-              height: 48.0, // py-[12px] = 24px + 24px content
+              height: 48.0,
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
                 children: [
                   // Back Button
-                  if (widget.onBack != null) ...[
-                    GestureDetector(
-                      onTap: widget.onBack,
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.arrow_back,
-                          size: 20,
-                          color: Variables.textPrimary,
-                        ),
+                  GestureDetector(
+                    onTap: _handleSafeBack,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.arrow_back,
+                        size: 20,
+                        color: Variables.textPrimary,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                  ],
+                  ),
+                  const SizedBox(width: 10),
+
                   // Title
                   Expanded(
                     child:
@@ -145,7 +173,7 @@ class _TopBarState extends State<TopBar> {
                                 fontFamily: 'GeneralSans',
                                 fontSize: 20,
                                 fontWeight: FontWeight.w500,
-                                height: 24 / 20, // line-height: 24px
+                                height: 24 / 20,
                                 color: Variables.textPrimary,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -166,10 +194,10 @@ class _TopBarState extends State<TopBar> {
                             )
                             : const SizedBox(),
                   ),
-                  // Settings Icon (only show if second row is visible)
+                  // Settings Icon
                   if (!widget.hideSecondRow)
                     GestureDetector(
-                      onTap: widget.onSettingsPressed,
+                      onTap: _openSettings,
                       child: SvgPicture.asset(
                         'assets/icons/settings-line.svg',
                         width: 24,
@@ -183,10 +211,10 @@ class _TopBarState extends State<TopBar> {
                 ],
               ),
             ),
-            // Second Row: Global Dropdown and Action Buttons
+            // Row 2: Global Dropdown and Action Buttons
             if (!widget.hideSecondRow)
               Container(
-                height: 40.0, // py-[8px] = 16px + 24px content
+                height: 40.0,
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Row(
                   children: [
@@ -213,7 +241,7 @@ class _TopBarState extends State<TopBar> {
                                 vertical: 10,
                               ),
                               decoration: BoxDecoration(
-                                color: Variables.borderSubtle, // #e4e4e7
+                                color: Variables.borderSubtle,
                                 borderRadius: BorderRadius.circular(1000),
                               ),
                               child: Row(
@@ -265,7 +293,6 @@ class _TopBarState extends State<TopBar> {
                               }).toList();
                             },
                           ),
-                        // Layout Icon Button (Toggle between All Images/Categorized) or Edit Icon
                         if (widget.onLayoutToggle != null ||
                             widget.onLayoutPressed != null) ...[
                           const SizedBox(width: 8),
@@ -286,8 +313,7 @@ class _TopBarState extends State<TopBar> {
                                     ? (widget.isAlternateView == true
                                         ? Icons.dashboard
                                         : Icons.view_agenda_outlined)
-                                    : Icons
-                                        .edit, // Use edit icon when only onLayoutPressed is provided
+                                    : Icons.edit,
                                 size: 20,
                                 color: Variables.textPrimary,
                               ),
@@ -297,12 +323,12 @@ class _TopBarState extends State<TopBar> {
                       ],
                     ),
                     const Spacer(),
-                    // Right group: Filter and AI/Sparkle Buttons
+                    // Right group: Filter and AI Buttons
                     if (widget.onFilterPressed != null ||
                         widget.onAIPressed != null)
                       Row(
                         children: [
-                          // Filter Icon Button
+                          // Filter Button
                           if (widget.onFilterPressed != null)
                             GestureDetector(
                               onTap: widget.onFilterPressed,
@@ -325,7 +351,7 @@ class _TopBarState extends State<TopBar> {
                           if (widget.onFilterPressed != null &&
                               widget.onAIPressed != null)
                             const SizedBox(width: 8),
-                          // AI/Sparkle Icon Button
+                          // AI Button
                           if (widget.onAIPressed != null)
                             GestureDetector(
                               onTap: widget.onAIPressed,

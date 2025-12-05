@@ -5,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:creekui/services/analyze/image_analyzer.dart';
 import 'package:creekui/ui/styles/variables.dart';
-import 'package:creekui/ui/widgets/empty_state.dart';
 
 class ImageAnalysisPage extends StatefulWidget {
   const ImageAnalysisPage({super.key});
@@ -22,6 +21,19 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
 
   final ImagePicker _picker = ImagePicker();
 
+  final Set<String> _selectedTags = {};
+  final List<String> _availableTags = [
+    'Compositions',
+    'Colours',
+    'Texture',
+    'Style',
+    'Emotion',
+    'Lighting',
+    'Era',
+    'Fonts',
+    'Subject',
+  ];
+
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(source: source);
@@ -31,8 +43,6 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
           _analysisResult = null;
           _errorMessage = null;
         });
-        // Auto-run analysis when a new image is picked
-        _runAnalysis(image.path);
       }
     } catch (e) {
       if (mounted) {
@@ -44,7 +54,9 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
     }
   }
 
-  Future<void> _runAnalysis(String sourcePath) async {
+  Future<void> _runAnalysis() async {
+    if (_selectedImage == null) return;
+
     setState(() {
       _isAnalyzing = true;
       _errorMessage = null;
@@ -52,12 +64,21 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
 
     try {
       final appDir = await getApplicationDocumentsDirectory();
-      final fileName = sourcePath.split('/').last;
+      final fileName = _selectedImage!.path.split('/').last;
       final targetPath = '${appDir.path}/$fileName';
-      final file = File(sourcePath);
+
+      final file = File(_selectedImage!.path);
       await file.copy(targetPath);
 
-      final result = await ImageAnalyzerService.analyzeFullSuite(targetPath);
+      Map<String, dynamic> result;
+      if (_selectedTags.isEmpty) {
+        result = await ImageAnalyzerService.analyzeFullSuite(targetPath);
+      } else {
+        result = await ImageAnalyzerService.analyzeSelected(
+          targetPath,
+          _selectedTags.toList(),
+        );
+      }
 
       if (mounted) {
         setState(() {
@@ -126,6 +147,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -135,16 +157,20 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
+        title: const Text(
           "Image Analysis",
-          style: Variables.headerStyle.copyWith(fontSize: 20),
+          style: TextStyle(
+            color: Colors.black,
+            fontFamily: 'GeneralSans',
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: [
-          if (_selectedImage != null)
+          if (_selectedImage != null && !_isAnalyzing)
             IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.black),
-              tooltip: "Re-analyze",
-              onPressed: () => _runAnalysis(_selectedImage!.path),
+              icon: const Icon(Icons.play_arrow, color: Variables.textPrimary),
+              tooltip: "Run Analysis",
+              onPressed: _runAnalysis,
             ),
         ],
       ),
@@ -159,7 +185,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                 width: double.infinity,
                 height: 250,
                 decoration: BoxDecoration(
-                  color: Variables.borderSubtle,
+                  color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
@@ -177,10 +203,23 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                       if (_selectedImage != null)
                         Image.file(_selectedImage!, fit: BoxFit.contain)
                       else
-                        const EmptyState(
-                          icon: Icons.bug_report_outlined,
-                          title: "No image selected",
-                          subtitle: "Select an image to test full suite",
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.bug_report_outlined,
+                              size: 48,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              "Select image to analyze",
+                              style: TextStyle(
+                                fontFamily: 'GeneralSans',
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
                         ),
                       if (_isAnalyzing)
                         Container(
@@ -195,6 +234,80 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                   ),
                 ),
               ),
+            ),
+            const SizedBox(height: 24),
+
+            // Tag Selector
+            Text(
+              "Select Analysis Modules",
+              style: Variables.headerStyle.copyWith(fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children:
+                  _availableTags.map((tag) {
+                    final isSelected = _selectedTags.contains(tag);
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedTags.remove(tag);
+                          } else {
+                            _selectedTags.add(tag);
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              isSelected
+                                  ? const Color(0xFFEEF0FF)
+                                  : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color:
+                                isSelected
+                                    ? const Color(0xFF7C4DFF)
+                                    : Colors.grey[300]!,
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isSelected) ...[
+                              const Icon(
+                                Icons.check,
+                                size: 14,
+                                color: Color(0xFF7C4DFF),
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Text(
+                              tag,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight:
+                                    isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                color:
+                                    isSelected
+                                        ? const Color(0xFF7C4DFF)
+                                        : Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
             ),
             const SizedBox(height: 24),
 
@@ -219,9 +332,13 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
 
             // Raw JSON Result
             if (_analysisResult != null) ...[
-              Text(
+              const Text(
                 "Results",
-                style: Variables.headerStyle.copyWith(fontSize: 18),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'GeneralSans',
+                ),
               ),
               const SizedBox(height: 12),
               _buildJsonViewer(_analysisResult!),
@@ -232,8 +349,8 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showSourceSelector,
-        backgroundColor: Variables.textPrimary,
-        foregroundColor: Colors.white,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
         icon: const Icon(Icons.add_photo_alternate),
         label: Text(
           _selectedImage == null ? "Select Image" : "Change Image",

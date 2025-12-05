@@ -9,6 +9,8 @@ import 'package:creekui/services/project_service.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/empty_state.dart';
 import 'package:creekui/ui/widgets/section_header.dart';
+import 'package:creekui/ui/pages/settings_page.dart';
+import 'package:creekui/ui/pages/home_page.dart';
 import 'project_board_page.dart';
 import 'stylesheet_page.dart';
 import 'project_file_page.dart';
@@ -305,8 +307,26 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         title: Text(_project!.title, style: Variables.headerStyle),
         backgroundColor: const Color(0xFFFAFAFA),
         elevation: 0,
-        leadingWidth: 40,
-        titleSpacing: 4,
+        leadingWidth: 50,
+        titleSpacing: 0,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+            size: 20,
+            color: Variables.textPrimary,
+          ),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const HomePage()),
+              );
+            }
+          },
+        ),
         actions: [
           IconButton(
             icon: SvgPicture.asset(
@@ -318,7 +338,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 BlendMode.srcIn,
               ),
             ),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              );
+            },
           ),
         ],
       ),

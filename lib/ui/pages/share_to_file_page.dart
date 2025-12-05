@@ -9,8 +9,8 @@ import 'package:creekui/data/models/project_model.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/search_bar.dart';
 import 'package:creekui/ui/widgets/file_card.dart';
-import 'package:creekui/ui/widgets/empty_state.dart';
 import 'package:creekui/ui/widgets/section_header.dart';
+import 'package:creekui/ui/widgets/empty_state.dart';
 import 'create_file_page.dart';
 import 'canvas_page.dart';
 
@@ -30,6 +30,8 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
   List<FileModel> _allFiles = [];
   List<FileModel> _filteredFiles = [];
   List<FileModel> _recentFiles = [];
+
+  // file.id -> { 'preview': path, 'dimensions': str }
   Map<String, Map<String, String>> _fileMetadata = {};
 
   // Avoid repeated fetches
@@ -69,7 +71,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
       await _loadFileMetadata(files);
       setState(() => _isLoading = false);
     } catch (e) {
-      debugPrint('Error fetching files: $e');
+      debugPrint('Error fetching files in ShareToFilePage: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -90,7 +92,8 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
             String dims = 'Unknown';
 
             if (data is Map) {
-              if (data['preview_path'] != null) {
+              if (data['preview_path'] != null &&
+                  data['preview_path'].toString().isNotEmpty) {
                 preview = data['preview_path'].toString();
                 // If preview is relative, try to resolve relative to JSON file
                 if (!File(preview).existsSync()) {
@@ -100,11 +103,15 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                 }
               }
               if (data['width'] != null && data['height'] != null) {
-                dims = '${data['width']} x ${data['height']} px';
+                final w = (data['width'] as num).toInt();
+                final h = (data['height'] as num).toInt();
+                dims = '$w x $h px';
               }
             }
             meta[fmodel.id] = {'preview': preview, 'dimensions': dims};
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('Error parsing canvas json for ${fmodel.id}: $e');
+          }
         } else {
           // Regular image file - assign path and try
           String dims = 'Unknown';
@@ -112,10 +119,14 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
             final bytes = await f.readAsBytes();
             final image = img.decodeImage(bytes);
             if (image != null) dims = '${image.width} x ${image.height} px';
-          } catch (_) {}
+          } catch (_) {
+            // ignore
+          }
           meta[fmodel.id] = {'preview': fmodel.filePath, 'dimensions': dims};
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error while loading metadata for ${fmodel.id}: $e');
+      }
     }
     _fileMetadata = meta;
   }
@@ -131,7 +142,8 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
             _allFiles.where((file) {
               final nameMatch = file.name.toLowerCase().contains(q);
               final breadcrumb = _getProjectBreadcrumbSync(file).toLowerCase();
-              return nameMatch || breadcrumb.contains(q);
+              final projectMatch = breadcrumb.contains(q);
+              return nameMatch || projectMatch;
             }).toList();
       }
     });
@@ -154,36 +166,63 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
       try {
         final p = await _projectService.getProjectById(file.projectId);
         if (p != null) _projectCache[file.projectId] = p;
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Project load failed for ${file.projectId}: $e');
+      }
     }
     final project = _projectCache[file.projectId];
     if (project == null) return "Unknown";
-    if (project.parentId == null) return project.title;
 
-    if (!_projectCache.containsKey(project.parentId!)) {
-      try {
-        final parent = await _projectService.getProjectById(project.parentId!);
-        if (parent != null) _projectCache[project.parentId!] = parent;
-      } catch (_) {}
+    if (project.parentId == null) {
+      return project.title;
     }
-    final parent = _projectCache[project.parentId];
-    return parent == null
-        ? project.title
-        : "${parent.title} / ${project.title}";
+
+    final parentId = project.parentId!;
+    if (!_projectCache.containsKey(parentId)) {
+      try {
+        final parent = await _projectService.getProjectById(parentId);
+        if (parent != null) _projectCache[parentId] = parent;
+      } catch (e) {
+        debugPrint('Parent project load failed for $parentId: $e');
+      }
+    }
+
+    final parentProject = _projectCache[parentId];
+    if (parentProject == null) return project.title;
+    return "${parentProject.title} / ${project.title}";
+  }
+
+  void _onAddPressed() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateFilePage(file: widget.sharedImage),
+      ),
+    );
   }
 
   void _onFileSelected(FileModel file) async {
     try {
       final f = File(file.filePath);
-      if (!await f.exists()) return;
+      if (!await f.exists()) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("File not found")));
+        return;
+      }
 
-      double width = 1080, height = 1080;
+      double width = 1080;
+      double height = 1080;
+
       if (file.filePath.toLowerCase().endsWith('.json')) {
         final content = await f.readAsString();
         final data = jsonDecode(content);
-        if (data is Map && data['width'] != null) {
-          width = (data['width'] as num).toDouble();
-          height = (data['height'] as num).toDouble();
+
+        if (data is Map) {
+          if (data['width'] != null && data['height'] != null) {
+            width = (data['width'] as num).toDouble();
+            height = (data['height'] as num).toDouble();
+          }
         }
       }
 
@@ -213,31 +252,54 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  // Fallback to original filePath if preview path empty/missing
+  String _resolvePreviewPath(FileModel file) {
+    final meta = _fileMetadata[file.id];
+    if (meta == null) return file.filePath;
+    final preview = meta['preview'] ?? '';
+    if (preview.isNotEmpty && File(preview).existsSync()) return preview;
+
+    if (file.filePath.toLowerCase().endsWith('.json')) {
+      final f = File(file.filePath);
+      final base = f.uri.pathSegments.last;
+      final nameWithoutExt = base.split('.').first;
+      final parent = f.parent;
+      final candidates = [
+        '${parent.path}/$nameWithoutExt.png',
+        '${parent.path}/$nameWithoutExt.jpg',
+        '${parent.path}/preview_$nameWithoutExt.png',
+      ];
+      for (final c in candidates) {
+        if (File(c).existsSync()) return c;
+      }
+    }
+    if (File(file.filePath).existsSync()) return file.filePath;
+    return '';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Variables.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Variables.background,
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Files',
-          style: Variables.headerStyle.copyWith(fontSize: 20),
+          style: Variables.headerStyle.copyWith(
+            color: theme.colorScheme.onSurface,
+          ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add, color: Colors.black, size: 28),
-            onPressed:
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreateFilePage(file: widget.sharedImage),
-                  ),
-                ),
+            icon: Icon(Icons.add, color: theme.colorScheme.onSurface, size: 28),
+            onPressed: _onAddPressed,
+            tooltip: "Create New File",
           ),
         ],
       ),
@@ -245,13 +307,10 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _allFiles.isEmpty
-              ? const EmptyState(
-                icon: Icons.folder_open,
-                title: "No files yet",
-                subtitle: "Tap + to create your first file",
-              )
+              ? _buildEmptyState()
               : Column(
                 children: [
+                  // Search bar
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     child: CommonSearchBar(
@@ -264,15 +323,24 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (_filteredFiles.isEmpty && _searchQuery.isNotEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(32.0),
+                              child: EmptyState(
+                                icon: Icons.search_off,
+                                title: "No results found",
+                                subtitle: "Try adjusting your search",
+                              ),
+                            ),
+
+                          // Recent Files
                           if (_recentFiles.isNotEmpty &&
                               _searchQuery.isEmpty) ...[
                             const Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
+                              padding: EdgeInsets.symmetric(horizontal: 16),
                               child: SectionHeader(title: "Recent Files"),
                             ),
+                            const SizedBox(height: 12),
                             Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -286,29 +354,35 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
                             ),
                             const SizedBox(height: 24),
                           ],
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
+
+                          // All files header
+                          if (_filteredFiles.isNotEmpty) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: SectionHeader(
+                                title:
+                                    _searchQuery.isEmpty
+                                        ? "All Files"
+                                        : "Search Results",
+                              ),
                             ),
-                            child: SectionHeader(
-                              title:
-                                  _searchQuery.isEmpty
-                                      ? "All Files"
-                                      : "Search Results",
+                            const SizedBox(height: 12),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _filteredFiles.length,
+                                itemBuilder:
+                                    (context, index) =>
+                                        _buildFileCard(_filteredFiles[index]),
+                              ),
                             ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: _filteredFiles.length,
-                              itemBuilder:
-                                  (context, index) =>
-                                      _buildFileItem(_filteredFiles[index]),
-                            ),
-                          ),
+                          ],
                           const SizedBox(height: 40),
                         ],
                       ),
@@ -319,18 +393,42 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
     );
   }
 
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.folder_open, size: 80, color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          Text(
+            "No files yet",
+            style: TextStyle(color: Colors.grey[500], fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _onAddPressed,
+            child: const Text("Create your first file"),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFileCard(FileModel file) {
+    final preview = _resolvePreviewPath(file);
+    final meta = _fileMetadata[file.id] ?? {};
+    final dimensions = meta['dimensions'] ?? 'Unknown';
+
     return FutureBuilder<String>(
       future: _getProjectEventLabel(file),
       builder: (context, snapshot) {
-        final meta = _fileMetadata[file.id] ?? {};
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: FileCard(
             file: file,
             breadcrumb: snapshot.data ?? "",
-            dimensions: meta['dimensions'] ?? "Unknown",
-            previewPath: meta['preview'] ?? "",
+            dimensions: dimensions,
+            previewPath: preview,
             timeAgo: _formatDate(file.lastUpdated),
             onTap: () => _onFileSelected(file),
             onMenuAction: null,
@@ -339,6 +437,4 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
       },
     );
   }
-
-  Widget _buildFileItem(FileModel file) => _buildFileCard(file);
 }

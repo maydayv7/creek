@@ -2,10 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:creekui/services/project_service.dart';
-import 'package:creekui/services/image_service.dart';
-import 'package:creekui/data/models/project_model.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/search_bar.dart';
+import 'package:creekui/ui/widgets/project_selector.dart';
 import 'canvas_page.dart';
 import 'define_brand_page.dart';
 
@@ -137,7 +136,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
-              child: ProjectSelectionModal(
+              child: _ProjectSelectionModalContent(
                 scrollController: controller,
                 onProjectSelected: (id, title) {
                   setState(() {
@@ -179,18 +178,24 @@ class _CreateFilePageState extends State<CreateFilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5F5F7),
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Create Files',
-          style: Variables.headerStyle.copyWith(fontSize: 16),
+          style: Variables.headerStyle.copyWith(
+            fontSize: 16,
+            color: theme.colorScheme.onSurface,
+          ),
         ),
 
         // Show project chooser only when ID not passed
@@ -201,7 +206,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
               child: TextButton.icon(
                 onPressed: _openProjectSelection,
                 style: TextButton.styleFrom(
-                  backgroundColor: Colors.white,
+                  backgroundColor: isDark ? Colors.grey[800] : Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 8,
@@ -215,11 +220,14 @@ class _CreateFilePageState extends State<CreateFilePage> {
                       ? Icons.create_new_folder_outlined
                       : Icons.folder_open,
                   size: 18,
-                  color: Colors.black,
+                  color: theme.colorScheme.onSurface,
                 ),
                 label: Text(
                   _selectedProjectTitle,
-                  style: Variables.bodyStyle.copyWith(fontSize: 12),
+                  style: Variables.bodyStyle.copyWith(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurface,
+                  ),
                 ),
               ),
             ),
@@ -243,7 +251,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
             child: Text(
               'Canvas Sizes',
               style: Variables.bodyStyle.copyWith(
-                color: Colors.grey,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
               ),
@@ -261,7 +269,8 @@ class _CreateFilePageState extends State<CreateFilePage> {
                 childAspectRatio: 0.75,
               ),
               itemCount: _filteredPresets.length,
-              itemBuilder: (_, i) => _buildPresetCard(_filteredPresets[i]),
+              itemBuilder:
+                  (_, i) => _buildPresetCard(_filteredPresets[i], theme),
             ),
           ),
         ],
@@ -269,9 +278,10 @@ class _CreateFilePageState extends State<CreateFilePage> {
     );
   }
 
-  // Card widget
-  Widget _buildPresetCard(CanvasPreset preset) {
+  Widget _buildPresetCard(CanvasPreset preset, ThemeData theme) {
     final bool isCustom = preset.name == 'Custom';
+    final isDark = theme.brightness == Brightness.dark;
+
     return InkWell(
       onTap:
           () => _navigateToEditor(
@@ -281,8 +291,11 @@ class _CreateFilePageState extends State<CreateFilePage> {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? Variables.borderDark : Colors.transparent,
+          ),
         ),
         padding: const EdgeInsets.all(8),
         child: Column(
@@ -291,7 +304,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE0E7FF),
+                  color: isDark ? Colors.grey[800] : const Color(0xFFE0E7FF),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
@@ -304,7 +317,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
                               aspectRatio: preset.width / preset.height,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: theme.cardColor,
                                   borderRadius: BorderRadius.circular(4),
                                   boxShadow: [
                                     BoxShadow(
@@ -335,11 +348,15 @@ class _CreateFilePageState extends State<CreateFilePage> {
               style: Variables.bodyStyle.copyWith(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             Text(
               preset.displaySize,
-              style: Variables.captionStyle.copyWith(fontSize: 9),
+              style: Variables.captionStyle.copyWith(
+                fontSize: 9,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
             ),
           ],
         ),
@@ -364,167 +381,24 @@ class CanvasPreset {
   });
 }
 
-// --------------------------------------------------------------------------
-// --- PROJECT SELECTION MODAL ----------------------------------------------
-// --------------------------------------------------------------------------
-
-class ProjectItemViewModel {
-  final ProjectModel item;
-  final String? parentTitle;
-  final String? coverPath;
-
-  ProjectItemViewModel({required this.item, this.parentTitle, this.coverPath});
-
-  String get title => item.title;
-  bool get isEvent => item.isEvent;
-  int get id => item.id!;
-}
-
-class ProjectGroup {
-  final ProjectModel project;
-  final List<ProjectItemViewModel> events;
-  final String? coverPath;
-  bool isExpanded;
-
-  ProjectGroup({
-    required this.project,
-    this.events = const [],
-    this.coverPath,
-    this.isExpanded = false,
-  });
-}
-
-class ProjectSelectionModal extends StatefulWidget {
+// Project Selection Modal
+class _ProjectSelectionModalContent extends StatefulWidget {
   final Function(int id, String title) onProjectSelected;
   final ScrollController scrollController;
 
-  const ProjectSelectionModal({
-    super.key,
+  const _ProjectSelectionModalContent({
     required this.onProjectSelected,
     required this.scrollController,
   });
 
   @override
-  State<ProjectSelectionModal> createState() => _ProjectSelectionModalState();
+  State<_ProjectSelectionModalContent> createState() =>
+      _ProjectSelectionModalContentState();
 }
 
-class _ProjectSelectionModalState extends State<ProjectSelectionModal> {
-  final ProjectService _projectService = ProjectService();
-  final ImageService _imageService = ImageService();
-
-  List<ProjectItemViewModel> _recentViewModels = [];
-  List<ProjectGroup> _groupedProjects = [];
-  List<ProjectGroup> _filteredGroupedProjects = [];
-
-  bool _isLoading = true;
-  String _searchQuery = "";
-
-  final TextEditingController _searchController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<String?> _getProjectCover(int projectId) async {
-    try {
-      final images = await _imageService.getImages(projectId);
-      if (images.isNotEmpty) {
-        return images.first.filePath;
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-
-    final recent = await _projectService.getRecentProjectsAndEvents();
-    final allProjects = await _projectService.getAllProjects();
-
-    // Build Recent
-    final List<ProjectItemViewModel> recents = [];
-    for (var item in recent.take(3)) {
-      String? parentTitle;
-      if (item.parentId != null) {
-        final parent = await _projectService.getProjectById(item.parentId!);
-        parentTitle = parent?.title;
-      }
-      final cover = await _getProjectCover(item.id!);
-      recents.add(
-        ProjectItemViewModel(
-          item: item,
-          parentTitle: parentTitle,
-          coverPath: cover,
-        ),
-      );
-    }
-    _recentViewModels = recents;
-
-    // Build groups
-    final List<ProjectGroup> groups = [];
-    for (final p in allProjects) {
-      final eventsRaw = await _projectService.getEvents(p.id!);
-      final List<ProjectItemViewModel> events = [];
-      for (final e in eventsRaw) {
-        final cover = await _getProjectCover(e.id!);
-        events.add(ProjectItemViewModel(item: e, coverPath: cover));
-      }
-      final cover = await _getProjectCover(p.id!);
-      groups.add(ProjectGroup(project: p, events: events, coverPath: cover));
-    }
-
-    _groupedProjects = groups;
-    _filteredGroupedProjects = groups;
-
-    if (mounted) setState(() => _isLoading = false);
-  }
-
-  void _filterProjects(String query) {
-    setState(() {
-      _searchQuery = query;
-      if (query.isEmpty) {
-        _filteredGroupedProjects = _groupedProjects;
-        return;
-      }
-      final q = query.toLowerCase();
-      final List<ProjectGroup> filtered = [];
-
-      for (final g in _groupedProjects) {
-        final projectMatch = g.project.title.toLowerCase().contains(q);
-        final matchingEvents =
-            g.events.where((e) => e.title.toLowerCase().contains(q)).toList();
-
-        if (projectMatch) {
-          filtered.add(
-            ProjectGroup(
-              project: g.project,
-              events: g.events,
-              isExpanded: true,
-              coverPath: g.coverPath,
-            ),
-          );
-        } else if (matchingEvents.isNotEmpty) {
-          filtered.add(
-            ProjectGroup(
-              project: g.project,
-              events: matchingEvents,
-              isExpanded: true,
-              coverPath: g.coverPath,
-            ),
-          );
-        }
-      }
-      _filteredGroupedProjects = filtered;
-    });
-  }
+class _ProjectSelectionModalContentState
+    extends State<_ProjectSelectionModalContent> {
+  Key _selectorKey = UniqueKey();
 
   Future<void> _createNewProject() async {
     final result = await Navigator.push(
@@ -534,6 +408,11 @@ class _ProjectSelectionModalState extends State<ProjectSelectionModal> {
 
     if (result != null && result is Map) {
       widget.onProjectSelected(result["id"], result["title"]);
+    } else {
+      // If project is created but not selected immediately, refreshing the list is a safe bet.
+      setState(() {
+        _selectorKey = UniqueKey();
+      });
     }
   }
 
@@ -559,135 +438,33 @@ class _ProjectSelectionModalState extends State<ProjectSelectionModal> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 "Select Destination",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: Variables.headerStyle.copyWith(fontSize: 18),
               ),
               IconButton(
                 icon: const Icon(Icons.add),
                 onPressed: _createNewProject,
+                tooltip: "Create New Project",
               ),
             ],
           ),
         ),
-
-        // Search Bar
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: CommonSearchBar(
-            controller: _searchController,
-            hintText: "Search Projects",
-            onChanged: _filterProjects,
-          ),
-        ),
-
-        Divider(color: Colors.grey[300]),
-
+        Divider(color: Colors.grey[300], height: 1),
+        // Selector
         Expanded(
-          child:
-              _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView(
-                    controller: widget.scrollController,
-                    children: [
-                      if (_searchQuery.isEmpty && _recentViewModels.isNotEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 16, bottom: 8),
-                          child: Text(
-                            "Recent Projects/Events",
-                            style: TextStyle(fontSize: 14),
-                          ),
-                        ),
-                      if (_searchQuery.isEmpty)
-                        ..._recentViewModels.map(_buildRecentItem),
-
-                      const Padding(
-                        padding: EdgeInsets.only(left: 16, top: 8, bottom: 8),
-                        child: Text(
-                          "All Projects/Events",
-                          style: TextStyle(fontSize: 14),
-                        ),
-                      ),
-                      ..._filteredGroupedProjects.map(_buildProjectGroup),
-                    ],
-                  ),
+          child: ProjectSelector(
+            key: _selectorKey,
+            scrollController: widget.scrollController,
+            searchHint: "Search Projects",
+            onProjectSelected: (id, title, parentTitle) {
+              final displayTitle =
+                  parentTitle != null ? "$parentTitle / $title" : title;
+              widget.onProjectSelected(id, displayTitle);
+            },
+          ),
         ),
       ],
-    );
-  }
-
-  Widget _buildRecentItem(ProjectItemViewModel vm) {
-    return InkWell(
-      onTap: () => widget.onProjectSelected(vm.id, vm.title),
-      child: ListTile(
-        leading: _thumbnail(vm.coverPath),
-        title: Text(vm.title),
-        subtitle: vm.parentTitle != null ? Text(vm.parentTitle!) : null,
-      ),
-    );
-  }
-
-  Widget _thumbnail(String? path) {
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
-        image:
-            path != null
-                ? DecorationImage(
-                  image: FileImage(File(path)),
-                  fit: BoxFit.cover,
-                )
-                : null,
-      ),
-      child: path == null ? Icon(Icons.image, color: Colors.grey[400]) : null,
-    );
-  }
-
-  Widget _buildProjectGroup(ProjectGroup g) {
-    final hasEvents = g.events.isNotEmpty;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        children: [
-          ListTile(
-            onTap: () {
-              if (hasEvents) {
-                setState(() => g.isExpanded = !g.isExpanded);
-              } else {
-                widget.onProjectSelected(g.project.id!, g.project.title);
-              }
-            },
-            leading: _thumbnail(g.coverPath),
-            title: Text(g.project.title),
-            trailing:
-                hasEvents
-                    ? Icon(
-                      g.isExpanded
-                          ? Icons.keyboard_arrow_up
-                          : Icons.keyboard_arrow_down,
-                    )
-                    : null,
-          ),
-          if (hasEvents && g.isExpanded)
-            Container(
-              color: Colors.grey[100],
-              child: Column(
-                children:
-                    g.events.map((e) {
-                      return ListTile(
-                        onTap: () => widget.onProjectSelected(e.id, e.title),
-                        leading: _thumbnail(e.coverPath),
-                        title: Text(e.title),
-                      );
-                    }).toList(),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
