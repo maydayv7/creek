@@ -4,12 +4,14 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:creekui/services/project_service.dart';
 import 'package:creekui/services/image_service.dart';
 import 'package:creekui/data/models/project_model.dart';
+import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/search_bar.dart';
 import 'canvas_page.dart';
 import 'define_brand_page.dart';
 
 class CreateFilePage extends StatefulWidget {
   final File? file;
-  final int? projectId; // ⭐ MAKE NULLABLE
+  final int? projectId;
 
   const CreateFilePage({super.key, this.file, this.projectId});
 
@@ -20,11 +22,9 @@ class CreateFilePage extends StatefulWidget {
 class _CreateFilePageState extends State<CreateFilePage> {
   final TextEditingController _searchController = TextEditingController();
 
-  // Project Selection
   int? _selectedProjectId;
   String _selectedProjectTitle = "Select Project";
 
-  // Presets
   final List<CanvasPreset> _allPresets = [
     CanvasPreset(
       name: 'Custom',
@@ -92,7 +92,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
     super.initState();
     _filteredPresets = _allPresets;
 
-    // ⭐ If an existing projectId was passed, lock to that project
+    // If an existing projectId was passed, lock to that project
     _selectedProjectId = widget.projectId;
     if (_selectedProjectId != null) {
       _selectedProjectTitle = "Current Project";
@@ -110,7 +110,6 @@ class _CreateFilePageState extends State<CreateFilePage> {
       setState(() => _filteredPresets = _allPresets);
       return;
     }
-
     setState(() {
       _filteredPresets =
           _allPresets
@@ -121,7 +120,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
     });
   }
 
-  // ⭐ Select project (only for ShareToFilePage flow)
+  // Select project
   void _openProjectSelection() {
     showModalBottomSheet(
       context: context,
@@ -155,7 +154,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
     );
   }
 
-  // ⭐ Go to canvas with selected project
+  // Go to canvas with selected project
   void _navigateToEditor(int width, int height) {
     if (_selectedProjectId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -169,7 +168,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
       MaterialPageRoute(
         builder:
             (_) => CanvasPage(
-              projectId: _selectedProjectId!, // ⭐ use selected project
+              projectId: _selectedProjectId!,
               width: width.toDouble(),
               height: height.toDouble(),
               initialImage: widget.file,
@@ -189,16 +188,12 @@ class _CreateFilePageState extends State<CreateFilePage> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Create Files',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
+          style: Variables.headerStyle.copyWith(fontSize: 16),
         ),
 
-        // ⭐ Show project chooser ONLY when projectId was NOT passed
+        // Show project chooser only when ID not passed
         actions: [
           if (widget.projectId == null)
             Padding(
@@ -224,67 +219,30 @@ class _CreateFilePageState extends State<CreateFilePage> {
                 ),
                 label: Text(
                   _selectedProjectTitle,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black,
-                  ),
+                  style: Variables.bodyStyle.copyWith(fontSize: 12),
                 ),
               ),
             ),
         ],
       ),
-
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Search
+          // Search Bar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: _runFilter,
-                decoration: InputDecoration(
-                  hintText: 'Search sizes',
-                  prefixIcon: Icon(
-                    Icons.search,
-                    color: Colors.grey[400],
-                    size: 20,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  suffixIcon:
-                      _searchController.text.isNotEmpty
-                          ? IconButton(
-                            icon: const Icon(
-                              Icons.clear,
-                              color: Colors.grey,
-                              size: 20,
-                            ),
-                            onPressed: () {
-                              _searchController.clear();
-                              _runFilter('');
-                            },
-                          )
-                          : null,
-                ),
-              ),
+            child: CommonSearchBar(
+              controller: _searchController,
+              hintText: 'Search sizes',
+              onChanged: _runFilter,
             ),
           ),
 
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Text(
               'Canvas Sizes',
-              style: TextStyle(
+              style: Variables.bodyStyle.copyWith(
                 color: Colors.grey,
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -314,14 +272,12 @@ class _CreateFilePageState extends State<CreateFilePage> {
   // Card widget
   Widget _buildPresetCard(CanvasPreset preset) {
     final bool isCustom = preset.name == 'Custom';
-
     return InkWell(
-      onTap: () {
-        _navigateToEditor(
-          isCustom ? 1000 : preset.width,
-          isCustom ? 1000 : preset.height,
-        );
-      },
+      onTap:
+          () => _navigateToEditor(
+            isCustom ? 1000 : preset.width,
+            isCustom ? 1000 : preset.height,
+          ),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
@@ -376,15 +332,14 @@ class _CreateFilePageState extends State<CreateFilePage> {
               preset.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
+              style: Variables.bodyStyle.copyWith(
                 fontSize: 11,
-                color: Colors.black,
+                fontWeight: FontWeight.w600,
               ),
             ),
             Text(
               preset.displaySize,
-              style: const TextStyle(color: Colors.grey, fontSize: 9),
+              style: Variables.captionStyle.copyWith(fontSize: 9),
             ),
           ],
         ),
@@ -535,12 +490,10 @@ class _ProjectSelectionModalState extends State<ProjectSelectionModal> {
   void _filterProjects(String query) {
     setState(() {
       _searchQuery = query;
-
       if (query.isEmpty) {
         _filteredGroupedProjects = _groupedProjects;
         return;
       }
-
       final q = query.toLowerCase();
       final List<ProjectGroup> filtered = [];
 
@@ -569,7 +522,6 @@ class _ProjectSelectionModalState extends State<ProjectSelectionModal> {
           );
         }
       }
-
       _filteredGroupedProjects = filtered;
     });
   }
@@ -619,22 +571,13 @@ class _ProjectSelectionModalState extends State<ProjectSelectionModal> {
           ),
         ),
 
-        // Search bar
+        // Search Bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: TextField(
+          child: CommonSearchBar(
             controller: _searchController,
+            hintText: "Search Projects",
             onChanged: _filterProjects,
-            decoration: InputDecoration(
-              hintText: "Search Projects",
-              prefixIcon: const Icon(Icons.search, size: 20),
-              filled: true,
-              fillColor: const Color(0xFFE4E4E7),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide.none,
-              ),
-            ),
           ),
         ),
 
@@ -665,7 +608,6 @@ class _ProjectSelectionModalState extends State<ProjectSelectionModal> {
                           style: TextStyle(fontSize: 14),
                         ),
                       ),
-
                       ..._filteredGroupedProjects.map(_buildProjectGroup),
                     ],
                   ),
@@ -730,7 +672,6 @@ class _ProjectSelectionModalState extends State<ProjectSelectionModal> {
                     )
                     : null,
           ),
-
           if (hasEvents && g.isExpanded)
             Container(
               color: Colors.grey[100],

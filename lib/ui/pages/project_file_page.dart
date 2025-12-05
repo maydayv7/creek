@@ -2,13 +2,16 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
-import 'package:intl/intl.dart';
 import 'package:creekui/data/models/file_model.dart';
 import 'package:creekui/data/models/project_model.dart';
 import 'package:creekui/services/file_service.dart';
 import 'package:creekui/data/repos/project_repo.dart';
 import 'package:creekui/ui/widgets/top_bar.dart';
 import 'package:creekui/ui/widgets/bottom_bar.dart';
+import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/search_bar.dart';
+import 'package:creekui/ui/widgets/file_card.dart';
+import 'package:creekui/ui/widgets/empty_state.dart';
 import 'create_file_page.dart';
 import 'canvas_page.dart';
 
@@ -24,6 +27,7 @@ class ProjectFilePage extends StatefulWidget {
 class _ProjectFilePageState extends State<ProjectFilePage> {
   final _fileService = FileService();
   final _projectRepo = ProjectRepo();
+  final TextEditingController _searchController = TextEditingController();
 
   List<FileModel> _allFiles = [];
   List<ProjectModel> _events = [];
@@ -39,6 +43,12 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
   void initState() {
     super.initState();
     _loadEverything();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   // ---------------------------------------
@@ -169,10 +179,14 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Rename File"),
+          title: Text(
+            "Rename File",
+            style: Variables.headerStyle.copyWith(fontSize: 18),
+          ),
           content: TextField(
             controller: controller,
             autofocus: true,
+            style: Variables.bodyStyle,
             decoration: const InputDecoration(
               labelText: "New file name",
               border: OutlineInputBorder(),
@@ -180,11 +194,11 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
           ),
           actions: [
             TextButton(
-              child: const Text("Cancel"),
+              child: Text("Cancel", style: Variables.bodyStyle),
               onPressed: () => Navigator.pop(context),
             ),
             FilledButton(
-              child: const Text("Save"),
+              child: Text("Save", style: Variables.buttonTextStyle),
               onPressed: () => Navigator.pop(context, controller.text.trim()),
             ),
           ],
@@ -193,11 +207,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     );
 
     if (newName == null || newName.isEmpty) return;
-
-    // ✔ Update DB
     await _fileService.renameFile(file.id, newName);
-
-    // ✔ Reload UI
     await _loadEverything();
   }
 
@@ -206,16 +216,22 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
       context: context,
       builder:
           (_) => AlertDialog(
-            title: const Text("Delete File?"),
-            content: Text("This will permanently remove ${file.name}."),
+            title: Text(
+              "Delete File?",
+              style: Variables.headerStyle.copyWith(fontSize: 18),
+            ),
+            content: Text(
+              "This will permanently remove ${file.name}.",
+              style: Variables.bodyStyle,
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text("Cancel"),
+                child: Text("Cancel", style: Variables.bodyStyle),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text("Delete"),
+                child: Text("Delete", style: Variables.buttonTextStyle),
               ),
             ],
           ),
@@ -225,7 +241,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
 
     try {
       await _fileService.deleteFile(file.id!);
-
       final disk = File(file.filePath);
       if (await disk.exists()) await disk.delete();
 
@@ -270,128 +285,21 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     return "just now";
   }
 
-  // ---------------------------------------
-  // FILE CARD (Same UI but thumbnail updated)
-  // ---------------------------------------
-  Widget _fileCard(FileModel file) {
+  Widget _buildFileCard(FileModel file) {
     final meta = _fileMetadata[file.id] ?? {};
     final preview = meta["preview"] ?? "";
     final dimensions = meta["dimensions"] ?? "Unknown";
 
-    final realPreview =
-        preview.isNotEmpty && File(preview).existsSync()
-            ? preview
-            : file.filePath;
-
-    return GestureDetector(
-      onTap: () => _openFile(file),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE4E4E7)),
-        ),
-
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ---------- THUMBNAIL ----------
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-              ),
-              child: Image.file(
-                File(realPreview),
-                width: 120,
-                height: 120,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, __, ___) => Container(
-                      width: 120,
-                      height: 120,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.broken_image),
-                    ),
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            // ---------- RIGHT SIDE TEXT ----------
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Breadcrumb
-                    Text(
-                      _breadcrumbFor(file),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey[600],
-                        fontFamily: 'GeneralSans',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-
-                    // Name
-                    Text(
-                      file.name,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'GeneralSans',
-                      ),
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    // Dimensions
-                    Text(
-                      dimensions,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[700],
-                        fontFamily: 'GeneralSans',
-                      ),
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    // Updated time
-                    Text(
-                      "Last edited • ${_formatRelative(file.lastUpdated)}",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                        fontFamily: 'GeneralSans',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ---------- MENU ----------
-            PopupMenuButton<String>(
-              onSelected: (value) => _handleFileMenuAction(file, value),
-              itemBuilder:
-                  (_) => const [
-                    PopupMenuItem(value: "open", child: Text("Open")),
-                    PopupMenuItem(value: "rename", child: Text("Rename")),
-                    PopupMenuItem(value: "delete", child: Text("Delete")),
-                  ],
-              icon: const Icon(Icons.more_vert, size: 20),
-            ),
-
-            const SizedBox(width: 4),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: FileCard(
+        file: file,
+        breadcrumb: _breadcrumbFor(file),
+        dimensions: dimensions,
+        previewPath: preview,
+        timeAgo: "Last edited • ${_formatRelative(file.lastUpdated)}",
+        onTap: () => _openFile(file),
+        onMenuAction: (value) => _handleFileMenuAction(file, value),
       ),
     );
   }
@@ -439,8 +347,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
         onBack: () => Navigator.pop(context),
         titleOverride: "Project Files",
         onProjectChanged: (project) {
-          // When user switches project from dropdown,
-          // refresh this page with the new projectId
+          // When user switches project from dropdown, refresh page with new ID
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -494,7 +401,12 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                     children: [
                       const SizedBox(height: 12),
 
-                      _buildSearchBar(),
+                      // Search Bar
+                      CommonSearchBar(
+                        controller: _searchController,
+                        hintText: "Search your files",
+                        onChanged: (v) => setState(() => _search = v.trim()),
+                      ),
 
                       const SizedBox(height: 24),
 
@@ -514,48 +426,22 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                       const SizedBox(height: 12),
 
                       if (_filteredAllFiles().isEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 48),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.folder_outlined,
-                                size: 64,
-                                color: Colors.grey[400],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _search.isEmpty
-                                    ? "No files yet"
-                                    : "No files found",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: 'GeneralSans',
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _search.isEmpty
-                                    ? "Create your first file to get started"
-                                    : "Try a different search term",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontFamily: 'GeneralSans',
-                                  color: Colors.grey[500],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
+                        EmptyState(
+                          icon: Icons.folder_outlined,
+                          title:
+                              _search.isEmpty
+                                  ? "No files yet"
+                                  : "No files found",
+                          subtitle:
+                              _search.isEmpty
+                                  ? "Create your first file to get started"
+                                  : "Try a different search term",
                         )
                       else
                         Column(
                           children:
                               _filteredAllFiles()
-                                  .map((f) => _fileCard(f))
+                                  .map((f) => _buildFileCard(f))
                                   .toList(),
                         ),
 
@@ -577,90 +463,33 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                       const SizedBox(height: 12),
 
                       if (_events.isEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 48),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.event_outlined,
-                                size: 64,
-                                color: Colors.grey[400],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                "No events yet",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: 'GeneralSans',
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "Create an event to organize your files",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontFamily: 'GeneralSans',
-                                  color: Colors.grey[500],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
+                        const EmptyState(
+                          icon: Icons.event_outlined,
+                          title: "No events yet",
+                          subtitle: "Create an event to organize your files",
                         )
                       else
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // -----------------------
-                            // DROPDOWN ONLY
+                            // DROPDOWN
                             // -----------------------
                             _buildEventDropdown(),
 
                             const SizedBox(height: 16),
 
                             _eventFiles.isEmpty
-                                ? Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 48,
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Icon(
-                                        Icons.insert_drive_file_outlined,
-                                        size: 64,
-                                        color: Colors.grey[400],
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        "No files in this event yet",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                          fontFamily: 'GeneralSans',
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        "Create a file to add it to this event",
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontFamily: 'GeneralSans',
-                                          color: Colors.grey[500],
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
+                                ? const EmptyState(
+                                  icon: Icons.insert_drive_file_outlined,
+                                  title: "No files in this event yet",
+                                  subtitle:
+                                      "Create a file to add it to this event",
                                 )
                                 : Column(
                                   children:
                                       _eventFiles
-                                          .map((f) => _fileCard(f))
+                                          .map((f) => _buildFileCard(f))
                                           .toList(),
                                 ),
                           ],
@@ -675,25 +504,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
   }
 
   // ---------------------------------------
-  // SEARCH
-  // ---------------------------------------
-  Widget _buildSearchBar() {
-    return TextField(
-      onChanged: (v) => setState(() => _search = v.trim()),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: Colors.grey[200],
-        hintText: "Search your files",
-        prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------
   // DROPDOWN
   // ---------------------------------------
   Widget _buildEventDropdown() {
@@ -702,7 +512,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFE4E4E7),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(Variables.radiusSmall),
       ),
       child: DropdownButton<ProjectModel>(
         value: _selectedEvent,

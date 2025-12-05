@@ -6,6 +6,9 @@ import 'package:creekui/data/models/image_model.dart';
 import 'package:creekui/data/repos/project_repo.dart';
 import 'package:creekui/data/repos/image_repo.dart';
 import 'package:creekui/services/project_service.dart';
+import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/empty_state.dart';
+import 'package:creekui/ui/widgets/section_header.dart';
 import 'project_board_page.dart';
 import 'stylesheet_page.dart';
 import 'project_file_page.dart';
@@ -59,7 +62,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       for (final event in events) {
         if (event.id != null) {
           final images = await _imageRepo.getImages(event.id!);
-          // Get the 3 most recent images (already ordered by created_at DESC)
           eventImagesMap[event.id!] = images.take(3).toList();
         }
       }
@@ -74,9 +76,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       }
     } catch (e) {
       debugPrint('Error loading project data: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -109,7 +109,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Drag handle
                   Container(
                     padding: const EdgeInsets.only(top: 8, bottom: 16),
                     child: Center(
@@ -123,7 +122,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       ),
                     ),
                   ),
-                  // Header section
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -134,24 +132,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         bottom: BorderSide(color: Color(0xFFE4E4E7), width: 1),
                       ),
                     ),
-                    child: const Text(
-                      "Event Details",
-                      style: TextStyle(
-                        fontFamily: 'GeneralSans',
-                        fontSize: 14,
-                        fontWeight: FontWeight.normal,
-                        color: Color(0xFF27272A),
-                        height: 20 / 14,
-                      ),
-                    ),
+                    child: Text("Event Details", style: Variables.bodyStyle),
                   ),
-                  // Content section
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Name field
                         Container(
                           height: 40,
                           decoration: BoxDecoration(
@@ -161,34 +148,22 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                           child: TextField(
                             controller: nameController,
                             autofocus: true,
-                            style: const TextStyle(
-                              fontFamily: 'GeneralSans',
-                              fontSize: 12,
-                              fontWeight: FontWeight.normal,
-                              color: Color(0xFF27272A),
-                              height: 16 / 12,
-                            ),
-                            decoration: const InputDecoration(
+                            style: Variables.bodyStyle.copyWith(fontSize: 12),
+                            decoration: InputDecoration(
                               hintText: "Add Name*",
-                              hintStyle: TextStyle(
-                                fontFamily: 'GeneralSans',
+                              hintStyle: Variables.bodyStyle.copyWith(
                                 fontSize: 12,
-                                fontWeight: FontWeight.normal,
-                                color: Color(0xFF71717B),
-                                height: 16 / 12,
+                                color: const Color(0xFF71717B),
                               ),
-                              contentPadding: EdgeInsets.symmetric(
+                              contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 12,
                               ),
                               border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
                             ),
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // Description field
                         Container(
                           height: 80,
                           decoration: BoxDecoration(
@@ -200,41 +175,28 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                             maxLines: null,
                             expands: true,
                             textAlignVertical: TextAlignVertical.top,
-                            style: const TextStyle(
-                              fontFamily: 'GeneralSans',
-                              fontSize: 12,
-                              fontWeight: FontWeight.normal,
-                              color: Color(0xFF27272A),
-                              height: 16 / 12,
-                            ),
-                            decoration: const InputDecoration(
+                            style: Variables.bodyStyle.copyWith(fontSize: 12),
+                            decoration: InputDecoration(
                               hintText: "Add Description",
-                              hintStyle: TextStyle(
-                                fontFamily: 'GeneralSans',
+                              hintStyle: Variables.bodyStyle.copyWith(
                                 fontSize: 12,
-                                fontWeight: FontWeight.normal,
-                                color: Color(0xFF71717B),
-                                height: 16 / 12,
+                                color: const Color(0xFF71717B),
                               ),
-                              contentPadding: EdgeInsets.symmetric(
+                              contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 12,
                               ),
                               border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  // Bottom actions
                   Container(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                     child: Row(
                       children: [
-                        // Cancel button
                         Expanded(
                           child: GestureDetector(
                             onTap: () => Navigator.pop(context),
@@ -244,16 +206,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                                 color: const Color(0xFFE4E4E7),
                                 borderRadius: BorderRadius.circular(1000),
                               ),
-                              child: const Center(
+                              child: Center(
                                 child: Text(
                                   "Cancel",
-                                  style: TextStyle(
-                                    fontFamily: 'GeneralSans',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF27272A),
-                                    height: 20 / 14,
-                                    letterSpacing: 0.25,
+                                  style: Variables.buttonTextStyle.copyWith(
+                                    color: Variables.textPrimary,
                                   ),
                                 ),
                               ),
@@ -261,7 +218,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Add Event button
                         Expanded(
                           child: GestureDetector(
                             onTap: () async {
@@ -279,7 +235,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                                   );
                                   if (context.mounted) {
                                     Navigator.pop(context);
-                                    _loadData(); // Refresh to show new event
+                                    _loadData();
                                   }
                                 } catch (e) {
                                   debugPrint("Error creating event: $e");
@@ -292,17 +248,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                                 color: const Color(0xFF27272A),
                                 borderRadius: BorderRadius.circular(1000),
                               ),
-                              child: const Center(
+                              child: Center(
                                 child: Text(
                                   "Add Event",
-                                  style: TextStyle(
-                                    fontFamily: 'GeneralSans',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFFFAFAFA),
-                                    height: 20 / 14,
-                                    letterSpacing: 0.25,
-                                  ),
+                                  style: Variables.buttonTextStyle,
                                 ),
                               ),
                             ),
@@ -339,24 +288,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     ).then((_) => _loadData());
   }
 
-  void _showPlaceholder(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature coming soon!'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFFAFAFA),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Scaffold(
+        backgroundColor: Color(0xFFFAFAFA),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -365,15 +302,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
-        title: Text(
-          _project!.title,
-          style: const TextStyle(
-            fontFamily: 'GeneralSans',
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF27272A),
-          ),
-        ),
+        title: Text(_project!.title, style: Variables.headerStyle),
         backgroundColor: const Color(0xFFFAFAFA),
         elevation: 0,
         leadingWidth: 40,
@@ -384,6 +313,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               'assets/icons/settings-line.svg',
               width: 24,
               height: 24,
+              colorFilter: const ColorFilter.mode(
+                Variables.textPrimary,
+                BlendMode.srcIn,
+              ),
             ),
             onPressed: () {},
           ),
@@ -398,43 +331,36 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
-
-              // Action Cards Row
               _buildActionCardsRow(_project!.id!),
-
               const SizedBox(height: 16),
-
-              // Events Header
-              _buildEventsHeader(),
-
-              const SizedBox(height: 16),
-
-              // Events List
-              if (_events.isEmpty)
-                Center(
-                  child: Container(
-                    width: 328,
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.event_note,
-                          size: 48,
-                          color: Colors.grey[400],
+              SectionHeader(
+                title: 'Events',
+                trailing: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _createEventDialog,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: SvgPicture.asset(
+                        'assets/icons/add-line.svg',
+                        width: 24,
+                        height: 24,
+                        colorFilter: const ColorFilter.mode(
+                          Variables.textPrimary,
+                          BlendMode.srcIn,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "No events created yet",
-                          style: TextStyle(color: Colors.grey[500]),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_events.isEmpty)
+                const EmptyState(
+                  icon: Icons.event_note,
+                  title: "No events created yet",
+                  subtitle: "Create an event to start organizing",
                 )
               else
                 ListView.separated(
@@ -447,7 +373,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     return Center(child: _buildEventCard(event));
                   },
                 ),
-
               const SizedBox(height: 40),
             ],
           ),
@@ -456,8 +381,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
-  // --- Widgets ---
-
+  // Widgets
   Widget _buildActionCardsRow(int projectId) {
     return Row(
       children: [
@@ -529,9 +453,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       child: Image.asset(
                         blobImage,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(color: const Color(0xFF27272A));
-                        },
+                        errorBuilder:
+                            (context, error, stackTrace) =>
+                                Container(color: const Color(0xFF27272A)),
                       ),
                     ),
                   ),
@@ -581,12 +505,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   // Label
                   Text(
                     label,
-                    style: const TextStyle(
-                      fontFamily: 'GeneralSans',
-                      fontSize: 12,
+                    style: Variables.bodyStyle.copyWith(
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFF27272A),
-                      letterSpacing: 0.4,
+                      fontSize: 12,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -600,57 +521,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
-  Widget _buildEventsHeader() {
-    return Container(
-      padding: const EdgeInsets.only(bottom: 8, top: 16),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE4E4E7), width: 1)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const Text(
-            'Events',
-            style: TextStyle(
-              fontFamily: 'GeneralSans',
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF27272A),
-            ),
-          ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _createEventDialog,
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                child: SvgPicture.asset(
-                  'assets/icons/add-line.svg',
-                  width: 24,
-                  height: 24,
-                  colorFilter: const ColorFilter.mode(
-                    Color(0xFF27272A),
-                    BlendMode.srcIn,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildEventCard(ProjectModel event) {
     final eventImages = _eventImages[event.id] ?? [];
-
     return GestureDetector(
       onTap: () {
-        if (event.id != null) {
-          _navigateToBoard(event.id!);
-        }
+        if (event.id != null) _navigateToBoard(event.id!);
       },
       child: Container(
         width: 328,
@@ -662,13 +537,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Three images side by side (or fewer if not available)
+            // 3 images side by side (or fewer if not available)
             Container(
               height: 115,
               padding: const EdgeInsets.only(bottom: 4),
               child: Row(
                 children: [
-                  // Show up to 3 images
                   for (int i = 0; i < 3; i++) ...[
                     Expanded(
                       child: ClipRRect(
@@ -678,9 +552,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                                 ? Image.file(
                                   File(eventImages[i].filePath),
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(color: Colors.grey[300]);
-                                  },
+                                  errorBuilder:
+                                      (_, __, ___) =>
+                                          Container(color: Colors.grey[300]),
                                 )
                                 : Container(color: Colors.grey[200]),
                       ),
@@ -695,12 +569,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               child: Text(
                 event.title,
-                style: const TextStyle(
-                  fontFamily: 'GeneralSans',
-                  fontSize: 14,
+                style: Variables.bodyStyle.copyWith(
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF27272A),
-                  letterSpacing: 0.25,
                 ),
               ),
             ),

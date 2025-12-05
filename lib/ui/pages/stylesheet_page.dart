@@ -14,6 +14,7 @@ import 'package:creekui/services/python_service.dart';
 import 'package:creekui/ui/widgets/bottom_bar.dart';
 import 'package:creekui/ui/widgets/top_bar.dart';
 import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/section_header.dart';
 
 class StylesheetPage extends StatefulWidget {
   final int projectId;
@@ -32,7 +33,6 @@ class StylesheetPage extends StatefulWidget {
 class _StylesheetPageState extends State<StylesheetPage> {
   late int _currentProjectId;
   bool _isLoading = false;
-  // State to toggle hex code visibility
   bool _showHexCodes = false;
 
   StylesheetData? _stylesheetData;
@@ -43,7 +43,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
   final ImagePicker _picker = ImagePicker();
   final StylesheetService _stylesheetService = StylesheetService();
 
-  // --- ASSET MAPPING ---
+  // Asset mapping
   final Map<String, String> _lightingAssets = {
     'backlit': 'assets/stylesheet/lighting/backlit.png',
     'diffused': 'assets/stylesheet/lighting/diffused.png',
@@ -94,8 +94,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
     }
   }
 
-  // --- UTILS ---
-
+  // Utils
   String _formatLabel(String label) {
     String clean = label.replaceAll(RegExp(r'[-_]'), ' ');
     List<String> words = clean.split(' ');
@@ -314,65 +313,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
-  // Modified to support a custom trailing widget (e.g. Eye Icon)
-  Widget _buildSectionHeader(
-    String title, {
-    bool showArrow = true,
-    Widget? trailing,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontFamily: 'GeneralSans',
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                height: 24 / 16,
-                color: Variables.textPrimary,
-              ),
-            ),
-          ),
-          if (trailing != null)
-            trailing
-          else if (showArrow)
-            Transform.rotate(
-              angle: 3.14159,
-              child: SvgPicture.asset(
-                'assets/icons/arrow-left-s-line.svg',
-                width: 24,
-                height: 24,
-                colorFilter: const ColorFilter.mode(
-                  Variables.textPrimary,
-                  BlendMode.srcIn,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // --- Logos ---
-  Future<void> _pickLogo() async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery,
-      );
-      if (pickedFile != null) {
-        setState(() {
-          _logoPaths.add(pickedFile.path);
-        });
-      }
-    } catch (e) {
-      debugPrint("Error picking logo: $e");
-    }
-  }
-
+  // Logos
   Widget _buildLogosSection(dynamic data) {
     List<String> logoPaths = List.from(_logoPaths);
 
@@ -389,7 +330,10 @@ class _StylesheetPageState extends State<StylesheetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader("Logos"),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: SectionHeader(title: "Logos"),
+        ),
         SizedBox(
           height: 76,
           child: ListView.separated(
@@ -430,7 +374,22 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
-  // --- Graphics ---
+  Future<void> _pickLogo() async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+      );
+      if (pickedFile != null) {
+        setState(() {
+          _logoPaths.add(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error picking logo: $e");
+    }
+  }
+
+  // Graphics
   Widget _buildGraphicsSection(List<String> extractedGraphics) {
     List<String> graphicPaths = List.from(_projectAssets);
     graphicPaths.addAll(extractedGraphics);
@@ -440,7 +399,10 @@ class _StylesheetPageState extends State<StylesheetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader("Graphics"),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: SectionHeader(title: "Graphics"),
+        ),
         SizedBox(
           height: 106,
           child: ListView.separated(
@@ -487,14 +449,17 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
-  // --- Fonts ---
+  // Fonts
   Widget _buildFontsSection(List<String> fontNames) {
     if (fontNames.isEmpty) return const SizedBox();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader("Fonts"),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: SectionHeader(title: "Fonts"),
+        ),
         SizedBox(
           height: 120,
           child: ListView.separated(
@@ -511,7 +476,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
 
   Widget _buildFontCard(String resolvedFontName) {
     final String displayFontName = _formatLabel(resolvedFontName);
-
     TextStyle sampleStyle;
     try {
       sampleStyle = GoogleFonts.getFont(resolvedFontName);
@@ -544,36 +508,31 @@ class _StylesheetPageState extends State<StylesheetPage> {
             displayFontName,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: 'GeneralSans',
-              fontSize: 12,
-              height: 16 / 12,
-              color: Variables.textSecondary,
-              fontWeight: FontWeight.w400,
-            ),
+            style: Variables.captionStyle,
           ),
         ],
       ),
     );
   }
 
-  // --- Colors ---
+  // Colors
   Widget _buildColorsSection(List<Color> colors) {
     if (colors.isEmpty) return const SizedBox();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Using custom trailing widget for the Eye Icon toggle
-        _buildSectionHeader(
-          "Colors",
-          showArrow: false,
-          trailing: GestureDetector(
-            onTap: () => setState(() => _showHexCodes = !_showHexCodes),
-            child: Icon(
-              _showHexCodes ? Icons.visibility : Icons.visibility_outlined,
-              color: Variables.textPrimary,
-              size: 20,
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: SectionHeader(
+            title: "Colors",
+            trailing: GestureDetector(
+              onTap: () => setState(() => _showHexCodes = !_showHexCodes),
+              child: Icon(
+                _showHexCodes ? Icons.visibility : Icons.visibility_outlined,
+                color: Variables.textPrimary,
+                size: 20,
+              ),
             ),
           ),
         ),
@@ -602,7 +561,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
         borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
-      // Only show text if _showHexCodes is true
       child:
           _showHexCodes
               ? Text(
@@ -618,7 +576,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
-  // --- Unified Card Builder ---
   Widget _buildUnifiedCard(String label, String? assetPath) {
     final formattedLabel = _formatLabel(label);
 
@@ -711,7 +668,10 @@ class _StylesheetPageState extends State<StylesheetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(title),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: SectionHeader(title: title),
+        ),
         SizedBox(
           height: (assetMap != null) ? 106 : 54,
           child: ListView.separated(
@@ -731,31 +691,18 @@ class _StylesheetPageState extends State<StylesheetPage> {
     );
   }
 
-  Widget _buildCompositionsSection(List<String> data) {
-    return _buildAttributeSection("Compositions", data, null);
-  }
-
-  Widget _buildMaterialLookSection(List<String> data) {
-    return _buildAttributeSection("Material Look", data, _materialAssets);
-  }
-
-  Widget _buildTexturesSection(List<String> data) {
-    return _buildAttributeSection("Textures", data, _textureAssets);
-  }
-
-  Widget _buildLightingSection(List<String> data) {
-    return _buildAttributeSection("Lighting", data, _lightingAssets);
-  }
-
-  Widget _buildStyleSection(List<String> data) {
-    return _buildAttributeSection("Style", data, null);
-  }
-
-  Widget _buildEraSection(List<String> data) {
-    return _buildAttributeSection("Era", data, null);
-  }
-
-  Widget _buildEmotionsSection(List<String> data) {
-    return _buildAttributeSection("Emotions", data, null);
-  }
+  Widget _buildCompositionsSection(List<String> data) =>
+      _buildAttributeSection("Compositions", data, null);
+  Widget _buildMaterialLookSection(List<String> data) =>
+      _buildAttributeSection("Material Look", data, _materialAssets);
+  Widget _buildTexturesSection(List<String> data) =>
+      _buildAttributeSection("Textures", data, _textureAssets);
+  Widget _buildLightingSection(List<String> data) =>
+      _buildAttributeSection("Lighting", data, _lightingAssets);
+  Widget _buildStyleSection(List<String> data) =>
+      _buildAttributeSection("Style", data, null);
+  Widget _buildEraSection(List<String> data) =>
+      _buildAttributeSection("Era", data, null);
+  Widget _buildEmotionsSection(List<String> data) =>
+      _buildAttributeSection("Emotions", data, null);
 }

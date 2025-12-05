@@ -9,20 +9,25 @@ class Variables {
 
   static const Color surfaceSubtle = Color(0xFFF4F4F5);
   static const Color background = Colors.white;
-
   static const Color borderSubtle = Color(0xFFE4E4E7);
+
+  // Dark Mode
+  static const Color surfaceDark = Color(0xFF27272A);
+  static const Color backgroundDark = Color(0xFF18181B);
+  static const Color borderDark = Color(0xFF3F3F46);
 
   // Dimensions
   static const double fontSizeHeader = 20.0;
   static const double lineHeightHeader = 24.0;
-
   static const double fontSizeBody = 14.0;
   static const double lineHeightBody = 20.0;
   static const double trackingBody = 0.25;
-
   static const double fontSizeSmall = 12.0;
-
   static const double fontSizeCaption = 10.0;
+
+  // Radius
+  static const double radiusSmall = 8.0;
+  static const double radiusMedium = 12.0;
 
   // Text Styles
   static TextStyle get headerStyle => const TextStyle(

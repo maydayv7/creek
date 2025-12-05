@@ -8,6 +8,12 @@ import 'package:creekui/data/repos/project_repo.dart';
 import 'package:creekui/data/repos/image_repo.dart';
 import 'package:creekui/data/repos/file_repo.dart';
 import 'package:creekui/services/project_service.dart';
+import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/search_bar.dart';
+import 'package:creekui/ui/widgets/file_card.dart';
+import 'package:creekui/ui/widgets/project_card.dart';
+import 'package:creekui/ui/widgets/empty_state.dart';
+import 'package:creekui/ui/widgets/section_header.dart';
 import 'project_detail_page.dart';
 import 'define_brand_page.dart';
 import 'canvas_page.dart';
@@ -203,19 +209,12 @@ class _HomePageState extends State<HomePage> {
             backgroundColor: theme.cardColor,
             title: Text(
               'Rename Project',
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontSize: 18,
-                color: theme.colorScheme.onSurface,
-              ),
+              style: Variables.headerStyle.copyWith(fontSize: 18),
             ),
             content: TextField(
               controller: controller,
               autofocus: true,
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                color: theme.colorScheme.onSurface,
-              ),
+              style: Variables.bodyStyle,
               decoration: InputDecoration(
                 hintText: 'Enter new name',
                 hintStyle: TextStyle(
@@ -236,7 +235,7 @@ class _HomePageState extends State<HomePage> {
               TextButton(
                 child: Text(
                   'Cancel',
-                  style: TextStyle(
+                  style: Variables.bodyStyle.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
@@ -245,7 +244,9 @@ class _HomePageState extends State<HomePage> {
               TextButton(
                 child: Text(
                   'Save',
-                  style: TextStyle(color: theme.colorScheme.primary),
+                  style: Variables.bodyStyle.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
                 onPressed: () {
                   if (controller.text.trim().isNotEmpty) {
@@ -291,16 +292,11 @@ class _HomePageState extends State<HomePage> {
             backgroundColor: theme.cardColor,
             title: Text(
               'Delete Project',
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontSize: 18,
-                color: theme.colorScheme.onSurface,
-              ),
+              style: Variables.headerStyle.copyWith(fontSize: 18),
             ),
             content: Text(
               'Are you sure you want to delete "${project.title}"? This cannot be undone.',
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
+              style: Variables.bodyStyle.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
               ),
             ),
@@ -308,16 +304,16 @@ class _HomePageState extends State<HomePage> {
               TextButton(
                 child: Text(
                   'Cancel',
-                  style: TextStyle(
+                  style: Variables.bodyStyle.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
                 onPressed: () => Navigator.pop(ctx, false),
               ),
               TextButton(
-                child: const Text(
+                child: Text(
                   'Delete',
-                  style: TextStyle(color: Colors.red),
+                  style: Variables.bodyStyle.copyWith(color: Colors.red),
                 ),
                 onPressed: () => Navigator.pop(ctx, true),
               ),
@@ -468,10 +464,8 @@ class _HomePageState extends State<HomePage> {
                             children: [
                               Text(
                                 "Hello, $_userName!",
-                                style: TextStyle(
+                                style: Variables.headerStyle.copyWith(
                                   fontSize: 24,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: 'GeneralSans',
                                   color: theme.colorScheme.onSurface,
                                 ),
                               ),
@@ -502,58 +496,13 @@ class _HomePageState extends State<HomePage> {
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: TextField(
+                          child: CommonSearchBar(
                             controller: _searchController,
                             onChanged: (value) {
                               setState(() {
                                 _searchQuery = value.trim();
                               });
                             },
-                            decoration: InputDecoration(
-                              hintText: 'Search',
-                              hintStyle: TextStyle(
-                                fontSize: 12,
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.5,
-                                ),
-                                fontFamily: 'GeneralSans',
-                              ),
-                              prefixIcon: Icon(
-                                Icons.search,
-                                size: 18,
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.5,
-                                ),
-                              ),
-                              prefixIconConstraints: const BoxConstraints(
-                                minWidth: 50,
-                                minHeight: 18,
-                              ),
-                              filled: true,
-                              fillColor:
-                                  isDark ? Colors.grey[800] : Colors.grey[200],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none,
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontFamily: 'GeneralSans',
-                              color: theme.colorScheme.onSurface,
-                            ),
                           ),
                         ),
                       ),
@@ -567,26 +516,17 @@ class _HomePageState extends State<HomePage> {
                             delegate: SliverChildListDelegate([
                               if (filteredFiles.isEmpty &&
                                   filteredProjects.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 40),
-                                  child: Center(
-                                    child: Text(
-                                      "No results found",
-                                      style: TextStyle(
-                                        color: theme.colorScheme.onSurface
-                                            .withValues(alpha: 0.5),
-                                        fontFamily: 'GeneralSans',
-                                      ),
-                                    ),
-                                  ),
+                                const EmptyState(
+                                  icon: Icons.search_off,
+                                  title: "No results found",
+                                  subtitle: "Try searching for something else",
                                 ),
+
                               if (filteredProjects.isNotEmpty) ...[
                                 Text(
                                   "Projects & Events",
-                                  style: TextStyle(
-                                    fontSize: 14,
+                                  style: Variables.bodyStyle.copyWith(
                                     fontWeight: FontWeight.w600,
-                                    fontFamily: 'GeneralSans',
                                     color: theme.colorScheme.onSurface
                                         .withValues(alpha: 0.7),
                                   ),
@@ -597,10 +537,8 @@ class _HomePageState extends State<HomePage> {
                                     padding: const EdgeInsets.only(bottom: 8),
                                     child: SizedBox(
                                       height: 180,
-                                      child: _ProjectCard(
+                                      child: ProjectCard(
                                         project: p,
-                                        theme: theme,
-                                        isDark: isDark,
                                         previewImages:
                                             _projectPreviews[p.id] ?? [],
                                         onTap: () => _openProject(p),
@@ -617,10 +555,8 @@ class _HomePageState extends State<HomePage> {
                               if (filteredFiles.isNotEmpty) ...[
                                 Text(
                                   "Files",
-                                  style: TextStyle(
-                                    fontSize: 14,
+                                  style: Variables.bodyStyle.copyWith(
                                     fontWeight: FontWeight.w600,
-                                    fontFamily: 'GeneralSans',
                                     color: theme.colorScheme.onSurface
                                         .withValues(alpha: 0.7),
                                   ),
@@ -630,16 +566,15 @@ class _HomePageState extends State<HomePage> {
                                   final meta = _fileMetadata[f.id] ?? {};
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
-                                    child: _FileCard(
+                                    child: FileCard(
                                       file: f,
-                                      theme: theme,
-                                      isDark: isDark,
                                       breadcrumb: _getProjectBreadcrumb(f),
                                       dimensions:
                                           meta['dimensions'] ?? 'Unknown',
                                       previewPath: meta['preview'] ?? '',
                                       timeAgo: _formatTimeAgo(f.lastUpdated),
                                       onTap: () => _openFile(f),
+                                      onMenuAction: null,
                                     ),
                                   );
                                 }),
@@ -655,9 +590,8 @@ class _HomePageState extends State<HomePage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 if (_recentFiles.isNotEmpty) ...[
-                                  _buildSectionHeader(
-                                    'Recent Files',
-                                    theme,
+                                  SectionHeader(
+                                    title: 'Recent Files',
                                     onTap:
                                         () => _navigateToSeeAll(
                                           'Recent Files',
@@ -671,10 +605,8 @@ class _HomePageState extends State<HomePage> {
                                       padding: const EdgeInsets.only(
                                         bottom: 12,
                                       ),
-                                      child: _FileCard(
+                                      child: FileCard(
                                         file: file,
-                                        theme: theme,
-                                        isDark: isDark,
                                         breadcrumb: _getProjectBreadcrumb(file),
                                         dimensions:
                                             meta['dimensions'] ?? 'Unknown',
@@ -683,14 +615,14 @@ class _HomePageState extends State<HomePage> {
                                           file.lastUpdated,
                                         ),
                                         onTap: () => _openFile(file),
+                                        onMenuAction: null,
                                       ),
                                     );
                                   }).toList()),
                                   const SizedBox(height: 24),
                                 ],
-                                _buildSectionHeader(
-                                  'Projects',
-                                  theme,
+                                SectionHeader(
+                                  title: 'Projects',
                                   onTap:
                                       () => _navigateToSeeAll(
                                         'All Projects',
@@ -703,7 +635,7 @@ class _HomePageState extends State<HomePage> {
                                 _allProjects.isEmpty
                                     ? _buildCreateProjectCard(theme, isDark)
                                     : SizedBox(
-                                      height: 140, // Reduced height
+                                      height: 140,
                                       child: ListView.builder(
                                         scrollDirection: Axis.horizontal,
                                         itemCount: _allProjects.length,
@@ -713,10 +645,8 @@ class _HomePageState extends State<HomePage> {
                                             padding: const EdgeInsets.only(
                                               right: 12,
                                             ),
-                                            child: _ProjectCard(
+                                            child: ProjectCard(
                                               project: project,
-                                              theme: theme,
-                                              isDark: isDark,
                                               previewImages:
                                                   _projectPreviews[project
                                                       .id] ??
@@ -728,15 +658,15 @@ class _HomePageState extends State<HomePage> {
                                               onDelete:
                                                   () => _deleteProject(project),
                                               showGrid: false,
+                                              isHorizontal: true,
                                             ),
                                           );
                                         },
                                       ),
                                     ),
                                 const SizedBox(height: 24),
-                                _buildSectionHeader(
-                                  'Explore templates',
-                                  theme,
+                                SectionHeader(
+                                  title: 'Explore templates',
                                   onTap: () {},
                                 ),
                                 const SizedBox(height: 12),
@@ -763,43 +693,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSectionHeader(
-    String title,
-    ThemeData theme, {
-    VoidCallback? onTap,
-  }) {
-    return Row(
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            fontFamily: 'GeneralSans',
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-        const Spacer(),
-        if (onTap != null)
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Icon(
-                  Icons.chevron_right,
-                  size: 24,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
   Widget _buildCreateProjectCard(ThemeData theme, bool isDark) {
     return GestureDetector(
       onTap: _createNewProject,
@@ -809,9 +702,9 @@ class _HomePageState extends State<HomePage> {
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(Variables.radiusMedium),
           border: Border.all(
-            color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
+            color: isDark ? Variables.borderDark : Variables.borderSubtle,
             width: 1,
             style: BorderStyle.solid,
           ),
@@ -827,10 +720,9 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 8),
             Text(
               "Create Project",
-              style: TextStyle(
+              style: Variables.bodyStyle.copyWith(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                fontFamily: 'GeneralSans',
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
@@ -904,11 +796,9 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 4),
                   Text(
                     template['title']!,
-                    style: TextStyle(
+                    style: Variables.bodyStyle.copyWith(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      fontFamily: 'GeneralSans',
-                      color: theme.colorScheme.onSurface,
                       height: 1.2,
                     ),
                     maxLines: 1,
@@ -917,9 +807,8 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 2),
                   Text(
                     template['subtitle']!,
-                    style: TextStyle(
+                    style: Variables.captionStyle.copyWith(
                       fontSize: 11,
-                      fontFamily: 'GeneralSans',
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       height: 1.2,
                     ),
@@ -932,426 +821,6 @@ class _HomePageState extends State<HomePage> {
           );
         },
       ),
-    );
-  }
-}
-
-// -----------------------------------------------------------------------------
-// REUSABLE WIDGETS & PAGES
-// -----------------------------------------------------------------------------
-
-class _FileCard extends StatelessWidget {
-  final FileModel file;
-  final ThemeData theme;
-  final bool isDark;
-  final String breadcrumb;
-  final String dimensions;
-  final String previewPath;
-  final String timeAgo;
-  final VoidCallback onTap;
-
-  const _FileCard({
-    required this.file,
-    required this.theme,
-    required this.isDark,
-    required this.breadcrumb,
-    required this.dimensions,
-    required this.previewPath,
-    required this.timeAgo,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 88,
-              height: 88,
-              child: Center(
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[800] : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child:
-                        previewPath.isNotEmpty
-                            ? Image.file(
-                              File(previewPath),
-                              fit: BoxFit.cover,
-                              errorBuilder:
-                                  (context, error, stackTrace) => Container(
-                                    color:
-                                        isDark
-                                            ? Colors.grey[800]
-                                            : Colors.grey[200],
-                                    child: Icon(
-                                      Icons.broken_image,
-                                      size: 20,
-                                      color: theme.colorScheme.onSurface
-                                          .withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                            )
-                            : Container(
-                              color:
-                                  isDark ? Colors.grey[800] : Colors.grey[200],
-                              child: Icon(
-                                Icons.image,
-                                size: 24,
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.3,
-                                ),
-                              ),
-                            ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize:
-                      MainAxisSize.min, // Keep height minimal for centering
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Project Breadcrumb
-                              if (breadcrumb.isNotEmpty)
-                                Text(
-                                  breadcrumb,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                    fontFamily: 'Inter',
-                                    color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.6),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              const SizedBox(height: 4),
-                              // File Name
-                              Text(
-                                file.name,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: 'GeneralSans',
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.more_vert,
-                          size: 20,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      dimensions,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontFamily: 'GeneralSans',
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      timeAgo,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontFamily: 'GeneralSans',
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProjectCard extends StatelessWidget {
-  final ProjectModel project;
-  final ThemeData theme;
-  final bool isDark;
-  final List<String> previewImages;
-  final VoidCallback onTap;
-  final VoidCallback? onRename;
-  final VoidCallback? onDelete;
-  final bool isHorizontal;
-  final bool showGrid;
-
-  const _ProjectCard({
-    required this.project,
-    required this.theme,
-    required this.isDark,
-    required this.previewImages,
-    required this.onTap,
-    this.onRename,
-    this.onDelete,
-    this.isHorizontal = true,
-    this.showGrid = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: isHorizontal ? 130 : null,
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
-            width: 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(12),
-                ),
-                child:
-                    showGrid
-                        ? Padding(
-                          padding: const EdgeInsets.all(4.0),
-                          child: _buildGridPreview(),
-                        )
-                        : (previewImages.isNotEmpty
-                            ? Image.file(
-                              File(previewImages.first),
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              errorBuilder:
-                                  (context, error, stackTrace) => Container(
-                                    color:
-                                        isDark
-                                            ? Colors.grey[800]
-                                            : Colors.grey[200],
-                                    child: Icon(
-                                      Icons.broken_image,
-                                      color: theme.colorScheme.onSurface
-                                          .withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                            )
-                            : Container(
-                              color:
-                                  isDark ? Colors.grey[800] : Colors.grey[200],
-                              child: Center(
-                                child: Icon(
-                                  Icons.folder_outlined,
-                                  size: 32,
-                                  color: theme.colorScheme.onSurface.withValues(
-                                    alpha: 0.3,
-                                  ),
-                                ),
-                              ),
-                            )),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      project.title,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'GeneralSans',
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: PopupMenuButton<String>(
-                      icon: Icon(
-                        Icons.more_vert,
-                        size: 16,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
-                      ),
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      onSelected: (value) {
-                        if (value == 'rename' && onRename != null) {
-                          onRename!();
-                        } else if (value == 'delete' && onDelete != null) {
-                          onDelete!();
-                        }
-                      },
-                      itemBuilder:
-                          (context) => [
-                            const PopupMenuItem(
-                              value: 'rename',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.edit_outlined, size: 18),
-                                  SizedBox(width: 12),
-                                  Text(
-                                    'Rename',
-                                    style: TextStyle(fontFamily: 'GeneralSans'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.delete_outline,
-                                    size: 18,
-                                    color: Colors.red,
-                                  ),
-                                  SizedBox(width: 12),
-                                  Text(
-                                    'Delete',
-                                    style: TextStyle(
-                                      fontFamily: 'GeneralSans',
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Grid Preview Logic
-  Widget _buildGridPreview() {
-    return Column(
-      children: [
-        Expanded(
-          child: Row(
-            children: [
-              Expanded(
-                child: _buildPreviewItem(
-                  previewImages.isNotEmpty ? previewImages[0] : null,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: _buildPreviewItem(
-                  previewImages.length > 1 ? previewImages[1] : null,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        Expanded(
-          child: Row(
-            children: [
-              Expanded(
-                child: _buildPreviewItem(
-                  previewImages.length > 2 ? previewImages[2] : null,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: _buildPreviewItem(
-                  previewImages.length > 3 ? previewImages[3] : null,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPreviewItem(String? imagePath) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800] : Colors.grey[200],
-        borderRadius: BorderRadius.circular(6), // Rounded grid items
-      ),
-      clipBehavior: Clip.antiAlias,
-      child:
-          imagePath != null
-              ? Image.file(
-                File(imagePath),
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                errorBuilder:
-                    (context, error, stackTrace) => const Icon(
-                      Icons.broken_image,
-                      size: 16,
-                      color: Colors.grey,
-                    ),
-              )
-              : null, // Empty placeholder
     );
   }
 }
@@ -1495,11 +964,10 @@ class _SeeAllPageState extends State<_SeeAllPage> {
       appBar: AppBar(
         title: Text(
           widget.title,
-          style: TextStyle(
-            fontFamily: 'GeneralSans',
-            color: theme.colorScheme.onSurface,
+          style: Variables.headerStyle.copyWith(
             fontSize: 18,
             fontWeight: FontWeight.w500,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         backgroundColor: theme.scaffoldBackgroundColor,
@@ -1524,10 +992,8 @@ class _SeeAllPageState extends State<_SeeAllPage> {
                           itemCount: _items.length,
                           itemBuilder: (context, index) {
                             final project = _items[index] as ProjectModel;
-                            return _ProjectCard(
+                            return ProjectCard(
                               project: project,
-                              theme: theme,
-                              isDark: isDark,
                               previewImages: _projectPreviews[project.id] ?? [],
                               onTap: () => widget.onProjectTap(project),
                               // Chain callbacks, reload data on completion
@@ -1551,15 +1017,14 @@ class _SeeAllPageState extends State<_SeeAllPage> {
                             final meta = _fileMetadata[file.id] ?? {};
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12),
-                              child: _FileCard(
+                              child: FileCard(
                                 file: file,
-                                theme: theme,
-                                isDark: isDark,
                                 breadcrumb: _getBreadcrumb(file),
                                 dimensions: meta['dimensions'] ?? 'Unknown',
                                 previewPath: meta['preview'] ?? '',
                                 timeAgo: _timeAgo(file.lastUpdated),
                                 onTap: () => widget.onFileTap(file),
+                                onMenuAction: null,
                               ),
                             );
                           },
