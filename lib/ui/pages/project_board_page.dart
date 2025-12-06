@@ -10,6 +10,7 @@ import 'package:creekui/data/repos/project_repo.dart';
 import 'package:creekui/data/repos/note_repo.dart';
 import 'package:creekui/data/repos/image_repo.dart';
 import 'package:creekui/ui/widgets/image_context_menu.dart';
+import 'package:creekui/ui/widgets/empty_state.dart';
 import 'project_tag_page.dart';
 import 'project_board_page_alternate.dart';
 import 'image_save_page.dart';
@@ -80,12 +81,12 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
         await Future.wait(
           images.map((img) async {
             final Set<String> distinctCategories = {...img.tags};
-            // final notes = await _noteRepo.getNotesForImage(img.id);
-            // for (var note in notes) {
-            //   if (note.category.isNotEmpty) {
-            //     distinctCategories.add(note.category);
-            //   }
-            // }
+            final notes = await _noteRepo.getNotesForImage(img.id);
+            for (var note in notes) {
+              if (note.category.isNotEmpty) {
+                distinctCategories.add(note.category);
+              }
+            }
             if (distinctCategories.isEmpty) {
               tempMap.putIfAbsent('Uncategorized', () => []).add(img);
             } else {
@@ -219,11 +220,10 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
   Widget _buildCategorizedView() {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_categorizedImages.isEmpty) {
-      return Center(
-        child: Text(
-          "No images found",
-          style: Variables.bodyStyle.copyWith(color: Variables.textSecondary),
-        ),
+      return EmptyState(
+        icon: Icons.image_not_supported_outlined,
+        title: "No images found",
+        subtitle: "Try adding new images",
       );
     }
 

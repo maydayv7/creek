@@ -60,9 +60,9 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
   Future<void> _handleFinish() async {
     // 1. Basic Validation
     if (_projectNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Project name is required')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Project name is required')));
       return;
     }
 
