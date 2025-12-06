@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:creekui/data/models/project_model.dart';
 import 'package:creekui/data/models/file_model.dart';
 import 'package:creekui/data/repos/project_repo.dart';
@@ -14,6 +15,7 @@ import 'package:creekui/ui/widgets/file_card.dart';
 import 'package:creekui/ui/widgets/project_card.dart';
 import 'package:creekui/ui/widgets/empty_state.dart';
 import 'package:creekui/ui/widgets/section_header.dart';
+import 'package:creekui/ui/pages/settings_page.dart';
 import 'project_detail_page.dart';
 import 'define_brand_page.dart';
 import 'canvas_page.dart';
@@ -40,7 +42,7 @@ class _HomePageState extends State<HomePage> {
   final Map<int, List<String>> _projectPreviews = {};
   Map<String, Map<String, String>> _fileMetadata = {};
   bool _isLoading = true;
-  final String _userName = "Alex"; // TODO
+  String _userName = "Alex"; // Default
 
   @override
   void initState() {
@@ -57,6 +59,10 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      // Load User Name
+      final prefs = await SharedPreferences.getInstance();
+      final storedName = prefs.getString('user_name') ?? "Alex";
+
       final allProjects = await _projectRepo.getAllProjects();
       final Map<int, ProjectModel> projectMap = {};
       for (final project in allProjects) {
@@ -114,6 +120,7 @@ class _HomePageState extends State<HomePage> {
 
       if (mounted) {
         setState(() {
+          _userName = storedName;
           _allProjects = allProjects;
           _recentFiles = recentFiles;
           _projectMap = projectMap;
@@ -470,21 +477,34 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               ),
                               const Spacer(),
-                              Container(
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primaryContainer,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: theme.scaffoldBackgroundColor,
-                                    width: 1.25,
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const SettingsPage(),
+                                    ),
+                                  ).then((_) {
+                                    _loadData(); // Reload to update name
+                                  });
+                                },
+                                behavior: HitTestBehavior.opaque,
+                                child: Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primaryContainer,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: theme.scaffoldBackgroundColor,
+                                      width: 1.25,
+                                    ),
                                   ),
-                                ),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 16,
-                                  color: theme.colorScheme.onPrimaryContainer,
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 16,
+                                    color: theme.colorScheme.onPrimaryContainer,
+                                  ),
                                 ),
                               ),
                             ],

@@ -178,7 +178,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
       if (analysisData.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("No analyzed images or notes found.")),
+            const SnackBar(content: Text("No analyzed images or notes found")),
           );
         }
         return;

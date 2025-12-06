@@ -1605,7 +1605,7 @@ class _CanvasPageState extends State<CanvasPage> {
       debugPrint("Generation Error: $e");
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text("Generation failed.")));
+      ).showSnackBar(const SnackBar(content: Text("Generation failed")));
     } finally {
       setState(() {
         _isInpainting = false;

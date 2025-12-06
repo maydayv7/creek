@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:creekui/ui/styles/variables.dart';
 
 class NoteInputSheet extends StatefulWidget {
@@ -20,11 +21,22 @@ class NoteInputSheet extends StatefulWidget {
 class _NoteInputSheetState extends State<NoteInputSheet> {
   late String _selectedCategory;
   final TextEditingController _controller = TextEditingController();
+  String _userName = "Alex"; // Default
 
   @override
   void initState() {
     super.initState();
     _selectedCategory = widget.initialCategory;
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _userName = prefs.getString('user_name') ?? "Alex";
+      });
+    }
   }
 
   @override
@@ -60,9 +72,9 @@ class _NoteInputSheetState extends State<NoteInputSheet> {
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
-                "Alex", // TODO
-                style: TextStyle(
+              Text(
+                _userName,
+                style: const TextStyle(
                   fontFamily: 'GeneralSans',
                   fontSize: 12,
                   fontWeight: FontWeight.w500,

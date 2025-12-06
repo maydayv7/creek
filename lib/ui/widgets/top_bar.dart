@@ -150,6 +150,7 @@ class _TopBarState extends State<TopBar> {
                   // Back Button
                   GestureDetector(
                     onTap: _handleSafeBack,
+                    behavior: HitTestBehavior.opaque,
                     child: Container(
                       width: 24,
                       height: 24,
@@ -198,13 +199,17 @@ class _TopBarState extends State<TopBar> {
                   if (!widget.hideSecondRow)
                     GestureDetector(
                       onTap: _openSettings,
-                      child: SvgPicture.asset(
-                        'assets/icons/settings-line.svg',
-                        width: 24,
-                        height: 24,
-                        colorFilter: const ColorFilter.mode(
-                          Variables.textPrimary,
-                          BlendMode.srcIn,
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        child: SvgPicture.asset(
+                          'assets/icons/settings-line.svg',
+                          width: 24,
+                          height: 24,
+                          colorFilter: const ColorFilter.mode(
+                            Variables.textPrimary,
+                            BlendMode.srcIn,
+                          ),
                         ),
                       ),
                     ),
