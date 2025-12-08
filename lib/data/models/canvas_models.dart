@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+enum DragHandle { none, topLeft, topRight, bottomLeft, bottomRight, center }
+
 class DrawingPoint {
   final Offset offset;
   final Paint paint;

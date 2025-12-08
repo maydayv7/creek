@@ -15,6 +15,8 @@ import 'package:creekui/ui/widgets/file_card.dart';
 import 'package:creekui/ui/widgets/project_card.dart';
 import 'package:creekui/ui/widgets/empty_state.dart';
 import 'package:creekui/ui/widgets/section_header.dart';
+import 'package:creekui/ui/widgets/dialog.dart';
+import 'package:creekui/ui/widgets/text_field.dart';
 import 'package:creekui/ui/pages/settings_page.dart';
 import 'project_detail_page.dart';
 import 'define_brand_page.dart';
@@ -138,9 +140,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final bytes = await File(filePath).readAsBytes();
       final image = img.decodeImage(bytes);
-      if (image != null) {
-        return '${image.width} x ${image.height} px';
-      }
+      if (image != null) return '${image.width} x ${image.height} px';
     } catch (e) {
       debugPrint('Error getting dimensions: $e');
     }
@@ -150,16 +150,13 @@ class _HomePageState extends State<HomePage> {
   String _formatTimeAgo(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
-
-    if (difference.inDays > 0) {
+    if (difference.inDays > 0)
       return 'Edited ${difference.inDays} ${difference.inDays == 1 ? 'day' : 'days'} ago';
-    } else if (difference.inHours > 0) {
+    if (difference.inHours > 0)
       return 'Edited ${difference.inHours} ${difference.inHours == 1 ? 'hour' : 'hours'} ago';
-    } else if (difference.inMinutes > 0) {
+    if (difference.inMinutes > 0)
       return 'Edited ${difference.inMinutes} ${difference.inMinutes == 1 ? 'minute' : 'minutes'} ago';
-    } else {
-      return 'Edited just now';
-    }
+    return 'Edited just now';
   }
 
   String _getProjectBreadcrumb(FileModel file) {
@@ -169,9 +166,8 @@ class _HomePageState extends State<HomePage> {
     // If the project has a parent, it's an event. Show Parent / Event
     if (project.parentId != null) {
       final parentProject = _projectMap[project.parentId!];
-      if (parentProject != null) {
+      if (parentProject != null)
         return '${parentProject.title} / ${project.title}';
-      }
     }
     // Otherwise just the project name
     return project.title;
@@ -187,9 +183,7 @@ class _HomePageState extends State<HomePage> {
               projectDescription: null,
             ),
       ),
-    ).then((result) {
-      _loadData();
-    });
+    ).then((_) => _loadData());
   }
 
   void _openProject(ProjectModel project) {
@@ -207,152 +201,73 @@ class _HomePageState extends State<HomePage> {
   // Rename Project Logic
   Future<void> _renameProject(ProjectModel project) async {
     final controller = TextEditingController(text: project.title);
-    final theme = Theme.of(context);
 
-    final didRename = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            backgroundColor: theme.cardColor,
-            title: Text(
-              'Rename Project',
-              style: Variables.headerStyle.copyWith(fontSize: 18),
-            ),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              style: Variables.bodyStyle,
-              decoration: InputDecoration(
-                hintText: 'Enter new name',
-                hintStyle: TextStyle(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-                enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                  ),
-                ),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: theme.colorScheme.primary),
-                ),
-              ),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-            actions: [
-              TextButton(
-                child: Text(
-                  'Cancel',
-                  style: Variables.bodyStyle.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-                onPressed: () => Navigator.pop(ctx, false),
-              ),
-              TextButton(
-                child: Text(
-                  'Save',
-                  style: Variables.bodyStyle.copyWith(
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                onPressed: () {
-                  if (controller.text.trim().isNotEmpty) {
-                    Navigator.pop(ctx, true);
-                  }
-                },
-              ),
-            ],
-          ),
+    await ShowDialog.show(
+      context,
+      title: 'Rename Project',
+      primaryButtonText: 'Save',
+      content: CommonTextField(
+        hintText: 'Enter new name',
+        controller: controller,
+        autoFocus: true,
+      ),
+      onPrimaryPressed: () async {
+        if (controller.text.trim().isNotEmpty) {
+          try {
+            await _projectService.updateProjectDetails(
+              project.id!,
+              title: controller.text.trim(),
+            );
+            if (mounted) {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Project renamed')));
+              _loadData();
+            }
+          } catch (e) {
+            if (mounted)
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('Error renaming: $e')));
+          }
+        }
+      },
     );
-
-    if (didRename == true && project.id != null) {
-      setState(() => _isLoading = true);
-      try {
-        await _projectService.updateProjectDetails(
-          project.id!,
-          title: controller.text.trim(),
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Project renamed')));
-        }
-        _loadData();
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error renaming: $e')));
-        }
-      }
-    }
   }
 
   // Delete Project Logic
   Future<void> _deleteProject(ProjectModel project) async {
-    final theme = Theme.of(context);
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            backgroundColor: theme.cardColor,
-            title: Text(
-              'Delete Project',
-              style: Variables.headerStyle.copyWith(fontSize: 18),
-            ),
-            content: Text(
-              'Are you sure you want to delete "${project.title}"? This cannot be undone.',
-              style: Variables.bodyStyle.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-              ),
-            ),
-            actions: [
-              TextButton(
-                child: Text(
-                  'Cancel',
-                  style: Variables.bodyStyle.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-                onPressed: () => Navigator.pop(ctx, false),
-              ),
-              TextButton(
-                child: Text(
-                  'Delete',
-                  style: Variables.bodyStyle.copyWith(color: Colors.red),
-                ),
-                onPressed: () => Navigator.pop(ctx, true),
-              ),
-            ],
-          ),
+    await ShowDialog.show(
+      context,
+      title: 'Delete Project',
+      description:
+          'Are you sure you want to delete "${project.title}"? This cannot be undone.',
+      primaryButtonText: 'Delete',
+      isDestructive: true,
+      onPrimaryPressed: () async {
+        try {
+          await _projectService.deleteProject(project.id!);
+          if (mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Project deleted successfully')),
+            );
+            _loadData();
+          }
+        } catch (e) {
+          if (mounted)
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error deleting project: $e')),
+            );
+        }
+      },
     );
-
-    if (confirm == true && project.id != null) {
-      setState(() => _isLoading = true);
-      try {
-        await _projectService.deleteProject(project.id!);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Project deleted successfully')),
-          );
-        }
-        _loadData();
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error deleting project: $e')));
-        }
-      }
-    }
   }
 
   Future<void> _openFile(FileModel file) async {
     double width = 1080;
     double height = 1920;
-
     try {
       final f = File(file.filePath);
       if (await f.exists()) {
@@ -426,8 +341,8 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
     final bool isSearching = _searchQuery.isNotEmpty;
+
     final List<FileModel> filteredFiles =
         isSearching
             ? _recentFiles
@@ -518,17 +433,13 @@ class _HomePageState extends State<HomePage> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: CommonSearchBar(
                             controller: _searchController,
-                            onChanged: (value) {
-                              setState(() {
-                                _searchQuery = value.trim();
-                              });
-                            },
+                            onChanged:
+                                (value) =>
+                                    setState(() => _searchQuery = value.trim()),
                           ),
                         ),
                       ),
-
                       const SliverToBoxAdapter(child: SizedBox(height: 12)),
-
                       if (isSearching)
                         SliverPadding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -541,14 +452,13 @@ class _HomePageState extends State<HomePage> {
                                   title: "No results found",
                                   subtitle: "Try searching for something else",
                                 ),
-
                               if (filteredProjects.isNotEmpty) ...[
                                 Text(
                                   "Projects & Events",
                                   style: Variables.bodyStyle.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.7),
+                                        .withOpacity(0.7),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -578,7 +488,7 @@ class _HomePageState extends State<HomePage> {
                                   style: Variables.bodyStyle.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.7),
+                                        .withOpacity(0.7),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -685,10 +595,7 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                     ),
                                 const SizedBox(height: 24),
-                                SectionHeader(
-                                  title: 'Explore templates',
-                                  onTap: () {},
-                                ),
+                                const SectionHeader(title: 'Explore templates'),
                                 const SizedBox(height: 12),
                                 _buildTemplatesSection(theme, isDark),
                                 const SizedBox(height: 24),
@@ -706,7 +613,7 @@ class _HomePageState extends State<HomePage> {
               ? null
               : FloatingActionButton(
                 onPressed: _createNewProject,
-                backgroundColor: isDark ? Colors.grey[900] : Colors.grey[900],
+                backgroundColor: Colors.grey[900],
                 foregroundColor: Colors.white,
                 child: const Icon(Icons.add, size: 24),
               ),
@@ -726,7 +633,6 @@ class _HomePageState extends State<HomePage> {
           border: Border.all(
             color: isDark ? Variables.borderDark : Variables.borderSubtle,
             width: 1,
-            style: BorderStyle.solid,
           ),
         ),
         child: Column(
@@ -735,7 +641,7 @@ class _HomePageState extends State<HomePage> {
             Icon(
               Icons.add_circle_outline,
               size: 32,
-              color: theme.colorScheme.primary.withValues(alpha: 0.7),
+              color: theme.colorScheme.primary.withOpacity(0.7),
             ),
             const SizedBox(height: 8),
             Text(
@@ -743,7 +649,7 @@ class _HomePageState extends State<HomePage> {
               style: Variables.bodyStyle.copyWith(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
               ),
             ),
           ],
@@ -804,8 +710,8 @@ class _HomePageState extends State<HomePage> {
                             child: Icon(
                               Icons.image_outlined,
                               size: 32,
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: 0.3,
+                              color: theme.colorScheme.onSurface.withOpacity(
+                                0.3,
                               ),
                             ),
                           );
@@ -829,7 +735,7 @@ class _HomePageState extends State<HomePage> {
                     template['subtitle']!,
                     style: Variables.captionStyle.copyWith(
                       fontSize: 11,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
                       height: 1.2,
                     ),
                     maxLines: 1,
@@ -895,13 +801,10 @@ class _SeeAllPageState extends State<_SeeAllPage> {
           if (p.id != null) {
             final events = await widget.projectRepo.getEvents(p.id!);
             List<String> eventImages = [];
-            // Get 1 image from up to 4 distinct events
             for (final event in events.take(4)) {
               if (event.id != null) {
                 final imgs = await widget.imageRepo.getImages(event.id!);
-                if (imgs.isNotEmpty) {
-                  eventImages.add(imgs.first.filePath);
-                }
+                if (imgs.isNotEmpty) eventImages.add(imgs.first.filePath);
               }
             }
             _projectPreviews[p.id!] = eventImages;
@@ -912,7 +815,6 @@ class _SeeAllPageState extends State<_SeeAllPage> {
         final files = await widget.fileRepo.getRecentFiles(limit: 50);
         final allProjects = await widget.projectRepo.getAllProjects();
         _projectMap = {for (var p in allProjects) p.id!: p};
-
         for (final file in files) {
           try {
             final f = File(file.filePath);
@@ -924,13 +826,11 @@ class _SeeAllPageState extends State<_SeeAllPage> {
                   String dims = 'Unknown';
                   String? previewPath;
                   if (data is Map) {
-                    if (data['width'] != null && data['height'] != null) {
+                    if (data['width'] != null && data['height'] != null)
                       dims =
                           '${(data['width'] as num).toInt()} x ${(data['height'] as num).toInt()} px';
-                    }
-                    if (data['preview_path'] != null) {
+                    if (data['preview_path'] != null)
                       previewPath = data['preview_path'];
-                    }
                   }
                   _fileMetadata[file.id] = {
                     'dimensions': dims,
@@ -940,12 +840,11 @@ class _SeeAllPageState extends State<_SeeAllPage> {
               } else {
                 final bytes = await f.readAsBytes();
                 final image = img.decodeImage(bytes);
-                if (image != null) {
+                if (image != null)
                   _fileMetadata[file.id] = {
                     'dimensions': '${image.width} x ${image.height} px',
                     'preview': file.filePath,
                   };
-                }
               }
             }
           } catch (_) {}
@@ -978,8 +877,6 @@ class _SeeAllPageState extends State<_SeeAllPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(

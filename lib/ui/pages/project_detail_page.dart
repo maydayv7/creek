@@ -9,6 +9,9 @@ import 'package:creekui/services/project_service.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/empty_state.dart';
 import 'package:creekui/ui/widgets/section_header.dart';
+import 'package:creekui/ui/widgets/app_bar.dart';
+import 'package:creekui/ui/widgets/dialog.dart';
+import 'package:creekui/ui/widgets/text_field.dart';
 import 'package:creekui/ui/pages/settings_page.dart';
 import 'package:creekui/ui/pages/home_page.dart';
 import 'project_board_page.dart';
@@ -90,182 +93,45 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
     if (!mounted) return;
 
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder:
-          (context) => Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFFFAFAFA),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-            ),
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.only(top: 8, bottom: 16),
-                    child: Center(
-                      child: Container(
-                        width: 48,
-                        height: 2,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF71717B),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: Color(0xFFE4E4E7), width: 1),
-                      ),
-                    ),
-                    child: Text("Event Details", style: Variables.bodyStyle),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE4E4E7),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: TextField(
-                            controller: nameController,
-                            autofocus: true,
-                            style: Variables.bodyStyle.copyWith(fontSize: 12),
-                            decoration: InputDecoration(
-                              hintText: "Add Name*",
-                              hintStyle: Variables.bodyStyle.copyWith(
-                                fontSize: 12,
-                                color: const Color(0xFF71717B),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              border: InputBorder.none,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Container(
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE4E4E7),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: TextField(
-                            controller: descriptionController,
-                            maxLines: null,
-                            expands: true,
-                            textAlignVertical: TextAlignVertical.top,
-                            style: Variables.bodyStyle.copyWith(fontSize: 12),
-                            decoration: InputDecoration(
-                              hintText: "Add Description",
-                              hintStyle: Variables.bodyStyle.copyWith(
-                                fontSize: 12,
-                                color: const Color(0xFF71717B),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              border: InputBorder.none,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => Navigator.pop(context),
-                            child: Container(
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE4E4E7),
-                                borderRadius: BorderRadius.circular(1000),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  "Cancel",
-                                  style: Variables.buttonTextStyle.copyWith(
-                                    color: Variables.textPrimary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () async {
-                              if (nameController.text.trim().isNotEmpty) {
-                                try {
-                                  await _projectService.createProject(
-                                    nameController.text.trim(),
-                                    description:
-                                        descriptionController.text
-                                                .trim()
-                                                .isEmpty
-                                            ? null
-                                            : descriptionController.text.trim(),
-                                    parentId: _project!.id,
-                                  );
-                                  if (context.mounted) {
-                                    Navigator.pop(context);
-                                    _loadData();
-                                  }
-                                } catch (e) {
-                                  debugPrint("Error creating event: $e");
-                                }
-                              }
-                            },
-                            child: Container(
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF27272A),
-                                borderRadius: BorderRadius.circular(1000),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  "Add Event",
-                                  style: Variables.buttonTextStyle,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    await ShowDialog.show(
+      context,
+      title: "Event Details",
+      primaryButtonText: "Add Event",
+      content: Column(
+        children: [
+          CommonTextField(
+            hintText: "Add Name*",
+            controller: nameController,
+            autoFocus: true,
           ),
+          const SizedBox(height: 16),
+          CommonTextField(
+            hintText: "Add Description",
+            controller: descriptionController,
+            maxLines: 3,
+          ),
+        ],
+      ),
+      onPrimaryPressed: () async {
+        if (nameController.text.trim().isNotEmpty) {
+          try {
+            await _projectService.createProject(
+              nameController.text.trim(),
+              description:
+                  descriptionController.text.trim().isEmpty
+                      ? null
+                      : descriptionController.text.trim(),
+              parentId: _project!.id,
+            );
+            if (context.mounted) {
+              Navigator.pop(context);
+              _loadData();
+            }
+          } catch (e) {
+            debugPrint("Error creating event: $e");
+          }
+        }
+      },
     );
   }
 
@@ -294,7 +160,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Color(0xFFFAFAFA),
+        backgroundColor: Variables.surfaceBackground,
         body: Center(child: CircularProgressIndicator()),
       );
     }
@@ -302,14 +168,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     if (_project == null) return const Scaffold(body: SizedBox());
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: Text(_project!.title, style: Variables.headerStyle),
-        backgroundColor: const Color(0xFFFAFAFA),
-        elevation: 0,
-        leadingWidth: 50,
-        titleSpacing: 0,
-        automaticallyImplyLeading: false,
+      backgroundColor: Variables.surfaceBackground,
+      appBar: CustomAppBar(
+        title: _project!.title,
+        showBack: true,
         leading: IconButton(
           icon: const Icon(
             Icons.arrow_back,
@@ -351,7 +213,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         onRefresh: _loadData,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(left: 16, right: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -451,12 +313,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE4E4E7), width: 1),
+          border: Border.all(color: Variables.borderSubtle, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Blob image container with dark background
+            // Blob image container
             Container(
               height: 115,
               decoration: const BoxDecoration(
@@ -556,7 +418,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         width: 328,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE4E4E7), width: 1),
+          border: Border.all(color: Variables.borderSubtle, width: 1),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -591,7 +453,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             ),
             // Event title
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              padding: const EdgeInsets.all(16),
               child: Text(
                 event.title,
                 style: Variables.bodyStyle.copyWith(

@@ -73,10 +73,9 @@ class ProjectCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       project.title,
-                      style: TextStyle(
+                      style: Variables.bodyStyle.copyWith(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        fontFamily: 'GeneralSans',
                         color: theme.colorScheme.onSurface,
                       ),
                       maxLines: 1,

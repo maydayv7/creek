@@ -8,8 +8,12 @@ class Variables {
   static const Color textDisabled = Color(0xFFA1A1AA);
 
   static const Color surfaceSubtle = Color(0xFFF4F4F5);
+  static const Color surfaceBackground = Color(0xFFFAFAFA);
   static const Color background = Colors.white;
   static const Color borderSubtle = Color(0xFFE4E4E7);
+
+  static const Color chipBackground = Color(0xFFE0E7FF);
+  static const Color chipText = Color(0xFF7C86FF);
 
   // Dark Mode
   static const Color surfaceDark = Color(0xFF27272A);
@@ -36,6 +40,7 @@ class Variables {
   // Radius
   static const double radiusSmall = 8.0;
   static const double radiusMedium = 12.0;
+  static const double radiusLarge = 16.0; // Added
 
   // Text Styles
   static TextStyle get headerStyle => const TextStyle(

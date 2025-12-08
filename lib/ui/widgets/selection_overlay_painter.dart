@@ -1,18 +1,6 @@
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-
-enum DragHandle { none, topLeft, topRight, bottomLeft, bottomRight, center }
-
-extension RectUtils on Rect {
-  Rect normalize() {
-    return Rect.fromLTRB(
-      left < right ? left : right,
-      top < bottom ? top : bottom,
-      left > right ? left : right,
-      top > bottom ? top : bottom,
-    );
-  }
-}
+import 'package:creekui/data/models/canvas_models.dart';
+import 'package:creekui/ui/styles/variables.dart';
 
 class SelectionOverlayPainter extends CustomPainter {
   final Rect rect;
@@ -21,95 +9,68 @@ class SelectionOverlayPainter extends CustomPainter {
 
   SelectionOverlayPainter({
     required this.rect,
-    required this.isResizing,
+    this.isResizing = false,
     this.activeHandle = DragHandle.none,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Dim Background
+    // 1. Draw the Selection Border
+    final paint =
+        Paint()
+          ..color = Variables.selectionBorder
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0;
+
+    // Use a dash effect for the selection box
+    _drawDashedRect(canvas, rect, paint);
+
+    // 2. If Resizing, Draw Handles
     if (isResizing) {
-      final Path backgroundPath =
-          Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-      final Path holePath = Path()..addRect(rect);
-      final Path overlayPath = Path.combine(
-        ui.PathOperation.difference,
-        backgroundPath,
-        holePath,
-      );
-      canvas.drawPath(overlayPath, Paint()..color = Colors.black54);
-    }
+      final handlePaint =
+          Paint()
+            ..color = Colors.white
+            ..style = PaintingStyle.fill;
 
-    // 2. Draw Dashed Border
-    final Paint borderPaint =
-        Paint()
-          ..color = const Color(0xFF448AFF)
-          ..strokeWidth = 2.0
-          ..style = PaintingStyle.stroke;
+      final handleBorderPaint =
+          Paint()
+            ..color = Variables.selectionBorder
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.0;
 
-    double dashWidth = 6;
-    double dashSpace = 4;
-    Path borderPath = Path()..addRect(rect);
+      final double handleRadius = 6.0;
 
-    for (ui.PathMetric pathMetric in borderPath.computeMetrics()) {
-      double distance = 0.0;
-      while (distance < pathMetric.length) {
-        canvas.drawPath(
-          pathMetric.extractPath(distance, distance + dashWidth),
-          borderPaint,
-        );
-        distance += (dashWidth + dashSpace);
-      }
-    }
-
-    // 3. Draw Center Dot (Initial) or Resize Handles (Resizing)
-    if (!isResizing) {
-      canvas.drawCircle(
-        rect.center,
-        8,
-        Paint()
-          ..color = Colors.black26
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-      );
-      canvas.drawCircle(
-        rect.center,
-        6,
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.fill,
-      );
-    } else {
-      final List<Offset> corners = [
+      final handles = [
         rect.topLeft,
         rect.topRight,
         rect.bottomLeft,
         rect.bottomRight,
       ];
 
-      final Paint handleShadow =
-          Paint()
-            ..color = Colors.black.withOpacity(0.3)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-      final Paint handleFill = Paint()..color = Colors.white;
-      final Paint handleBorder =
-          Paint()
-            ..color = const Color(0xFF448AFF)
-            ..strokeWidth = 2
-            ..style = PaintingStyle.stroke;
-
-      const double handleRadius = 8;
-
-      for (final corner in corners) {
-        canvas.drawCircle(corner, handleRadius, handleShadow);
-        canvas.drawCircle(corner, handleRadius, handleFill);
-        canvas.drawCircle(corner, handleRadius, handleBorder);
+      for (final handle in handles) {
+        canvas.drawCircle(handle, handleRadius, handlePaint);
+        canvas.drawCircle(handle, handleRadius, handleBorderPaint);
       }
+
+      // 3. Draw Center Handle (Move)
+      final centerPaint =
+          Paint()
+            ..color = Variables.accentMagic.withOpacity(0.5)
+            ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(rect.center, 8.0, centerPaint);
     }
   }
 
+  void _drawDashedRect(Canvas canvas, Rect rect, Paint paint) {
+    final path = Path()..addRect(rect);
+    canvas.drawPath(path, paint);
+  }
+
   @override
-  bool shouldRepaint(covariant SelectionOverlayPainter oldDelegate) =>
-      rect != oldDelegate.rect ||
-      isResizing != oldDelegate.isResizing ||
-      activeHandle != oldDelegate.activeHandle;
+  bool shouldRepaint(covariant SelectionOverlayPainter oldDelegate) {
+    return oldDelegate.rect != rect ||
+        oldDelegate.isResizing != isResizing ||
+        oldDelegate.activeHandle != activeHandle;
+  }
 }

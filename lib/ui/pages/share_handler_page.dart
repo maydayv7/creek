@@ -5,6 +5,7 @@ import 'package:creekui/services/instagram_download_service.dart';
 import 'package:creekui/services/image_service.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/primary_button.dart';
+import 'package:creekui/ui/widgets/app_bar.dart';
 import 'share_to_moodboard_page.dart';
 import 'share_to_file_page.dart';
 
@@ -118,8 +119,8 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(title: const Text("Processing")),
+      backgroundColor: Variables.background,
+      appBar: const CustomAppBar(title: "Processing", showBack: false),
       body: Center(
         child:
             _hasError
@@ -158,7 +159,7 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
                 : const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircularProgressIndicator(),
+                    CircularProgressIndicator(color: Variables.textPrimary),
                     SizedBox(height: 20),
                     Text("Downloading media..."),
                   ],

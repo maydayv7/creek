@@ -1,12 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:creekui/data/models/canvas_models.dart';
 import 'package:creekui/services/image_service.dart';
 import 'package:creekui/services/note_service.dart';
+import 'package:creekui/utils/image_utils.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/primary_button.dart';
 import 'package:creekui/ui/widgets/selection_overlay_painter.dart';
 import 'package:creekui/ui/widgets/note_input_sheet.dart';
+import 'package:creekui/ui/widgets/app_bar.dart';
 import 'project_board_page.dart';
 
 // Temporary note model
@@ -430,21 +433,16 @@ class _ImageSavePageState extends State<ImageSavePage> {
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: Variables.surfaceBackground,
+      appBar: CustomAppBar(
+        title: titleText,
         leading: IconButton(
           icon: const Icon(
             Icons.arrow_back_ios_new,
             size: 20,
-            color: Colors.black,
+            color: Variables.textPrimary,
           ),
           onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          titleText,
-          style: Variables.headerStyle.copyWith(fontSize: 20),
         ),
         actions: [
           // Confirm Selection Button (Visible only in resizing mode)

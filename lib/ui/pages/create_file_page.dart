@@ -5,6 +5,7 @@ import 'package:creekui/services/project_service.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/search_bar.dart';
 import 'package:creekui/ui/widgets/project_selector.dart';
+import 'package:creekui/ui/widgets/app_bar.dart';
 import 'canvas_page.dart';
 import 'define_brand_page.dart';
 
@@ -183,22 +184,13 @@ class _CreateFilePageState extends State<CreateFilePage> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 0,
+      appBar: CustomAppBar(
+        title: 'Create Files',
+        showBack: true,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          'Create Files',
-          style: Variables.headerStyle.copyWith(
-            fontSize: 16,
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-
-        // Show project chooser only when ID not passed
         actions: [
           if (widget.projectId == null)
             Padding(
@@ -409,7 +401,7 @@ class _ProjectSelectionModalContentState
     if (result != null && result is Map) {
       widget.onProjectSelected(result["id"], result["title"]);
     } else {
-      // If project is created but not selected immediately, refreshing the list is a safe bet.
+      // If project is created but not selected immediately, refreshing the list is a safe bet
       setState(() {
         _selectorKey = UniqueKey();
       });

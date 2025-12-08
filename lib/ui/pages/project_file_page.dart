@@ -12,6 +12,8 @@ import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/search_bar.dart';
 import 'package:creekui/ui/widgets/file_card.dart';
 import 'package:creekui/ui/widgets/empty_state.dart';
+import 'package:creekui/ui/widgets/dialog.dart';
+import 'package:creekui/ui/widgets/text_field.dart';
 import 'create_file_page.dart';
 import 'canvas_page.dart';
 
@@ -51,9 +53,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     super.dispose();
   }
 
-  // ---------------------------------------
-  // LOAD EVERYTHING
-  // ---------------------------------------
+  // Load data
   Future<void> _loadEverything() async {
     setState(() => _isLoading = true);
     try {
@@ -77,9 +77,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     if (mounted) setState(() => _isLoading = false);
   }
 
-  // ---------------------------------------
-  // LOAD METADATA
-  // ---------------------------------------
+  // File Metadata
   Future<void> _loadMetadata(List<FileModel> list) async {
     for (final file in list) {
       try {
@@ -128,9 +126,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     }
   }
 
-  // ---------------------------------------
-  // SELECT EVENT
-  // ---------------------------------------
   Future<void> _onSelectEvent(ProjectModel event) async {
     setState(() => _selectedEvent = event);
     _eventFiles = await _fileService.getFiles(event.id!);
@@ -138,9 +133,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     setState(() {});
   }
 
-  // ---------------------------------------
-  // OPEN FILE
-  // ---------------------------------------
   void _openFile(FileModel file) {
     Navigator.push(
       context,
@@ -175,91 +167,57 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
   Future<void> _renameFile(FileModel file) async {
     final controller = TextEditingController(text: file.name);
 
-    final newName = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(
-            "Rename File",
-            style: Variables.headerStyle.copyWith(fontSize: 18),
-          ),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            style: Variables.bodyStyle,
-            decoration: const InputDecoration(
-              labelText: "New file name",
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: Text("Cancel", style: Variables.bodyStyle),
-              onPressed: () => Navigator.pop(context),
-            ),
-            FilledButton(
-              child: Text("Save", style: Variables.buttonTextStyle),
-              onPressed: () => Navigator.pop(context, controller.text.trim()),
-            ),
-          ],
-        );
+    await ShowDialog.show(
+      context,
+      title: "Rename File",
+      primaryButtonText: "Save",
+      content: CommonTextField(
+        hintText: "New file name",
+        controller: controller,
+        autoFocus: true,
+      ),
+      onPrimaryPressed: () async {
+        final newName = controller.text.trim();
+        if (newName.isNotEmpty) {
+          await _fileService.renameFile(file.id, newName);
+          await _loadEverything();
+          if (mounted) Navigator.pop(context);
+        }
       },
     );
-
-    if (newName == null || newName.isEmpty) return;
-    await _fileService.renameFile(file.id, newName);
-    await _loadEverything();
   }
 
   Future<void> _deleteFile(FileModel file) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder:
-          (_) => AlertDialog(
-            title: Text(
-              "Delete File?",
-              style: Variables.headerStyle.copyWith(fontSize: 18),
-            ),
-            content: Text(
-              "This will permanently remove ${file.name}.",
-              style: Variables.bodyStyle,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text("Cancel", style: Variables.bodyStyle),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text("Delete", style: Variables.buttonTextStyle),
-              ),
-            ],
-          ),
+    await ShowDialog.show(
+      context,
+      title: "Delete File?",
+      description: "This will permanently remove ${file.name}.",
+      primaryButtonText: "Delete",
+      isDestructive: true,
+      onPrimaryPressed: () async {
+        try {
+          await _fileService.deleteFile(file.id!);
+          final disk = File(file.filePath);
+          if (await disk.exists()) await disk.delete();
+
+          setState(() {
+            _allFiles.removeWhere((f) => f.id == file.id);
+            _eventFiles.removeWhere((f) => f.id == file.id);
+          });
+
+          if (mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text("File deleted")));
+          }
+        } catch (e) {
+          debugPrint("Delete error: $e");
+        }
+      },
     );
-
-    if (confirm != true) return;
-
-    try {
-      await _fileService.deleteFile(file.id!);
-      final disk = File(file.filePath);
-      if (await disk.exists()) await disk.delete();
-
-      setState(() {
-        _allFiles.removeWhere((f) => f.id == file.id);
-        _eventFiles.removeWhere((f) => f.id == file.id);
-      });
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("File deleted")));
-    } catch (e) {
-      debugPrint("Delete error: $e");
-    }
   }
 
-  // ---------------------------------------
-  // CREATE FILE
-  // ---------------------------------------
   void _navigateToCreateFile() {
     Navigator.push(
       context,
@@ -304,9 +262,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     );
   }
 
-  // ---------------------------------------
-  // BREADCRUMB
-  // ---------------------------------------
+  // Breadcrumb
   String _breadcrumbFor(FileModel file) {
     final event = _events.firstWhere(
       (e) => e.id == file.projectId,
@@ -335,13 +291,11 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     return "${parent.title} / ${event.title}";
   }
 
-  // ---------------------------------------
-  // UI
-  // ---------------------------------------
+  // UI Builder
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7F8),
+      backgroundColor: Variables.surfaceSubtle,
       appBar: TopBar(
         currentProjectId: widget.projectId,
         onBack: () => Navigator.pop(context),
@@ -371,7 +325,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
-            color: const Color(0xFF27272A),
+            color: Variables.textPrimary,
             borderRadius: BorderRadius.circular(50),
           ),
           child: Row(
@@ -400,31 +354,22 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 12),
-
                       // Search Bar
                       CommonSearchBar(
                         controller: _searchController,
                         hintText: "Search your files",
                         onChanged: (v) => setState(() => _search = v.trim()),
                       ),
-
                       const SizedBox(height: 24),
-
-                      // -------------------------
-                      // ALL FILES
-                      // -------------------------
-                      const Text(
+                      // All Files
+                      Text(
                         "All Files",
-                        style: TextStyle(
+                        style: Variables.bodyStyle.copyWith(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          fontFamily: 'GeneralSans',
-                          color: Color(0xFF27272A),
                         ),
                       ),
-
                       const SizedBox(height: 12),
-
                       if (_filteredAllFiles().isEmpty)
                         EmptyState(
                           icon: Icons.folder_outlined,
@@ -444,24 +389,16 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                                   .map((f) => _buildFileCard(f))
                                   .toList(),
                         ),
-
                       const SizedBox(height: 32),
-
-                      // -------------------------
-                      // FILES FOR EVENTS
-                      // -------------------------
-                      const Text(
+                      // Files for Events
+                      Text(
                         "Files for Events",
-                        style: TextStyle(
+                        style: Variables.bodyStyle.copyWith(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          fontFamily: 'GeneralSans',
-                          color: Color(0xFF27272A),
                         ),
                       ),
-
                       const SizedBox(height: 12),
-
                       if (_events.isEmpty)
                         const EmptyState(
                           icon: Icons.event_outlined,
@@ -472,13 +409,8 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // -----------------------
-                            // DROPDOWN
-                            // -----------------------
                             _buildEventDropdown(),
-
                             const SizedBox(height: 16),
-
                             _eventFiles.isEmpty
                                 ? const EmptyState(
                                   icon: Icons.insert_drive_file_outlined,
@@ -494,7 +426,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                                 ),
                           ],
                         ),
-
                       const SizedBox(height: 100),
                     ],
                   ),
@@ -503,9 +434,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     );
   }
 
-  // ---------------------------------------
-  // DROPDOWN
-  // ---------------------------------------
+  // Dropdown
   Widget _buildEventDropdown() {
     return Container(
       height: 36,
@@ -555,9 +484,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     );
   }
 
-  // ---------------------------------------
-  // FILTER
-  // ---------------------------------------
+  // Filter
   List<FileModel> _filteredAllFiles() {
     if (_search.isEmpty) return _allFiles;
     return _allFiles

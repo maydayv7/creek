@@ -48,7 +48,7 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
   @override
   void initState() {
     super.initState();
-    // Set initial view based on parameter, default to true (grid view)
+    // Set initial view, default to grid view
     _showAlternateView = widget.initialShowAlternateView ?? true;
     _initData();
   }
@@ -158,13 +158,13 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
   Widget build(BuildContext context) {
     if (_currentProject == null) {
       return const Scaffold(
-        backgroundColor: Variables.background,
+        backgroundColor: Variables.surfaceBackground,
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      backgroundColor: Variables.background,
+      backgroundColor: Variables.surfaceBackground,
       appBar: TopBar(
         currentProjectId: _currentProject!.id!,
         onBack: () => Navigator.pop(context),
@@ -220,7 +220,7 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
   Widget _buildCategorizedView() {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_categorizedImages.isEmpty) {
-      return EmptyState(
+      return const EmptyState(
         icon: Icons.image_not_supported_outlined,
         title: "No images found",
         subtitle: "Try adding new images",
@@ -308,7 +308,6 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
                             ),
                           );
                         },
-
                         child: Container(
                           width: 120,
                           decoration: BoxDecoration(

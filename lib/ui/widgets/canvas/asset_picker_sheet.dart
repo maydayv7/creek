@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:creekui/data/repos/project_repo.dart';
 import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/primary_button.dart';
 
 class AssetPickerSheet extends StatefulWidget {
   final int projectId;
@@ -188,24 +189,9 @@ class _AssetPickerSheetState extends State<AssetPickerSheet> {
             child: Container(
               width: double.infinity,
               margin: const EdgeInsets.only(top: 16, bottom: 16),
-              child: ElevatedButton(
+              child: PrimaryButton(
+                text: "Add to File",
                 onPressed: () => widget.onAddAssets(_selectedPaths.toList()),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Variables.surfaceDark,
-                  foregroundColor: Variables.textWhite,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-                child: const Text(
-                  "Add to File",
-                  style: TextStyle(
-                    fontFamily: 'GeneralSans',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ),
             ),
           ),

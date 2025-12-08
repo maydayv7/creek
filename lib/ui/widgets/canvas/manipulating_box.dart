@@ -153,8 +153,7 @@ class _ManipulatingBoxState extends State<ManipulatingBox> {
                         final rotated = _rotateVector(scaledDelta, -_rot);
                         setState(() {
                           _pos += scaledDelta;
-                          _previousFocalPoint =
-                              currentFocalPoint; // Update for next frame
+                          _previousFocalPoint = currentFocalPoint;
                         });
                         widget.onUpdate(_pos, _size, _rot);
                       }

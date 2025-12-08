@@ -1,4 +1,17 @@
 import 'dart:math';
+import 'dart:ui';
+
+// Extension to normalize Rect
+extension RectNormalize on Rect {
+  Rect normalize() {
+    return Rect.fromLTRB(
+      left < right ? left : right,
+      top < bottom ? top : bottom,
+      left < right ? right : left,
+      top < bottom ? bottom : top,
+    );
+  }
+}
 
 List<double> l2Normalize(List<double> vec) {
   double sum = vec.fold(0, (p, c) => p + c * c);

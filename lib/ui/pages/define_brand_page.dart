@@ -4,6 +4,9 @@ import 'package:creekui/services/project_service.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/text_field.dart';
 import 'package:creekui/ui/widgets/primary_button.dart';
+import 'package:creekui/ui/widgets/app_bar.dart';
+import 'package:creekui/ui/widgets/tag_chip.dart';
+import 'package:creekui/ui/widgets/dialog.dart';
 import 'project_detail_page.dart';
 
 class DefineBrandPage extends StatefulWidget {
@@ -114,32 +117,47 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
     }
   }
 
+  void _showAddKeywordDialog() {
+    final controller = TextEditingController();
+
+    ShowDialog.show(
+      context,
+      title: 'Add Keyword',
+      primaryButtonText: 'Add',
+      content: CommonTextField(
+        hintText: 'e.g., Minimal',
+        controller: controller,
+        autoFocus: true,
+      ),
+      onPrimaryPressed: () {
+        final val = controller.text.trim();
+        if (val.isNotEmpty && !_keywords.contains(val)) {
+          setState(() => _keywords.add(val));
+        }
+        Navigator.pop(context);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Variables.background,
+      appBar: CustomAppBar(
+        title: "",
+        showBack: true,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios,
+            size: 24,
+            color: Variables.textSecondary,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar with Back Button
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.arrow_back_ios,
-                      size: 24,
-                      color: Variables.textSecondary,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-
-            // Scrollable Content
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -271,36 +289,9 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
           runSpacing: 8,
           children: [
             for (final keyword in _keywords)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0E7FF),
-                  borderRadius: BorderRadius.circular(48),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      keyword,
-                      style: Variables.captionStyle.copyWith(
-                        fontSize: 12,
-                        color: Variables.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () => setState(() => _keywords.remove(keyword)),
-                      child: Icon(
-                        Icons.close,
-                        size: 16,
-                        color: Variables.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
+              TagChip(
+                label: keyword,
+                onDelete: () => setState(() => _keywords.remove(keyword)),
               ),
             GestureDetector(
               onTap: _showAddKeywordDialog,
@@ -324,7 +315,11 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(Icons.add, size: 14, color: Variables.textPrimary),
+                    const Icon(
+                      Icons.add,
+                      size: 14,
+                      color: Variables.textPrimary,
+                    ),
                   ],
                 ),
               ),
@@ -365,95 +360,39 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
           const SizedBox(height: 8),
           SizedBox(
             height: 44,
-            child: ListView.builder(
+            child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _competitorBrands.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 final brand = _competitorBrands[index];
-                return Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Variables.surfaceSubtle,
-                    border: Border.all(color: Variables.borderSubtle),
-                    borderRadius: BorderRadius.circular(64),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            brand['initial'] ?? '',
-                            style: Variables.captionStyle.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
+                return TagChip(
+                  label: brand['name'] ?? '',
+                  icon: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        brand['initial'] ?? '',
+                        style: Variables.captionStyle.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(brand['name'] ?? '', style: Variables.bodyStyle),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap:
-                            () => setState(
-                              () => _competitorBrands.removeAt(index),
-                            ),
-                        child: Icon(
-                          Icons.close,
-                          size: 16,
-                          color: Variables.textSecondary,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
+                  onDelete:
+                      () => setState(() => _competitorBrands.removeAt(index)),
                 );
               },
             ),
           ),
         ],
       ],
-    );
-  }
-
-  void _showAddKeywordDialog() {
-    final controller = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Add Keyword'),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: const InputDecoration(hintText: 'e.g., Minimal'),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  final val = controller.text.trim();
-                  if (val.isNotEmpty && !_keywords.contains(val))
-                    setState(() => _keywords.add(val));
-                  Navigator.pop(context);
-                },
-                child: const Text('Add'),
-              ),
-            ],
-          ),
     );
   }
 }

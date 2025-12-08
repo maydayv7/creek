@@ -111,28 +111,30 @@ class _BottomBarItem extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
+    final color = isActive ? Variables.iconActive : Variables.iconInactive;
+
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             SvgPicture.asset(
               iconPath,
               width: 24,
-              colorFilter: ColorFilter.mode(
-                isActive ? Variables.iconActive : Variables.iconInactive,
-                BlendMode.srcIn,
-              ),
+              height: 24,
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
             ),
             const SizedBox(height: 6),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: isActive ? Variables.iconActive : Variables.iconInactive,
+              style: Variables.captionStyle.copyWith(
+                color: color,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                fontSize: 10,
               ),
             ),
           ],

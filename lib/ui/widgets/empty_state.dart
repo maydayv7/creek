@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:creekui/ui/styles/variables.dart';
 
 class EmptyState extends StatelessWidget {
   final IconData icon;
@@ -14,30 +15,23 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 48),
+    return Center(
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 64, color: Colors.grey[400]),
+          Icon(icon, size: 48, color: Variables.textDisabled),
           const SizedBox(height: 16),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'GeneralSans',
-              color: Colors.grey[600],
+            style: Variables.bodyStyle.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Variables.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(
-              fontSize: 14,
-              fontFamily: 'GeneralSans',
-              color: Colors.grey[500],
-            ),
+            style: Variables.captionStyle,
             textAlign: TextAlign.center,
           ),
         ],

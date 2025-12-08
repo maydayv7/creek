@@ -47,7 +47,7 @@ class TextToolsOverlay extends StatelessWidget {
               ),
             ],
           ),
-          // Use SingleChildScrollView + Row to prevent overflow if screen is narrow
+          // Prevent overflow if screen is narrow
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -61,7 +61,7 @@ class TextToolsOverlay extends StatelessWidget {
                   onPressed: onClose,
                   tooltip: "Done",
                 ),
-                Container(width: 1, height: 20, color: Colors.grey[300]),
+                Container(width: 1, height: 20, color: Variables.borderSubtle),
                 const SizedBox(width: 8),
 
                 IconButton(
@@ -75,13 +75,17 @@ class TextToolsOverlay extends StatelessWidget {
 
                 if (isTextSelected) ...[
                   const SizedBox(width: 8),
-                  Container(width: 1, height: 20, color: Colors.grey[300]),
+                  Container(
+                    width: 1,
+                    height: 20,
+                    color: Variables.borderSubtle,
+                  ),
                   const SizedBox(width: 12),
 
                   const Icon(
                     Icons.text_fields,
                     size: 18,
-                    color: Colors.black54,
+                    color: Variables.textSecondary,
                   ),
                   SizedBox(
                     width: 100,
@@ -92,7 +96,7 @@ class TextToolsOverlay extends StatelessWidget {
                           enabledThumbRadius: 6,
                         ),
                         activeTrackColor: Variables.textPrimary,
-                        inactiveTrackColor: Colors.grey[200],
+                        inactiveTrackColor: Variables.borderSubtle,
                         thumbColor: Colors.black,
                         overlayShape: SliderComponentShape.noOverlay,
                       ),
@@ -115,13 +119,20 @@ class TextToolsOverlay extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: currentColor,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
+                        border: Border.all(
+                          color: Variables.borderSubtle,
+                          width: 1,
+                        ),
                       ),
                     ),
                   ),
 
                   const SizedBox(width: 12),
-                  Container(width: 1, height: 20, color: Colors.grey[300]),
+                  Container(
+                    width: 1,
+                    height: 20,
+                    color: Variables.borderSubtle,
+                  ),
                   const SizedBox(width: 8),
                 ],
               ],
@@ -144,13 +155,12 @@ class TextToolsOverlay extends StatelessWidget {
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: SafeArea(
-              // Added SafeArea here for the bottom sheet content
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     "Text Color",
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    style: Variables.headerStyle.copyWith(fontSize: 16),
                   ),
                   const SizedBox(height: 20),
                   BlockPicker(

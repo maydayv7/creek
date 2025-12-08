@@ -22,10 +22,14 @@ import 'package:creekui/services/flask_service.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/data/models/canvas_models.dart';
 import 'package:creekui/ui/painters/canvas_painter.dart';
+import 'package:creekui/utils/image_utils.dart';
 
 import 'package:creekui/ui/widgets/canvas/manipulating_box.dart';
 import 'package:creekui/ui/widgets/canvas/canvas_bottom_bar.dart';
 import 'package:creekui/ui/widgets/canvas/asset_picker_sheet.dart';
+import 'package:creekui/ui/widgets/app_bar.dart';
+import 'package:creekui/ui/widgets/dialog.dart';
+import 'package:creekui/ui/widgets/text_field.dart';
 import './canvas_toolbar/magic_draw_overlay.dart';
 import './canvas_toolbar/text_tools_overlay.dart';
 import 'project_file_page.dart';
@@ -93,7 +97,6 @@ class _CanvasPageState extends State<CanvasPage> {
   // Tools
   bool _isMagicDrawActive = false;
   bool _isTextToolsActive = false;
-
   bool _isMagicPanelDisabled = false;
   bool _isViewMode = false;
 
@@ -160,30 +163,18 @@ class _CanvasPageState extends State<CanvasPage> {
   }
 
   Future<bool> _confirmDiscardMagicDraw() async {
-    if (_magicPaths.isEmpty) return true; // nothing drawn – no popup
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text("Discard Magic Draw?"),
-            content: const Text(
-              "Leaving Magic Draw will remove your sketch. Continue?",
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text("Stay"),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text("Discard"),
-              ),
-            ],
-          ),
-    );
-
-    return result == true;
+    if (_magicPaths.isEmpty) return true;
+    return await ShowDialog.show<bool>(
+          context,
+          title: "Discard Magic Draw?",
+          description: "Leaving Magic Draw will remove your sketch. Continue?",
+          primaryButtonText: "Discard",
+          isDestructive: true,
+          onPrimaryPressed: () => Navigator.pop(context, true),
+          secondaryButtonText: "Stay",
+          onSecondaryPressed: () => Navigator.pop(context, false),
+        ) ??
+        false;
   }
 
   Future<void> _analyzeCanvas() async {
@@ -551,70 +542,49 @@ class _CanvasPageState extends State<CanvasPage> {
       return;
     }
 
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text("Save Changes?"),
-            content: const Text(
-              "Do you want to save your canvas before leaving?",
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context); // Close dialog
-                  Navigator.pop(context); // Leave page
-                },
-                child: const Text(
-                  "Discard",
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  Navigator.pop(context); // Close dialog
-                  await _saveCanvas(); // Save
-                  // Note: The redirect logic is handled in _saveCanvas for new files.
-                  // For existing files, we pop here.
-                  if (mounted && widget.existingFile != null) {
-                    Navigator.pop(context);
-                  }
-                },
-                child: const Text("Save"),
-              ),
-            ],
-          ),
+    ShowDialog.show(
+      context,
+      title: "Save Changes?",
+      description: "Do you want to save your canvas before leaving?",
+      primaryButtonText: "Save",
+      onPrimaryPressed: () async {
+        Navigator.pop(context); // Close dialog
+        await _saveCanvas(); // Save
+        if (mounted && widget.existingFile != null) {
+          Navigator.pop(context);
+        }
+      },
+      secondaryButtonText: "Discard",
+      onSecondaryPressed: () {
+        Navigator.pop(context); // Close dialog
+        Navigator.pop(context); // Leave page
+      },
     );
   }
 
   Future<String?> _showNameDialog() async {
-    TextEditingController nameController = TextEditingController(
-      text: "Untitled Canvas",
-    );
-    return showDialog<String>(
+    final nameController = TextEditingController(text: "Untitled Canvas");
+    return await showDialog<String>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text("Save Canvas"),
-            content: TextField(
-              controller: nameController,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: "Canvas Name",
-                hintText: "Enter a name for your file",
-                border: OutlineInputBorder(),
-              ),
+          (ctx) => Dialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(Variables.radiusLarge),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("Cancel"),
+            child: ShowDialog(
+              title: "Save Canvas",
+              content: CommonTextField(
+                hintText: "Enter a name for your file",
+                controller: nameController,
+                autoFocus: true,
               ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, nameController.text.trim()),
-                child: const Text("Save"),
-              ),
-            ],
+              primaryButtonText: "Save",
+              onPrimaryPressed:
+                  () => Navigator.pop(ctx, nameController.text.trim()),
+              secondaryButtonText: "Cancel",
+              onSecondaryPressed: () => Navigator.pop(ctx),
+            ),
           ),
     );
   }
@@ -1795,9 +1765,6 @@ class _CanvasPageState extends State<CanvasPage> {
           ],
         ),
       ),
-      backgroundColor: Variables.background,
-      foregroundColor: Variables.textPrimary,
-      elevation: 0,
       actions: [
         SafeArea(
           child: Row(

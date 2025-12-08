@@ -15,6 +15,7 @@ import 'package:creekui/ui/widgets/bottom_bar.dart';
 import 'package:creekui/ui/widgets/top_bar.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/section_header.dart';
+import 'package:creekui/ui/widgets/primary_button.dart';
 
 class StylesheetPage extends StatefulWidget {
   final int projectId;
@@ -201,7 +202,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Variables.background,
+      backgroundColor: Variables.surfaceBackground,
       appBar: TopBar(
         currentProjectId: _currentProjectId,
         onBack: () => Navigator.of(context).pop(),
@@ -232,17 +233,24 @@ class _StylesheetPageState extends State<StylesheetPage> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            "Are you ready to start building\nyour visual identity",
-            style: Variables.headerStyle.copyWith(fontSize: 18),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          _buildGenerateButton("Generate Stylesheet"),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              "Are you ready to start building\nyour visual identity",
+              style: Variables.headerStyle.copyWith(fontSize: 18),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            PrimaryButton(
+              text: "Generate Stylesheet",
+              iconPath: 'assets/icons/generate_icon.svg',
+              onPressed: _generateStylesheet,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -258,7 +266,16 @@ class _StylesheetPageState extends State<StylesheetPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: _buildGenerateButton("Regenerate Stylesheet")),
+            Center(
+              child: SizedBox(
+                width: 200,
+                child: PrimaryButton(
+                  text: "Regenerate Stylesheet",
+                  iconPath: 'assets/icons/generate_icon.svg',
+                  onPressed: _generateStylesheet,
+                ),
+              ),
+            ),
             const SizedBox(height: 24),
 
             _buildLogosSection(null),
@@ -277,36 +294,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
             if (data.emotions.isNotEmpty) _buildEmotionsSection(data.emotions),
 
             const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGenerateButton(String label) {
-    return GestureDetector(
-      onTap: _generateStylesheet,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: BoxDecoration(
-          color: Variables.textPrimary,
-          borderRadius: BorderRadius.circular(112),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(label, style: Variables.buttonTextStyle),
-            const SizedBox(width: 8),
-            SvgPicture.asset(
-              'assets/icons/generate_icon.svg',
-              width: 18,
-              height: 18,
-              colorFilter: const ColorFilter.mode(
-                Colors.white,
-                BlendMode.srcIn,
-              ),
-            ),
           ],
         ),
       ),

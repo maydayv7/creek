@@ -27,128 +27,118 @@ class FileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Resolve valid image path
-    final bool hasPreview =
-        previewPath.isNotEmpty && File(previewPath).existsSync();
-    final ImageProvider? imageProvider =
-        hasPreview ? FileImage(File(previewPath)) : null;
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        height: 100,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE4E4E7)),
+          color: Variables.background,
+          borderRadius: BorderRadius.circular(Variables.radiusMedium),
+          border: Border.all(color: Variables.borderSubtle),
         ),
+        padding: const EdgeInsets.all(12),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
+            // Preview Image
+            Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                color: Variables.surfaceSubtle,
+                borderRadius: BorderRadius.circular(Variables.radiusSmall),
               ),
-              child: SizedBox(
-                width: 120,
-                height: 120,
-                child:
-                    hasPreview
-                        ? Image(
-                          image: imageProvider!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _buildPlaceholder(),
-                        )
-                        : _buildPlaceholder(),
-              ),
+              clipBehavior: Clip.antiAlias,
+              child:
+                  previewPath.isNotEmpty
+                      ? Image.file(
+                        File(previewPath),
+                        fit: BoxFit.cover,
+                        errorBuilder:
+                            (context, error, stackTrace) => const Center(
+                              child: Icon(
+                                Icons.broken_image,
+                                color: Variables.textDisabled,
+                              ),
+                            ),
+                      )
+                      : const Center(
+                        child: Icon(Icons.image, color: Variables.textDisabled),
+                      ),
             ),
-
-            const SizedBox(width: 12),
-
-            // Info Column
+            const SizedBox(width: 16),
+            // Info
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (breadcrumb.isNotEmpty)
-                      Text(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (breadcrumb.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
                         breadcrumb,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF71717B),
-                          fontFamily: 'GeneralSans',
-                        ),
+                        style: Variables.captionStyle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    const SizedBox(height: 4),
-                    Text(
-                      file.name,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'GeneralSans',
-                        color: Color(0xFF27272A),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      dimensions,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF71717B),
-                        fontFamily: 'GeneralSans',
-                      ),
+                  Text(
+                    file.name,
+                    style: Variables.bodyStyle.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      timeAgo,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: const Color(0xFF71717B).withValues(alpha: 0.8),
-                        fontFamily: 'GeneralSans',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(dimensions, style: Variables.captionStyle),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 3,
+                        height: 3,
+                        decoration: const BoxDecoration(
+                          color: Variables.textDisabled,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 8),
+                      Text(timeAgo, style: Variables.captionStyle),
+                    ],
+                  ),
+                ],
               ),
             ),
-
-            // Menu
+            // Menu Action
             if (onMenuAction != null)
               PopupMenuButton<String>(
-                onSelected: onMenuAction,
-                itemBuilder:
-                    (_) => const [
-                      PopupMenuItem(value: "open", child: Text("Open")),
-                      PopupMenuItem(value: "rename", child: Text("Rename")),
-                      PopupMenuItem(value: "delete", child: Text("Delete")),
-                    ],
                 icon: const Icon(
                   Icons.more_vert,
-                  size: 20,
-                  color: Color(0xFF71717B),
+                  color: Variables.textSecondary,
                 ),
-              )
-            else
-              const SizedBox(width: 40),
+                onSelected: onMenuAction,
+                itemBuilder:
+                    (BuildContext context) => <PopupMenuEntry<String>>[
+                      const PopupMenuItem<String>(
+                        value: 'open',
+                        child: Text('Open'),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'rename',
+                        child: Text('Rename'),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Text(
+                          'Delete',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+              ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildPlaceholder() {
-    return Container(
-      color: Colors.grey[300],
-      child: const Center(
-        child: Icon(Icons.image, size: 32, color: Colors.white),
       ),
     );
   }

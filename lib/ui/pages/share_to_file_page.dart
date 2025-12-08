@@ -11,6 +11,7 @@ import 'package:creekui/ui/widgets/search_bar.dart';
 import 'package:creekui/ui/widgets/file_card.dart';
 import 'package:creekui/ui/widgets/section_header.dart';
 import 'package:creekui/ui/widgets/empty_state.dart';
+import 'package:creekui/ui/widgets/app_bar.dart';
 import 'create_file_page.dart';
 import 'canvas_page.dart';
 
@@ -279,25 +280,17 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 0,
+      backgroundColor: Variables.surfaceBackground,
+      appBar: CustomAppBar(
+        title: 'Files',
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          icon: const Icon(Icons.arrow_back, color: Variables.textPrimary),
           onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Files',
-          style: Variables.headerStyle.copyWith(
-            color: theme.colorScheme.onSurface,
-          ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.add, color: theme.colorScheme.onSurface, size: 28),
+            icon: const Icon(Icons.add, color: Variables.textPrimary, size: 28),
             onPressed: _onAddPressed,
             tooltip: "Create New File",
           ),
@@ -305,7 +298,9 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
       ),
       body:
           _isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(
+                child: CircularProgressIndicator(color: Variables.textPrimary),
+              )
               : _allFiles.isEmpty
               ? _buildEmptyState()
               : Column(
@@ -398,11 +393,11 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.folder_open, size: 80, color: Colors.grey[300]),
+          const Icon(Icons.folder_open, size: 80, color: Colors.grey),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             "No files yet",
-            style: TextStyle(color: Colors.grey[500], fontSize: 16),
+            style: TextStyle(color: Colors.grey, fontSize: 16),
           ),
           const SizedBox(height: 8),
           TextButton(

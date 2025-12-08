@@ -170,12 +170,9 @@ class _TopBarState extends State<TopBar> {
                         widget.titleOverride != null
                             ? Text(
                               widget.titleOverride!,
-                              style: const TextStyle(
-                                fontFamily: 'GeneralSans',
+                              style: Variables.headerStyle.copyWith(
                                 fontSize: 20,
-                                fontWeight: FontWeight.w500,
                                 height: 24 / 20,
-                                color: Variables.textPrimary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             )
@@ -184,12 +181,9 @@ class _TopBarState extends State<TopBar> {
                                 _rootProject != null)
                             ? Text(
                               _rootProject!.title,
-                              style: const TextStyle(
-                                fontFamily: 'GeneralSans',
+                              style: Variables.headerStyle.copyWith(
                                 fontSize: 20,
-                                fontWeight: FontWeight.w500,
                                 height: 24 / 20,
-                                color: Variables.textPrimary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             )
@@ -283,7 +277,6 @@ class _TopBarState extends State<TopBar> {
                                   child: Text(
                                     isRoot ? "Global" : project.title,
                                     style: Variables.bodyStyle.copyWith(
-                                      fontFamily: 'GeneralSans',
                                       fontWeight:
                                           isSelected
                                               ? FontWeight.bold

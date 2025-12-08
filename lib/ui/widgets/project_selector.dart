@@ -103,9 +103,7 @@ class _ProjectSelectorState extends State<ProjectSelector> {
         final parent = await _projectRepo.getProjectById(item.parentId!);
         parentTitle = parent?.title;
       }
-
       final cover = await _getProjectCover(item.id!);
-
       recents.add(
         ProjectItemViewModel(
           item: item,
@@ -124,9 +122,7 @@ class _ProjectSelectorState extends State<ProjectSelector> {
         final eCover = await _getProjectCover(e.id!);
         eventVMs.add(ProjectItemViewModel(item: e, coverPath: eCover));
       }
-
       final pCover = await _getProjectCover(p.id!);
-
       groups.add(ProjectGroup(project: p, events: eventVMs, coverPath: pCover));
     }
 
@@ -180,9 +176,6 @@ class _ProjectSelectorState extends State<ProjectSelector> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -198,7 +191,6 @@ class _ProjectSelectorState extends State<ProjectSelector> {
             hintText: widget.searchHint,
           ),
         ),
-
         Expanded(
           child: SingleChildScrollView(
             controller: widget.scrollController,
@@ -228,7 +220,7 @@ class _ProjectSelectorState extends State<ProjectSelector> {
                     child: Column(
                       children:
                           _recentViewModels
-                              .map((vm) => _buildRecentItem(vm, theme, isDark))
+                              .map((vm) => _buildRecentItem(vm))
                               .toList(),
                     ),
                   ),
@@ -256,8 +248,6 @@ class _ProjectSelectorState extends State<ProjectSelector> {
                       itemBuilder:
                           (context, index) => _buildProjectGroup(
                             _filteredGroupedProjects[index],
-                            theme,
-                            isDark,
                           ),
                     ),
                   ),
@@ -271,12 +261,7 @@ class _ProjectSelectorState extends State<ProjectSelector> {
     );
   }
 
-  // Widgets
-  Widget _buildRecentItem(
-    ProjectItemViewModel vm,
-    ThemeData theme,
-    bool isDark,
-  ) {
+  Widget _buildRecentItem(ProjectItemViewModel vm) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -285,12 +270,9 @@ class _ProjectSelectorState extends State<ProjectSelector> {
         child: Container(
           padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
           decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
+            color: Variables.background,
             borderRadius: BorderRadius.circular(Variables.radiusMedium),
-            border: Border.all(
-              color: isDark ? Variables.borderDark : Variables.borderSubtle,
-              width: 1,
-            ),
+            border: Border.all(color: Variables.borderSubtle, width: 1),
           ),
           child: Row(
             children: [
@@ -299,8 +281,7 @@ class _ProjectSelectorState extends State<ProjectSelector> {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color:
-                      isDark ? Variables.surfaceDark : Variables.surfaceSubtle,
+                  color: Variables.surfaceSubtle,
                   borderRadius: BorderRadius.circular(Variables.radiusSmall),
                   image:
                       vm.coverPath != null
@@ -312,11 +293,9 @@ class _ProjectSelectorState extends State<ProjectSelector> {
                 ),
                 child:
                     vm.coverPath == null
-                        ? Icon(
+                        ? const Icon(
                           Icons.image,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.3,
-                          ),
+                          color: Variables.textDisabled,
                           size: 28,
                         )
                         : null,
@@ -333,11 +312,7 @@ class _ProjectSelectorState extends State<ProjectSelector> {
                         padding: const EdgeInsets.only(bottom: 2),
                         child: Text(
                           vm.parentTitle!,
-                          style: Variables.captionStyle.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
-                            ),
-                          ),
+                          style: Variables.captionStyle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -346,7 +321,6 @@ class _ProjectSelectorState extends State<ProjectSelector> {
                       vm.title,
                       style: Variables.bodyStyle.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -361,7 +335,7 @@ class _ProjectSelectorState extends State<ProjectSelector> {
     );
   }
 
-  Widget _buildProjectGroup(ProjectGroup g, ThemeData theme, bool isDark) {
+  Widget _buildProjectGroup(ProjectGroup g) {
     final project = g.project;
     final hasEvents = g.events.isNotEmpty;
 
@@ -369,11 +343,9 @@ class _ProjectSelectorState extends State<ProjectSelector> {
       margin: const EdgeInsets.only(bottom: 8),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
+        color: Variables.background,
         borderRadius: BorderRadius.circular(Variables.radiusMedium),
-        border: Border.all(
-          color: isDark ? Variables.borderDark : Variables.borderSubtle,
-        ),
+        border: Border.all(color: Variables.borderSubtle),
       ),
       child: Column(
         children: [
@@ -397,7 +369,7 @@ class _ProjectSelectorState extends State<ProjectSelector> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: isDark ? Variables.surfaceDark : Variables.surfaceSubtle,
+                color: Variables.surfaceSubtle,
                 borderRadius: BorderRadius.circular(Variables.radiusMedium),
                 image:
                     g.coverPath != null
@@ -409,12 +381,7 @@ class _ProjectSelectorState extends State<ProjectSelector> {
               ),
               child:
                   g.coverPath == null
-                      ? Icon(
-                        Icons.folder,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.4,
-                        ),
-                      )
+                      ? const Icon(Icons.folder, color: Variables.textDisabled)
                       : null,
             ),
             title: Text(
@@ -422,7 +389,6 @@ class _ProjectSelectorState extends State<ProjectSelector> {
               style: Variables.bodyStyle.copyWith(
                 fontWeight: FontWeight.w600,
                 fontSize: 16,
-                color: theme.colorScheme.onSurface,
               ),
             ),
             trailing:
@@ -432,9 +398,7 @@ class _ProjectSelectorState extends State<ProjectSelector> {
                         g.isExpanded
                             ? Icons.keyboard_arrow_up
                             : Icons.keyboard_arrow_down,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
+                        color: Variables.textSecondary,
                       ),
                       onPressed: () {
                         setState(() => g.isExpanded = !g.isExpanded);
@@ -449,10 +413,7 @@ class _ProjectSelectorState extends State<ProjectSelector> {
               firstChild: const SizedBox.shrink(),
               secondChild: Container(
                 width: double.infinity,
-                color:
-                    isDark
-                        ? Colors.black26
-                        : Variables.surfaceSubtle.withValues(alpha: 0.5),
+                color: Variables.surfaceSubtle.withOpacity(0.5),
                 child: Column(
                   children:
                       g.events.map((e) {
@@ -472,16 +433,11 @@ class _ProjectSelectorState extends State<ProjectSelector> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: theme.cardColor,
+                              color: Variables.background,
                               borderRadius: BorderRadius.circular(
                                 Variables.radiusSmall,
                               ),
-                              border: Border.all(
-                                color:
-                                    isDark
-                                        ? Variables.borderDark
-                                        : Variables.borderSubtle,
-                              ),
+                              border: Border.all(color: Variables.borderSubtle),
                               image:
                                   e.coverPath != null
                                       ? DecorationImage(
@@ -492,11 +448,10 @@ class _ProjectSelectorState extends State<ProjectSelector> {
                             ),
                             child:
                                 e.coverPath == null
-                                    ? Icon(
+                                    ? const Icon(
                                       Icons.event,
                                       size: 20,
-                                      color: theme.colorScheme.onSurface
-                                          .withValues(alpha: 0.4),
+                                      color: Variables.textDisabled,
                                     )
                                     : null,
                           ),
@@ -505,7 +460,6 @@ class _ProjectSelectorState extends State<ProjectSelector> {
                             style: Variables.bodyStyle.copyWith(
                               fontSize: 15,
                               fontWeight: FontWeight.w500,
-                              color: theme.colorScheme.onSurface,
                             ),
                           ),
                         );

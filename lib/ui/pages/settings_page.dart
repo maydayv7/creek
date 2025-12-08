@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/pages/image_analysis_page.dart';
 import 'package:creekui/ui/widgets/primary_button.dart';
+import 'package:creekui/ui/widgets/app_bar.dart';
+import 'package:creekui/ui/widgets/text_field.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -25,9 +27,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     String name = prefs.getString('user_name') ?? 'Alex';
-    if (name.trim().isEmpty) {
-      name = 'Alex';
-    }
+    if (name.trim().isEmpty) name = 'Alex';
 
     setState(() {
       _nameController.text = name;
@@ -39,17 +39,10 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _saveUserName() async {
     final newName = _nameController.text.trim();
     if (newName.isEmpty) return;
-
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_name', newName);
-
-    setState(() {
-      _originalName = newName;
-    });
-
-    if (mounted) {
-      FocusScope.of(context).unfocus();
-    }
+    setState(() => _originalName = newName);
+    if (mounted) FocusScope.of(context).unfocus();
   }
 
   @override
@@ -63,18 +56,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final bool hasChanges = _nameController.text.trim() != _originalName;
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          "Settings",
-          style: TextStyle(
-            fontFamily: 'GeneralSans',
-            color: Variables.textPrimary,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Variables.textPrimary),
-      ),
+      appBar: const CustomAppBar(title: "Settings"),
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -93,58 +75,23 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // User Name Field
-                    const Text(
-                      "Your Name",
-                      style: TextStyle(
-                        fontFamily: 'GeneralSans',
-                        fontSize: 14,
-                        color: Variables.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
+                    CommonTextField(
+                      label: "Your Name",
+                      hintText: "Enter your name",
                       controller: _nameController,
-                      onChanged: (val) {
-                        setState(
-                          () {},
-                        ); // Trigger rebuild to show/hide checkmark
-                      },
-                      decoration: InputDecoration(
-                        hintText: "Enter your name",
-                        hintStyle: TextStyle(
-                          color: Variables.textSecondary.withValues(alpha: 0.5),
-                        ),
-                        filled: true,
-                        fillColor: Variables.surfaceSubtle,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        suffixIcon:
-                            hasChanges
-                                ? IconButton(
-                                  icon: const Icon(
-                                    Icons.check,
-                                    color: Variables.textPrimary,
-                                  ),
-                                  onPressed: _saveUserName,
-                                  tooltip: 'Save Name',
-                                )
-                                : null,
-                      ),
-                      style: const TextStyle(
-                        fontFamily: 'GeneralSans',
-                        fontSize: 16,
-                        color: Variables.textPrimary,
-                      ),
+                      onChanged: (val) => setState(() {}),
+                      suffixIcon:
+                          hasChanges
+                              ? IconButton(
+                                icon: const Icon(
+                                  Icons.check,
+                                  color: Variables.textPrimary,
+                                ),
+                                onPressed: _saveUserName,
+                                tooltip: 'Save Name',
+                              )
+                              : null,
                     ),
-
                     const Spacer(),
 
                     // Test Analysis

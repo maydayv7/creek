@@ -61,7 +61,7 @@ class _NoteInputSheetState extends State<NoteInputSheet> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: const Color(0xFFFAFAFA),
+                    color: Variables.surfaceBackground,
                     width: 1.25,
                   ),
                 ),
@@ -74,11 +74,9 @@ class _NoteInputSheetState extends State<NoteInputSheet> {
               const SizedBox(width: 10),
               Text(
                 _userName,
-                style: const TextStyle(
-                  fontFamily: 'GeneralSans',
+                style: Variables.bodyStyle.copyWith(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: Colors.black,
                 ),
               ),
               const Spacer(),
@@ -88,7 +86,7 @@ class _NoteInputSheetState extends State<NoteInputSheet> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE0E7FF),
+                  color: Variables.chipBackground,
                   borderRadius: BorderRadius.circular(1000),
                 ),
                 child: DropdownButtonHideUnderline(
@@ -97,21 +95,17 @@ class _NoteInputSheetState extends State<NoteInputSheet> {
                         widget.categories.contains(_selectedCategory)
                             ? _selectedCategory
                             : null,
-                    hint: const Text(
+                    hint: Text(
                       "Type",
-                      style: TextStyle(fontFamily: 'GeneralSans', fontSize: 12),
+                      style: Variables.bodyStyle.copyWith(fontSize: 12),
                     ),
                     isDense: true,
                     icon: const Icon(
                       Icons.arrow_drop_down,
                       size: 20,
-                      color: Color(0xFF27272A),
+                      color: Variables.textPrimary,
                     ),
-                    style: const TextStyle(
-                      fontFamily: 'GeneralSans',
-                      fontSize: 12,
-                      color: Color(0xFF27272A),
-                    ),
+                    style: Variables.bodyStyle.copyWith(fontSize: 12),
                     dropdownColor: Colors.white,
                     items:
                         widget.categories
@@ -135,18 +129,15 @@ class _NoteInputSheetState extends State<NoteInputSheet> {
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF4F4F5),
-                    border: Border.all(color: const Color(0xFFE4E4E7)),
+                    color: Variables.surfaceSubtle,
+                    border: Border.all(color: Variables.borderSubtle),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: TextField(
                     controller: _controller,
                     autofocus: true,
                     maxLines: null,
-                    style: const TextStyle(
-                      fontFamily: 'GeneralSans',
-                      fontSize: 12,
-                    ),
+                    style: Variables.bodyStyle.copyWith(fontSize: 12),
                     decoration: const InputDecoration(
                       hintText: "Enter note details...",
                       border: InputBorder.none,
@@ -162,7 +153,7 @@ class _NoteInputSheetState extends State<NoteInputSheet> {
               IconButton(
                 icon: const Icon(
                   Icons.send,
-                  color: Color(0xFF27272A),
+                  color: Variables.textPrimary,
                   size: 24,
                 ),
                 onPressed: () {

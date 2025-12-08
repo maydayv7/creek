@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:creekui/services/analyze/image_analyzer.dart';
 import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/app_bar.dart';
+import 'package:creekui/ui/widgets/tag_chip.dart';
 
 class ImageAnalysisPage extends StatefulWidget {
   const ImageAnalysisPage({super.key});
@@ -115,10 +117,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                       Icons.camera_alt_outlined,
                       color: Colors.black,
                     ),
-                    title: const Text(
-                      "Take Photo",
-                      style: TextStyle(fontFamily: 'GeneralSans'),
-                    ),
+                    title: Text("Take Photo", style: Variables.bodyStyle),
                     onTap: () {
                       Navigator.pop(ctx);
                       _pickImage(ImageSource.camera);
@@ -129,9 +128,9 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                       Icons.image_outlined,
                       color: Colors.black,
                     ),
-                    title: const Text(
+                    title: Text(
                       "Choose from Gallery",
-                      style: TextStyle(fontFamily: 'GeneralSans'),
+                      style: Variables.bodyStyle,
                     ),
                     onTap: () {
                       Navigator.pop(ctx);
@@ -149,21 +148,13 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: Variables.surfaceBackground,
+      appBar: CustomAppBar(
+        title: "Image Analysis",
+        showBack: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "Image Analysis",
-          style: TextStyle(
-            color: Colors.black,
-            fontFamily: 'GeneralSans',
-            fontWeight: FontWeight.bold,
-          ),
         ),
         actions: [
           if (_selectedImage != null && !_isAnalyzing)
@@ -185,7 +176,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                 width: double.infinity,
                 height: 250,
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: Variables.surfaceSubtle,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
@@ -214,8 +205,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                             const SizedBox(height: 12),
                             Text(
                               "Select image to analyze",
-                              style: TextStyle(
-                                fontFamily: 'GeneralSans',
+                              style: Variables.bodyStyle.copyWith(
                                 color: Colors.grey[500],
                               ),
                             ),
@@ -259,52 +249,17 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                           }
                         });
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              isSelected
-                                  ? const Color(0xFFEEF0FF)
-                                  : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color:
-                                isSelected
-                                    ? const Color(0xFF7C4DFF)
-                                    : Colors.grey[300]!,
-                            width: 1.0,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (isSelected) ...[
-                              const Icon(
-                                Icons.check,
-                                size: 14,
-                                color: Color(0xFF7C4DFF),
-                              ),
-                              const SizedBox(width: 4),
-                            ],
-                            Text(
-                              tag,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight:
-                                    isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                color:
-                                    isSelected
-                                        ? const Color(0xFF7C4DFF)
-                                        : Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: TagChip(
+                        label: tag,
+                        icon:
+                            isSelected
+                                ? const Icon(
+                                  Icons.check,
+                                  size: 14,
+                                  color: Variables.chipText,
+                                )
+                                : null,
+                        onDelete: () {},
                       ),
                     );
                   }).toList(),
@@ -367,9 +322,9 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Variables.borderSubtle,
+        color: Variables.surfaceSubtle,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[800]!),
+        border: Border.all(color: Variables.borderSubtle),
       ),
       child: SelectableText(
         prettyJson,

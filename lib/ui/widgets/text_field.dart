@@ -2,21 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:creekui/ui/styles/variables.dart';
 
 class CommonTextField extends StatelessWidget {
-  final String label;
+  final String? label;
   final String hintText;
   final TextEditingController controller;
   final int maxLines;
   final bool isRequired;
   final ValueChanged<String>? onSubmitted;
+  final ValueChanged<String>? onChanged;
+  final Widget? suffixIcon;
+  final bool autoFocus;
 
   const CommonTextField({
     super.key,
-    required this.label,
+    this.label,
     required this.hintText,
     required this.controller,
     this.maxLines = 1,
     this.isRequired = false,
     this.onSubmitted,
+    this.onChanged,
+    this.suffixIcon,
+    this.autoFocus = false,
   });
 
   @override
@@ -24,23 +30,27 @@ class CommonTextField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: Variables.bodyStyle.copyWith(fontWeight: FontWeight.w500),
-            ),
-            if (isRequired)
+        if (label != null) ...[
+          Row(
+            children: [
               Text(
-                '*',
+                label!,
                 style: Variables.bodyStyle.copyWith(
-                  color: const Color(0xFF4F39F6),
-                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-          ],
-        ),
-        const SizedBox(height: 6),
+              if (isRequired)
+                Text(
+                  '*',
+                  style: Variables.bodyStyle.copyWith(
+                    color: const Color(0xFF4F39F6),
+                    fontSize: 12,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+        ],
         Container(
           decoration: BoxDecoration(
             color: Variables.borderSubtle,
@@ -49,7 +59,9 @@ class CommonTextField extends StatelessWidget {
           child: TextField(
             controller: controller,
             maxLines: maxLines,
+            autofocus: autoFocus,
             onSubmitted: onSubmitted,
+            onChanged: onChanged,
             style: Variables.bodyStyle,
             decoration: InputDecoration(
               hintText: hintText,
@@ -61,6 +73,7 @@ class CommonTextField extends StatelessWidget {
                 horizontal: 16,
                 vertical: 12,
               ),
+              suffixIcon: suffixIcon,
             ),
           ),
         ),

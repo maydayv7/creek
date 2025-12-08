@@ -4,6 +4,9 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:creekui/services/project_service.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/project_selector.dart';
+import 'package:creekui/ui/widgets/app_bar.dart';
+import 'package:creekui/ui/widgets/dialog.dart';
+import 'package:creekui/ui/widgets/text_field.dart';
 import 'image_save_page.dart';
 
 class ShareToMoodboardPage extends StatefulWidget {
@@ -20,40 +23,27 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
 
   Future<void> _createNewProject() async {
     final controller = TextEditingController();
-    final String? title = await showDialog<String>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text(
-              "New Project",
-              style: TextStyle(fontFamily: 'GeneralSans'),
-            ),
-            content: TextField(
-              controller: controller,
-              decoration: const InputDecoration(hintText: "Project Title"),
-              autofocus: true,
-              textCapitalization: TextCapitalization.sentences,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Cancel"),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, controller.text.trim()),
-                child: const Text("Create"),
-              ),
-            ],
-          ),
+    await ShowDialog.show(
+      context,
+      title: "New Project",
+      primaryButtonText: "Create",
+      content: CommonTextField(
+        hintText: "Project Title",
+        controller: controller,
+        autoFocus: true,
+      ),
+      onPrimaryPressed: () async {
+        final title = controller.text.trim();
+        if (title.isNotEmpty) {
+          Navigator.pop(context); // Close dialog
+          final newId = await _projectService.createProject(title);
+          setState(() {
+            _selectorKey = UniqueKey();
+          });
+          _navigateToSavePage(newId, title);
+        }
+      },
     );
-
-    if (title != null && title.isNotEmpty) {
-      final newId = await _projectService.createProject(title);
-      setState(() {
-        _selectorKey = UniqueKey();
-      });
-      _navigateToSavePage(newId, title);
-    }
   }
 
   void _navigateToSavePage(
@@ -80,26 +70,17 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 0,
+      backgroundColor: Variables.surfaceBackground,
+      appBar: CustomAppBar(
+        title: "MoodBoards",
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          icon: const Icon(Icons.arrow_back, color: Variables.textPrimary),
           onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          "MoodBoards",
-          style: Variables.headerStyle.copyWith(
-            color: theme.colorScheme.onSurface,
-          ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.add, color: theme.colorScheme.onSurface, size: 28),
+            icon: const Icon(Icons.add, color: Variables.textPrimary, size: 28),
             onPressed: _createNewProject,
             tooltip: "Create New Project",
           ),

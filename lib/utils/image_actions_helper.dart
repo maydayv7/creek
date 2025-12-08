@@ -4,7 +4,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:creekui/data/models/image_model.dart';
 import 'package:creekui/services/image_service.dart';
 import 'package:creekui/ui/pages/share_to_file_page.dart';
-import 'package:creekui/ui/styles/variables.dart';
+import 'package:creekui/ui/widgets/dialog.dart';
+import 'package:creekui/ui/widgets/text_field.dart';
 
 class ImageActionsHelper {
   static Future<void> shareImage(BuildContext context, String filePath) async {
@@ -31,67 +32,26 @@ class ImageActionsHelper {
     final TextEditingController nameController = TextEditingController(
       text: image.name,
     );
-    await showDialog(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: const Text(
-              "Rename Image",
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            content: TextField(
-              controller: nameController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: "Enter new name",
-                filled: true,
-                fillColor: Variables.surfaceSubtle,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text(
-                  "Cancel",
-                  style: TextStyle(
-                    color: Variables.textSecondary,
-                    fontFamily: 'GeneralSans',
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () async {
-                  if (nameController.text.isNotEmpty) {
-                    await ImageService().renameImage(
-                      image.id,
-                      nameController.text.trim(),
-                    );
-                    onSuccess();
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  }
-                },
-                child: const Text(
-                  "Save",
-                  style: TextStyle(
-                    color: Variables.textPrimary,
-                    fontFamily: 'GeneralSans',
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
+
+    await ShowDialog.show(
+      context,
+      title: "Rename Image",
+      primaryButtonText: "Save",
+      content: CommonTextField(
+        hintText: "Enter new name",
+        controller: nameController,
+        autoFocus: true,
+      ),
+      onPrimaryPressed: () async {
+        if (nameController.text.isNotEmpty) {
+          await ImageService().renameImage(
+            image.id,
+            nameController.text.trim(),
+          );
+          onSuccess();
+          if (context.mounted) Navigator.pop(context);
+        }
+      },
     );
   }
 
@@ -100,57 +60,17 @@ class ImageActionsHelper {
     ImageModel image,
     VoidCallback onSuccess,
   ) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: const Text(
-              "Delete Image?",
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            content: const Text(
-              "This action cannot be undone.",
-              style: TextStyle(
-                fontFamily: 'GeneralSans',
-                color: Variables.textSecondary,
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  "Cancel",
-                  style: TextStyle(
-                    color: Variables.textSecondary,
-                    fontFamily: 'GeneralSans',
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  "Delete",
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontFamily: 'GeneralSans',
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
+    await ShowDialog.show(
+      context,
+      title: "Delete Image?",
+      description: "This action cannot be undone.",
+      primaryButtonText: "Delete",
+      isDestructive: true,
+      onPrimaryPressed: () async {
+        await ImageService().deleteImage(image.id);
+        onSuccess();
+        if (context.mounted) Navigator.pop(context);
+      },
     );
-
-    if (confirm == true) {
-      await ImageService().deleteImage(image.id);
-      onSuccess();
-    }
   }
 }

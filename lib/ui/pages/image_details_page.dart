@@ -5,12 +5,17 @@ import 'package:creekui/services/image_service.dart';
 import 'package:creekui/services/note_service.dart';
 import 'package:creekui/data/models/note_model.dart';
 import 'package:creekui/data/models/image_model.dart';
+import 'package:creekui/data/models/canvas_models.dart';
 import 'package:creekui/utils/image_actions_helper.dart';
+import 'package:creekui/utils/image_utils.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/primary_button.dart';
 import 'package:creekui/ui/widgets/empty_state.dart';
 import 'package:creekui/ui/widgets/selection_overlay_painter.dart';
 import 'package:creekui/ui/widgets/note_input_sheet.dart';
+import 'package:creekui/ui/widgets/app_bar.dart';
+import 'package:creekui/ui/widgets/dialog.dart';
+import 'package:creekui/ui/widgets/tag_chip.dart';
 
 class ImageDetailsPage extends StatefulWidget {
   final String imagePath;
@@ -356,96 +361,60 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
 
   // Edit Tags Dialog
   void _openEditTagsDialog() {
+    List<String> tempTags = List.from(_currentTags);
     showDialog(
       context: context,
-      builder: (ctx) {
-        List<String> tempTags = List.from(_currentTags);
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text(
-                "Edit Tags",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              content: SingleChildScrollView(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                      _allAvailableTags.map((tag) {
-                        final isSelected = tempTags.contains(tag);
-                        return GestureDetector(
-                          onTap:
-                              () => setState(
-                                () =>
-                                    isSelected
-                                        ? tempTags.remove(tag)
-                                        : tempTags.add(tag),
-                              ),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  isSelected
-                                      ? const Color(0xFFEEF0FF)
-                                      : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color:
-                                    isSelected
-                                        ? const Color(0xFF7C4DFF)
-                                        : Colors.grey[300]!,
-                              ),
-                            ),
-                            child: Text(
-                              tag,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight:
-                                    isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                color:
-                                    isSelected
-                                        ? const Color(0xFF7C4DFF)
-                                        : Colors.black87,
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder: (context, setLocalState) {
+              return Dialog(
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(Variables.radiusLarge),
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    "Cancel",
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    this.setState(() => _currentTags = tempTags);
+                child: ShowDialog(
+                  title: "Edit Tags",
+                  primaryButtonText: "Save",
+                  onPrimaryPressed: () async {
+                    setState(() => _currentTags = tempTags);
                     await _imageService.updateTags(widget.imageId, tempTags);
-                    if (context.mounted) Navigator.pop(context);
+                    if (mounted) Navigator.pop(context);
                   },
-                  child: const Text(
-                    "Save",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
+                  content: SingleChildScrollView(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children:
+                          _allAvailableTags.map((tag) {
+                            final isSelected = tempTags.contains(tag);
+                            return GestureDetector(
+                              onTap: () {
+                                setLocalState(() {
+                                  isSelected
+                                      ? tempTags.remove(tag)
+                                      : tempTags.add(tag);
+                                });
+                              },
+                              child: TagChip(
+                                label: tag,
+                                icon:
+                                    isSelected
+                                        ? const Icon(
+                                          Icons.check,
+                                          size: 14,
+                                          color: Variables.chipText,
+                                        )
+                                        : null,
+                                onDelete: () {},
+                              ),
+                            );
+                          }).toList(),
                     ),
                   ),
                 ),
-              ],
-            );
-          },
-        );
-      },
+              );
+            },
+          ),
     );
   }
 
@@ -457,25 +426,24 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
     return Scaffold(
       // Prevents the main screen from pushing up when the keyboard opens
       resizeToAvoidBottomInset: false,
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: Variables.surfaceBackground,
+      appBar: CustomAppBar(
+        showBack: true,
         leading: IconButton(
           icon: const Icon(
             Icons.arrow_back_ios_new,
             size: 20,
-            color: Colors.black,
+            color: Variables.textPrimary,
           ),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
-        title:
+        titleWidget:
             (!isSelectionModeActive && _imageModel != null)
                 ? Container(
                   height: 40,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
+                    color: Variables.surfaceSubtle,
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: InkWell(
@@ -495,17 +463,16 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                             width: 18,
                             height: 18,
                             colorFilter: const ColorFilter.mode(
-                              Colors.black,
+                              Variables.textPrimary,
                               BlendMode.srcIn,
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
+                          Text(
                             "Send to File",
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w600,
+                            style: Variables.headerStyle.copyWith(
                               fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -528,7 +495,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
           // 2. Cancel Selection (Any selection mode)
           if (isSelectionModeActive)
             IconButton(
-              icon: const Icon(Icons.close, color: Colors.black),
+              icon: const Icon(Icons.close, color: Variables.textPrimary),
               onPressed: _resetSelectionMode,
             ),
 
@@ -546,7 +513,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                 width: 20,
                 height: 20,
                 colorFilter: const ColorFilter.mode(
-                  Colors.black,
+                  Variables.textPrimary,
                   BlendMode.srcIn,
                 ),
               ),
@@ -558,11 +525,11 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                   () => ImageActionsHelper.renameImage(
                     context,
                     _imageModel!,
-                    () => _loadData(), // Refresh title after rename
+                    () => _loadData(),
                   ),
               icon: const Icon(
                 Icons.drive_file_rename_outline,
-                color: Colors.black,
+                color: Variables.textPrimary,
               ),
             ),
           ],
@@ -571,7 +538,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
       body:
           _isLoading
               ? const Center(
-                child: CircularProgressIndicator(color: Colors.black),
+                child: CircularProgressIndicator(color: Variables.textPrimary),
               )
               : Column(
                 children: [
@@ -822,7 +789,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                                     color: const Color(0xFFF9F9F9),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                      color: Colors.grey[200]!,
+                                      color: Variables.borderSubtle,
                                     ),
                                   ),
                                   child: Column(
@@ -843,15 +810,15 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                                             child: const Icon(
                                               Icons.edit_outlined,
                                               size: 18,
-                                              color: Colors.black54,
+                                              color: Variables.textSecondary,
                                             ),
                                           ),
                                         ],
                                       ),
                                       const SizedBox(height: 12),
-                                      Divider(
+                                      const Divider(
                                         height: 1,
-                                        color: Colors.grey[300],
+                                        color: Variables.borderSubtle,
                                       ),
                                       const SizedBox(height: 16),
                                       SizedBox(
@@ -870,40 +837,10 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                                                   children:
                                                       _currentTags
                                                           .map(
-                                                            (tag) => Container(
-                                                              padding:
-                                                                  const EdgeInsets.symmetric(
-                                                                    horizontal:
-                                                                        12,
-                                                                    vertical: 6,
-                                                                  ),
-                                                              decoration: BoxDecoration(
-                                                                color:
-                                                                    const Color(
-                                                                      0xFFEEF0FF,
-                                                                    ),
-                                                                borderRadius:
-                                                                    BorderRadius.circular(
-                                                                      20,
-                                                                    ),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                    0xFF7C4DFF,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              child: Text(
-                                                                tag,
-                                                                style: const TextStyle(
-                                                                  fontSize: 13,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500,
-                                                                  color: Color(
-                                                                    0xFF7C4DFF,
-                                                                  ),
-                                                                ),
-                                                              ),
+                                                            (tag) => TagChip(
+                                                              label: tag,
+                                                              onDelete: () {},
+                                                              icon: null,
                                                             ),
                                                           )
                                                           .toList(),
@@ -950,12 +887,13 @@ class __NotesListSheetState extends State<_NotesListSheet> {
         final index = widget.notes.indexWhere(
           (n) => n.id == widget.highlightId,
         );
-        if (index != -1 && _scrollController.hasClients)
+        if (index != -1 && _scrollController.hasClients) {
           _scrollController.animateTo(
             index * 80.0,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
           );
+        }
       });
     }
   }

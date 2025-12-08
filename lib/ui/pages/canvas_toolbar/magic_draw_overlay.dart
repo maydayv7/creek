@@ -155,21 +155,6 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
     });
   }
 
-  void _handleToolTap(VoidCallback toolAction) {
-    setState(() {
-      _showStrokeSlider = false;
-      _showModelMenu = false;
-      if (_isViewMode) {
-        _isViewMode = false;
-        widget.onViewModeToggle(false);
-      }
-      if (widget.isMagicPanelDisabled) {
-        widget.onMagicPanelActivityToggle(false);
-      }
-    });
-    toolAction();
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!widget.isActive) return const SizedBox.shrink();
@@ -210,8 +195,8 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
   }
 
   Widget _buildToolIcon(dynamic icon, bool isActive, VoidCallback onTap) {
-    final Color activeColor = Colors.black;
-    final Color inactiveColor = Colors.grey;
+    final Color activeColor = Variables.textPrimary;
+    final Color inactiveColor = Variables.textSecondary;
     final Color iconColor = isActive ? activeColor : inactiveColor;
 
     final Widget iconWidget =
@@ -229,7 +214,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isActive ? Colors.grey.shade200 : Colors.transparent,
+          color: isActive ? Variables.surfaceSubtle : Colors.transparent,
           shape: BoxShape.circle,
         ),
         child: iconWidget,
@@ -245,7 +230,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
         children: [
           Text(
             widget.hasImageLayers ? 'Inpainting Models' : 'Sketch Models',
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
+            style: Variables.captionStyle.copyWith(fontSize: 12),
           ),
           const SizedBox(height: 4),
 
@@ -270,10 +255,9 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                     const SizedBox(width: 8),
                     Text(
                       model.name,
-                      style: TextStyle(
+                      style: Variables.bodyStyle.copyWith(
                         fontWeight:
                             isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: Colors.black87,
                       ),
                     ),
                     const Spacer(),
@@ -289,10 +273,11 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                         ),
                         child: Text(
                           model.badge!,
-                          style: TextStyle(
-                            color: Colors.blue.shade900,
+                          style: const TextStyle(
+                            color: Color(0xFF0D47A1), // Dark blue
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
+                            fontFamily: 'GeneralSans',
                           ),
                         ),
                       ),
@@ -301,7 +286,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
               ),
             );
           }).toList(),
-          Divider(height: 1, color: Colors.grey.shade100),
+          const Divider(height: 1, color: Variables.borderSubtle),
         ],
       ),
     );
@@ -320,8 +305,9 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: _showModelMenu ? Colors.grey.shade100 : Colors.white,
-                    border: Border.all(color: Colors.grey.shade300),
+                    color:
+                        _showModelMenu ? Variables.surfaceSubtle : Colors.white,
+                    border: Border.all(color: Variables.borderSubtle),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
@@ -338,9 +324,10 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                   controller: _promptController,
                   enabled: !widget.isProcessing,
                   onSubmitted: (_) => _handleSubmit(),
-                  decoration: const InputDecoration.collapsed(
+                  style: Variables.bodyStyle,
+                  decoration: InputDecoration.collapsed(
                     hintText: "tap imagination...",
-                    hintStyle: TextStyle(fontSize: 14, color: Colors.black54),
+                    hintStyle: Variables.captionStyle.copyWith(fontSize: 14),
                   ),
                 ),
               ),
@@ -352,7 +339,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                   width: 44,
                   height: 44,
                   decoration: const BoxDecoration(
-                    color: Color(0xFF2B2B2B),
+                    color: Variables.textPrimary,
                     shape: BoxShape.circle,
                   ),
                   child:
@@ -374,7 +361,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
             ],
           ),
         ),
-        Divider(height: 1, color: Colors.grey.shade200),
+        const Divider(height: 1, color: Variables.borderSubtle),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
@@ -461,7 +448,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                   decoration: BoxDecoration(
                     color:
                         _showStrokeSlider
-                            ? Colors.grey.shade200
+                            ? Variables.surfaceSubtle
                             : Colors.transparent,
                     shape: BoxShape.circle,
                   ),
@@ -469,7 +456,7 @@ class _MagicDrawToolsState extends State<MagicDrawTools> {
                     width: 10,
                     height: 10,
                     decoration: const BoxDecoration(
-                      color: Colors.black87,
+                      color: Variables.textPrimary,
                       shape: BoxShape.circle,
                     ),
                   ),
