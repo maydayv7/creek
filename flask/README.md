@@ -31,7 +31,7 @@ modal deploy modal_app.py
 # Setup
 
 > [!NOTE]
-> Python 3.11 is the preferred version for running the backend
+> For [Nix](https://nixos.org/) users, a [Flake](./flake.nix) for the development shell is provided
 
 ## Models
 
@@ -46,5 +46,5 @@ FAL_KEY=<Fal.ai API Key>
 SHARED_SECRET_KEY=<Base64 Security Key>
 ```
 
-> [!NOTE]
+> [!CAUTION]
 > You must update the root [`.env`](../.env) file for the app to recognize the deployed backend

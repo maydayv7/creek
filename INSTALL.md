@@ -17,6 +17,9 @@ To build the app from source, read the rest of this document.
 
 Ensure that all these programs with the correct versions are installed on your system before using this repository
 
+> [!NOTE]
+> For [Nix](https://nixos.org/) users, a [Flake](./flake.nix) for the development shell is provided
+
 # Setup
 
 ### 1. Download Models
