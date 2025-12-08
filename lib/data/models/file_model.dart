@@ -1,5 +1,15 @@
 import 'dart:convert';
 
+class FileMetadataInfo {
+  final double width;
+  final double height;
+  final String? previewPath;
+
+  FileMetadataInfo({this.width = 0, this.height = 0, this.previewPath});
+
+  String get dimensions => '${width.toInt()} x ${height.toInt()} px';
+}
+
 class FileModel {
   final String id;
   final int projectId;

@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:image/image.dart' as img;
 import 'package:creekui/data/repos/file_repo.dart';
 import 'package:creekui/data/models/file_model.dart';
 
@@ -46,8 +48,7 @@ class FileService {
     return await _repo.getRecentFiles(limit: limit);
   }
 
-  // Retained for backwards compatibility, though generally deprecated for a global file list view.
-  @Deprecated('Use getAllFiles() or getRecentFiles() for the file list page.')
+  @Deprecated('Use getAllFiles() or getRecentFiles() instead')
   Future<List<FileModel>> getFiles(int projectId) async {
     return await _repo.getFiles(projectId);
   }
@@ -85,5 +86,91 @@ class FileService {
 
   Future<void> renameFile(String id, String newName) async {
     await _repo.updateDetails(id, name: newName);
+  }
+
+  // Saves canvas JSON structure to a file
+  Future<void> saveCanvasFile({
+    required int projectId,
+    required Map<String, dynamic> canvasData,
+    String? fileId,
+    String? fileName,
+  }) async {
+    final jsonString = jsonEncode(canvasData);
+
+    if (fileId != null) {
+      // Update existing file
+      final fileData = await _repo.getById(fileId);
+      if (fileData != null) {
+        final file = File(fileData.filePath);
+        await file.writeAsString(jsonString);
+        await _repo.touchFile(fileId); // Update last modified
+      }
+    } else {
+      // Create new file via temporary storage
+      final directory = await getTemporaryDirectory();
+      final tempFile = File(
+        '${directory.path}/canvas_${DateTime.now().millisecondsSinceEpoch}.json',
+      );
+      await tempFile.writeAsString(jsonString);
+
+      await saveFile(
+        tempFile,
+        projectId,
+        name: fileName ?? "Untitled Canvas",
+        description: "Editable Canvas Board",
+      );
+
+      // Cleanup temp file
+      if (await tempFile.exists()) await tempFile.delete();
+    }
+  }
+
+  // Unified metadata extraction logic
+  Future<FileMetadataInfo> getFileMetadata(String filePath) async {
+    try {
+      final f = File(filePath);
+      if (!await f.exists()) return FileMetadataInfo();
+
+      if (filePath.toLowerCase().endsWith('.json')) {
+        try {
+          final content = await f.readAsString();
+          final data = jsonDecode(content);
+
+          if (data is Map) {
+            final width = (data['width'] as num?)?.toDouble() ?? 0;
+            final height = (data['height'] as num?)?.toDouble() ?? 0;
+            final previewPath = data['preview_path'] as String?;
+
+            return FileMetadataInfo(
+              width: width,
+              height: height,
+              previewPath: previewPath,
+            );
+          }
+        } catch (e) {
+          // ignore: avoid_print
+          print('Error parsing JSON metadata for $filePath: $e');
+        }
+      } else {
+        // Attempt to decode image dimensions directly
+        try {
+          final bytes = await f.readAsBytes();
+          final image = img.decodeImage(bytes);
+          if (image != null) {
+            return FileMetadataInfo(
+              width: image.width.toDouble(),
+              height: image.height.toDouble(),
+              previewPath: filePath,
+            );
+          }
+        } catch (e) {
+          print('Error decoding image metadata for $filePath: $e');
+        }
+      }
+    } catch (e) {
+      print('Error accessing file metadata for $filePath: $e');
+    }
+
+    return FileMetadataInfo();
   }
 }

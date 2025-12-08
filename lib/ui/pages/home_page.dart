@@ -9,6 +9,7 @@ import 'package:creekui/data/repos/project_repo.dart';
 import 'package:creekui/data/repos/image_repo.dart';
 import 'package:creekui/data/repos/file_repo.dart';
 import 'package:creekui/services/project_service.dart';
+import 'package:creekui/services/file_service.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/search_bar.dart';
 import 'package:creekui/ui/widgets/file_card.dart';
@@ -34,6 +35,7 @@ class _HomePageState extends State<HomePage> {
   final _imageRepo = ImageRepo();
   final _fileRepo = FileRepo();
   final _projectService = ProjectService();
+  final _fileService = FileService();
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -80,44 +82,11 @@ class _HomePageState extends State<HomePage> {
       final Map<String, Map<String, String>> fileMetadata = {};
 
       for (final file in recentFiles) {
-        try {
-          final f = File(file.filePath);
-          if (await f.exists()) {
-            if (file.filePath.toLowerCase().endsWith('.json')) {
-              try {
-                final content = await f.readAsString();
-                final data = jsonDecode(content);
-                String dims = 'Unknown';
-                String? previewPath;
-
-                if (data is Map) {
-                  if (data['width'] != null && data['height'] != null) {
-                    dims =
-                        '${(data['width'] as num).toInt()} x ${(data['height'] as num).toInt()} px';
-                  }
-                  if (data['preview_path'] != null) {
-                    previewPath = data['preview_path'];
-                  }
-                }
-
-                fileMetadata[file.id] = {
-                  'dimensions': dims,
-                  'preview': previewPath ?? '',
-                };
-              } catch (e) {
-                debugPrint('Error parsing JSON for ${file.id}: $e');
-              }
-            } else {
-              final dimensions = await _getImageDimensions(file.filePath);
-              fileMetadata[file.id] = {
-                'dimensions': dimensions,
-                'preview': file.filePath,
-              };
-            }
-          }
-        } catch (e) {
-          debugPrint('Error loading metadata for ${file.id}: $e');
-        }
+        final meta = await _fileService.getFileMetadata(file.filePath);
+        fileMetadata[file.id] = {
+          'dimensions': meta.dimensions,
+          'preview': meta.previewPath ?? '',
+        };
       }
 
       if (mounted) {
@@ -134,17 +103,6 @@ class _HomePageState extends State<HomePage> {
       debugPrint('Error loading home data: $e');
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  Future<String> _getImageDimensions(String filePath) async {
-    try {
-      final bytes = await File(filePath).readAsBytes();
-      final image = img.decodeImage(bytes);
-      if (image != null) return '${image.width} x ${image.height} px';
-    } catch (e) {
-      debugPrint('Error getting dimensions: $e');
-    }
-    return 'Unknown';
   }
 
   String _formatTimeAgo(DateTime dateTime) {
@@ -266,29 +224,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openFile(FileModel file) async {
+    // Default values
     double width = 1080;
     double height = 1920;
-    try {
-      final f = File(file.filePath);
-      if (await f.exists()) {
-        if (file.filePath.toLowerCase().endsWith('.json')) {
-          final content = await f.readAsString();
-          final data = jsonDecode(content);
-          if (data is Map) {
-            width = (data['width'] as num?)?.toDouble() ?? width;
-            height = (data['height'] as num?)?.toDouble() ?? height;
-          }
-        } else {
-          final bytes = await f.readAsBytes();
-          final image = img.decodeImage(bytes);
-          if (image != null) {
-            width = image.width.toDouble();
-            height = image.height.toDouble();
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint("Error detecting dimensions for open: $e");
+
+    // File Metadata
+    final meta = await _fileService.getFileMetadata(file.filePath);
+    if (meta.width > 0 && meta.height > 0) {
+      width = meta.width;
+      height = meta.height;
     }
 
     if (mounted) {
@@ -779,6 +723,7 @@ class _SeeAllPage extends StatefulWidget {
 }
 
 class _SeeAllPageState extends State<_SeeAllPage> {
+  final _fileService = FileService();
   bool _isLoading = true;
   List<dynamic> _items = [];
   Map<int, ProjectModel> _projectMap = {};
@@ -816,38 +761,11 @@ class _SeeAllPageState extends State<_SeeAllPage> {
         final allProjects = await widget.projectRepo.getAllProjects();
         _projectMap = {for (var p in allProjects) p.id!: p};
         for (final file in files) {
-          try {
-            final f = File(file.filePath);
-            if (await f.exists()) {
-              if (file.filePath.toLowerCase().endsWith('.json')) {
-                try {
-                  final content = await f.readAsString();
-                  final data = jsonDecode(content);
-                  String dims = 'Unknown';
-                  String? previewPath;
-                  if (data is Map) {
-                    if (data['width'] != null && data['height'] != null)
-                      dims =
-                          '${(data['width'] as num).toInt()} x ${(data['height'] as num).toInt()} px';
-                    if (data['preview_path'] != null)
-                      previewPath = data['preview_path'];
-                  }
-                  _fileMetadata[file.id] = {
-                    'dimensions': dims,
-                    'preview': previewPath ?? '',
-                  };
-                } catch (_) {}
-              } else {
-                final bytes = await f.readAsBytes();
-                final image = img.decodeImage(bytes);
-                if (image != null)
-                  _fileMetadata[file.id] = {
-                    'dimensions': '${image.width} x ${image.height} px',
-                    'preview': file.filePath,
-                  };
-              }
-            }
-          } catch (_) {}
+          final meta = await _fileService.getFileMetadata(file.filePath);
+          _fileMetadata[file.id] = {
+            'dimensions': meta.dimensions,
+            'preview': meta.previewPath ?? '',
+          };
         }
         _items = files;
       }

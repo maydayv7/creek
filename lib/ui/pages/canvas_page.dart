@@ -644,37 +644,20 @@ class _CanvasPageState extends State<CanvasPage> {
       final jsonList = _elementsToJson(elements);
       final pathsJson = _paths.map((p) => p.toMap()).toList();
 
-      final saveData = {
+      final canvasData = {
         'elements': jsonList,
         'paths': pathsJson,
         'width': _canvasSize.width,
         'height': _canvasSize.height,
         'preview_path': previewPath,
       };
-      final jsonString = jsonEncode(saveData);
 
-      final directory = await getTemporaryDirectory();
-      final tempFile = File(
-        '${directory.path}/canvas_temp_${DateTime.now().millisecondsSinceEpoch}.json',
+      await _fileService.saveCanvasFile(
+        projectId: widget.projectId,
+        canvasData: canvasData,
+        fileId: widget.existingFile?.id,
+        fileName: widget.existingFile == null ? fileName : null,
       );
-      await tempFile.writeAsString(jsonString);
-
-      if (widget.existingFile != null) {
-        // Overwrite existing file
-        final existingFile = File(widget.existingFile!.filePath);
-        await existingFile.writeAsString(jsonString);
-        await _fileService.openFile(widget.existingFile!.id);
-      } else {
-        // Save as new file
-        await _fileService.saveFile(
-          tempFile,
-          widget.projectId,
-          name: fileName,
-          description: "Editable Canvas Board",
-        );
-      }
-
-      if (await tempFile.exists()) await tempFile.delete();
 
       setState(() => _hasUnsavedChanges = false);
 
@@ -698,6 +681,17 @@ class _CanvasPageState extends State<CanvasPage> {
 
   Future<void> _loadCanvasFromFile() async {
     try {
+      // File Metadata
+      final meta = await _fileService.getFileMetadata(
+        widget.existingFile!.filePath,
+      );
+      if (meta.width > 0 && meta.height > 0) {
+        setState(() {
+          _canvasSize = Size(meta.width, meta.height);
+          _hasInitializedView = false;
+        });
+      }
+
       final file = File(widget.existingFile!.filePath);
       if (await file.exists()) {
         final jsonString = await file.readAsString();
@@ -713,13 +707,6 @@ class _CanvasPageState extends State<CanvasPage> {
                       .toList();
             } else {
               _paths = [];
-            }
-            if (decoded['width'] != null && decoded['height'] != null) {
-              _canvasSize = Size(
-                (decoded['width'] as num).toDouble(),
-                (decoded['height'] as num).toDouble(),
-              );
-              _hasInitializedView = false;
             }
           } else if (decoded is List) {
             // Legacy support

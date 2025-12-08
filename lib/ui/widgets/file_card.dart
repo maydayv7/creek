@@ -114,17 +114,48 @@ class FileCard extends StatelessWidget {
                     (BuildContext context) => <PopupMenuEntry<String>>[
                       const PopupMenuItem<String>(
                         value: 'open',
-                        child: Text('Open'),
+                        child: Row(
+                          children: [
+                            Icon(Icons.file_open_outlined, size: 18),
+                            SizedBox(width: 12),
+                            Text(
+                              'Open',
+                              style: TextStyle(fontFamily: 'GeneralSans'),
+                            ),
+                          ],
+                        ),
                       ),
                       const PopupMenuItem<String>(
                         value: 'rename',
-                        child: Text('Rename'),
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 18),
+                            SizedBox(width: 12),
+                            Text(
+                              'Rename',
+                              style: TextStyle(fontFamily: 'GeneralSans'),
+                            ),
+                          ],
+                        ),
                       ),
                       const PopupMenuItem<String>(
                         value: 'delete',
-                        child: Text(
-                          'Delete',
-                          style: TextStyle(color: Colors.red),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: Colors.red,
+                            ),
+                            SizedBox(width: 12),
+                            Text(
+                              'Delete',
+                              style: TextStyle(
+                                fontFamily: 'GeneralSans',
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

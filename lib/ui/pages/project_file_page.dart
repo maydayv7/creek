@@ -80,49 +80,11 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
   // File Metadata
   Future<void> _loadMetadata(List<FileModel> list) async {
     for (final file in list) {
-      try {
-        final f = File(file.filePath);
-        if (!await f.exists()) continue;
-
-        if (file.filePath.toLowerCase().endsWith(".json")) {
-          final content = await f.readAsString();
-          final data = jsonDecode(content);
-
-          String dims = "Unknown";
-          String preview = "";
-
-          if (data is Map) {
-            if (data["width"] != null && data["height"] != null) {
-              dims = "${data["width"]} x ${data["height"]} px";
-            }
-            if (data["preview_path"] != null) {
-              preview = data["preview_path"];
-            }
-          }
-
-          // Fix relative preview path
-          if (preview.isNotEmpty && !File(preview).existsSync()) {
-            final base = f.parent.path;
-            final candidate = "$base/$preview";
-            if (File(candidate).existsSync()) preview = candidate;
-          }
-
-          _fileMetadata[file.id] = {"preview": preview, "dimensions": dims};
-        } else {
-          final bytes = await f.readAsBytes();
-          final decoded = img.decodeImage(bytes);
-
-          String dims = "Unknown";
-          if (decoded != null) {
-            dims = "${decoded.width} x ${decoded.height} px";
-          }
-
-          _fileMetadata[file.id] = {
-            "preview": file.filePath,
-            "dimensions": dims,
-          };
-        }
-      } catch (_) {}
+      final meta = await _fileService.getFileMetadata(file.filePath);
+      _fileMetadata[file.id] = {
+        "preview": meta.previewPath ?? "",
+        "dimensions": meta.dimensions,
+      };
     }
   }
 
@@ -133,19 +95,30 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
     setState(() {});
   }
 
-  void _openFile(FileModel file) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (_) => CanvasPage(
-              projectId: file.projectId,
-              width: 1080,
-              height: 1920,
-              existingFile: file,
-            ),
-      ),
-    );
+  void _openFile(FileModel file) async {
+    // Default values
+    double width = 1080;
+    double height = 1920;
+    final meta = await _fileService.getFileMetadata(file.filePath);
+    if (meta.width > 0 && meta.height > 0) {
+      width = meta.width;
+      height = meta.height;
+    }
+
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (_) => CanvasPage(
+                projectId: file.projectId,
+                width: width,
+                height: height,
+                existingFile: file,
+              ),
+        ),
+      );
+    }
   }
 
   void _handleFileMenuAction(FileModel file, String action) {

@@ -17,6 +17,8 @@ Optional Creative Artefacts -> https://drive.google.com/file/d/1kSpf-y0LhQCn9-fF
 
 # Problem Statement
 
+> **Inter IIT Tech Meet 14.0 - Adobe Mid Prep**
+
 Design and prototype a lightweight, mobile-first AI image editor for 2030 that demonstrates how creative editing can become faster, more intuitive, and energy-efficient on low-compute devices.
 Your solution should combine design thinking, market research, and AI engineering across three integrated tracks:
 

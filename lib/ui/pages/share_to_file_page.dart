@@ -80,54 +80,11 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
   Future<void> _loadFileMetadata(List<FileModel> files) async {
     final Map<String, Map<String, String>> meta = {};
     for (final fmodel in files) {
-      try {
-        final f = File(fmodel.filePath);
-        if (!await f.exists()) continue;
-
-        if (fmodel.filePath.toLowerCase().endsWith('.json')) {
-          // File JSON
-          try {
-            final content = await f.readAsString();
-            final data = jsonDecode(content);
-            String preview = '';
-            String dims = 'Unknown';
-
-            if (data is Map) {
-              if (data['preview_path'] != null &&
-                  data['preview_path'].toString().isNotEmpty) {
-                preview = data['preview_path'].toString();
-                // If preview is relative, try to resolve relative to JSON file
-                if (!File(preview).existsSync()) {
-                  final parentDir = f.parent.path;
-                  final candidate = File('$parentDir/$preview');
-                  if (candidate.existsSync()) preview = candidate.path;
-                }
-              }
-              if (data['width'] != null && data['height'] != null) {
-                final w = (data['width'] as num).toInt();
-                final h = (data['height'] as num).toInt();
-                dims = '$w x $h px';
-              }
-            }
-            meta[fmodel.id] = {'preview': preview, 'dimensions': dims};
-          } catch (e) {
-            debugPrint('Error parsing canvas json for ${fmodel.id}: $e');
-          }
-        } else {
-          // Regular image file - assign path and try
-          String dims = 'Unknown';
-          try {
-            final bytes = await f.readAsBytes();
-            final image = img.decodeImage(bytes);
-            if (image != null) dims = '${image.width} x ${image.height} px';
-          } catch (_) {
-            // ignore
-          }
-          meta[fmodel.id] = {'preview': fmodel.filePath, 'dimensions': dims};
-        }
-      } catch (e) {
-        debugPrint('Error while loading metadata for ${fmodel.id}: $e');
-      }
+      final info = await _fileService.getFileMetadata(fmodel.filePath);
+      meta[fmodel.id] = {
+        'preview': info.previewPath ?? '',
+        'dimensions': info.dimensions,
+      };
     }
     _fileMetadata = meta;
   }
@@ -150,7 +107,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
     });
   }
 
-  // Synchronous breadcrumb using cached project; returns empty if not cached
+  // Synchronous breadcrumb using cached project (returns empty if not cached)
   String _getProjectBreadcrumbSync(FileModel file) {
     final proj = _projectCache[file.projectId];
     if (proj == null) return '';
@@ -212,19 +169,15 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
         return;
       }
 
+      // Default values
       double width = 1080;
       double height = 1080;
 
-      if (file.filePath.toLowerCase().endsWith('.json')) {
-        final content = await f.readAsString();
-        final data = jsonDecode(content);
-
-        if (data is Map) {
-          if (data['width'] != null && data['height'] != null) {
-            width = (data['width'] as num).toDouble();
-            height = (data['height'] as num).toDouble();
-          }
-        }
+      // File Metadata
+      final meta = await _fileService.getFileMetadata(file.filePath);
+      if (meta.width > 0 && meta.height > 0) {
+        width = meta.width;
+        height = meta.height;
       }
 
       Navigator.push(
@@ -251,31 +204,6 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
     if (diff.inDays == 1) return 'Yesterday';
     if (diff.inDays < 7) return '${diff.inDays} days ago';
     return '${date.day}/${date.month}/${date.year}';
-  }
-
-  // Fallback to original filePath if preview path empty/missing
-  String _resolvePreviewPath(FileModel file) {
-    final meta = _fileMetadata[file.id];
-    if (meta == null) return file.filePath;
-    final preview = meta['preview'] ?? '';
-    if (preview.isNotEmpty && File(preview).existsSync()) return preview;
-
-    if (file.filePath.toLowerCase().endsWith('.json')) {
-      final f = File(file.filePath);
-      final base = f.uri.pathSegments.last;
-      final nameWithoutExt = base.split('.').first;
-      final parent = f.parent;
-      final candidates = [
-        '${parent.path}/$nameWithoutExt.png',
-        '${parent.path}/$nameWithoutExt.jpg',
-        '${parent.path}/preview_$nameWithoutExt.png',
-      ];
-      for (final c in candidates) {
-        if (File(c).existsSync()) return c;
-      }
-    }
-    if (File(file.filePath).existsSync()) return file.filePath;
-    return '';
   }
 
   @override
@@ -410,8 +338,8 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
   }
 
   Widget _buildFileCard(FileModel file) {
-    final preview = _resolvePreviewPath(file);
     final meta = _fileMetadata[file.id] ?? {};
+    final preview = meta['preview'] ?? '';
     final dimensions = meta['dimensions'] ?? 'Unknown';
 
     return FutureBuilder<String>(
