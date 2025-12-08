@@ -56,7 +56,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final bool hasChanges = _nameController.text.trim() != _originalName;
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: const CustomAppBar(title: "Settings"),
+      appBar: const CommonAppBar(title: "Settings"),
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())

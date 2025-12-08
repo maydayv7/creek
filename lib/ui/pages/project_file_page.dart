@@ -310,7 +310,6 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
           );
         },
         hideSecondRow: true,
-        onSettingsPressed: () {},
         onLayoutToggle: () {},
         isAlternateView: false,
       ),
@@ -359,6 +358,7 @@ class _ProjectFilePageState extends State<ProjectFilePage> {
                         controller: _searchController,
                         hintText: "Search your files",
                         onChanged: (v) => setState(() => _search = v.trim()),
+                        backgroundColor: Variables.background,
                       ),
                       const SizedBox(height: 24),
                       // All Files

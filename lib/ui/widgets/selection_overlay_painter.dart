@@ -15,7 +15,24 @@ class SelectionOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw the Selection Border
+    // 1. Dim the rest of image
+    final backgroundPath =
+        Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+    final selectionPath = Path()..addRect(rect);
+    final dimmedPath = Path.combine(
+      PathOperation.difference,
+      backgroundPath,
+      selectionPath,
+    );
+
+    final dimPaint =
+        Paint()
+          ..color = Colors.black.withOpacity(0.5)
+          ..style = PaintingStyle.fill;
+
+    canvas.drawPath(dimmedPath, dimPaint);
+
+    // 2. Draw Selection Border
     final paint =
         Paint()
           ..color = Variables.selectionBorder
@@ -25,7 +42,7 @@ class SelectionOverlayPainter extends CustomPainter {
     // Use a dash effect for the selection box
     _drawDashedRect(canvas, rect, paint);
 
-    // 2. If Resizing, Draw Handles
+    // 3. If Resizing, Draw Handles
     if (isResizing) {
       final handlePaint =
           Paint()
@@ -52,7 +69,7 @@ class SelectionOverlayPainter extends CustomPainter {
         canvas.drawCircle(handle, handleRadius, handleBorderPaint);
       }
 
-      // 3. Draw Center Handle (Move)
+      // 4. Draw Center Handle (Move)
       final centerPaint =
           Paint()
             ..color = Variables.accentMagic.withOpacity(0.5)

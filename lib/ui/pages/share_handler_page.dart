@@ -120,7 +120,7 @@ class _ShareHandlerPageState extends State<ShareHandlerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Variables.background,
-      appBar: const CustomAppBar(title: "Processing", showBack: false),
+      appBar: const CommonAppBar(title: "Processing", showBack: false),
       body: Center(
         child:
             _hasError

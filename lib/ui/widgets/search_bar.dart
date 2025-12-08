@@ -5,12 +5,14 @@ class CommonSearchBar extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String>? onChanged;
   final String hintText;
+  final Color? backgroundColor;
 
   const CommonSearchBar({
     super.key,
     required this.controller,
     this.onChanged,
     this.hintText = 'Search',
+    this.backgroundColor,
   });
 
   @override
@@ -34,7 +36,7 @@ class CommonSearchBar extends StatelessWidget {
           minHeight: 18,
         ),
         filled: true,
-        fillColor: Variables.surfaceSubtle,
+        fillColor: backgroundColor ?? Variables.surfaceSubtle,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(Variables.radiusSmall),
           borderSide: BorderSide.none,

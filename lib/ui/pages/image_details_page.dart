@@ -405,7 +405,6 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                                           color: Variables.chipText,
                                         )
                                         : null,
-                                onDelete: () {},
                               ),
                             );
                           }).toList(),
@@ -427,7 +426,7 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
       // Prevents the main screen from pushing up when the keyboard opens
       resizeToAvoidBottomInset: false,
       backgroundColor: Variables.surfaceBackground,
-      appBar: CustomAppBar(
+      appBar: CommonAppBar(
         showBack: true,
         leading: IconButton(
           icon: const Icon(
@@ -839,7 +838,6 @@ class _ImageDetailsPageState extends State<ImageDetailsPage> {
                                                           .map(
                                                             (tag) => TagChip(
                                                               label: tag,
-                                                              onDelete: () {},
                                                               icon: null,
                                                             ),
                                                           )

@@ -15,9 +15,11 @@ class TopBar extends StatefulWidget implements PreferredSizeWidget {
   final VoidCallback? onLayoutPressed;
   final VoidCallback? onFilterPressed;
   final VoidCallback? onAIPressed;
-  final bool? isAlternateView; // For toggle state
-  final VoidCallback? onLayoutToggle; // For toggle callback
-  final bool hideSecondRow; // Hide the second row (dropdown, buttons, etc.)
+  final bool? isAlternateView;
+  final VoidCallback? onLayoutToggle;
+  final bool hideSecondRow;
+  final bool hideSelector;
+  final bool showSettings;
 
   const TopBar({
     super.key,
@@ -32,6 +34,8 @@ class TopBar extends StatefulWidget implements PreferredSizeWidget {
     this.isAlternateView,
     this.onLayoutToggle,
     this.hideSecondRow = false,
+    this.hideSelector = false,
+    this.showSettings = true,
   });
 
   @override
@@ -39,9 +43,7 @@ class TopBar extends StatefulWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize =>
-      hideSecondRow
-          ? const Size.fromHeight(48.0) // Height for single row
-          : const Size.fromHeight(88.0); // Height for two rows
+      hideSecondRow ? const Size.fromHeight(48.0) : const Size.fromHeight(88.0);
 }
 
 class _TopBarState extends State<TopBar> {
@@ -189,20 +191,26 @@ class _TopBarState extends State<TopBar> {
                             )
                             : const SizedBox(),
                   ),
+
                   // Settings Icon
-                  if (!widget.hideSecondRow)
-                    GestureDetector(
-                      onTap: _openSettings,
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        child: SvgPicture.asset(
-                          'assets/icons/settings-line.svg',
-                          width: 24,
-                          height: 24,
-                          colorFilter: const ColorFilter.mode(
-                            Variables.textPrimary,
-                            BlendMode.srcIn,
+                  if (widget.showSettings)
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _openSettings,
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          alignment: Alignment.center,
+                          child: SvgPicture.asset(
+                            'assets/icons/settings-line.svg',
+                            width: 24,
+                            height: 24,
+                            colorFilter: const ColorFilter.mode(
+                              Variables.textPrimary,
+                              BlendMode.srcIn,
+                            ),
                           ),
                         ),
                       ),
@@ -221,7 +229,8 @@ class _TopBarState extends State<TopBar> {
                     Row(
                       children: [
                         // Global Dropdown
-                        if (!_isLoading &&
+                        if (!widget.hideSelector &&
+                            !_isLoading &&
                             _currentProject != null &&
                             _rootProject != null)
                           PopupMenuButton<ProjectModel>(

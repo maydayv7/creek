@@ -30,7 +30,7 @@ class FileCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 100,
+        height: 110,
         decoration: BoxDecoration(
           color: Variables.background,
           borderRadius: BorderRadius.circular(Variables.radiusMedium),
@@ -91,21 +91,13 @@ class FileCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(dimensions, style: Variables.captionStyle),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 3,
-                        height: 3,
-                        decoration: const BoxDecoration(
-                          color: Variables.textDisabled,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(timeAgo, style: Variables.captionStyle),
-                    ],
+                  Text(dimensions, style: Variables.captionStyle),
+                  const SizedBox(height: 2),
+                  Text(
+                    timeAgo,
+                    style: Variables.captionStyle.copyWith(
+                      color: Variables.textSecondary,
+                    ),
                   ),
                 ],
               ),

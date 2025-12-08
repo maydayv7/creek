@@ -202,7 +202,7 @@ class _StylesheetPageState extends State<StylesheetPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Variables.surfaceBackground,
+      backgroundColor: Variables.background,
       appBar: TopBar(
         currentProjectId: _currentProjectId,
         onBack: () => Navigator.of(context).pop(),
@@ -214,7 +214,6 @@ class _StylesheetPageState extends State<StylesheetPage> {
               _logoPaths = [];
               _loadSavedStylesheet();
             }),
-        onSettingsPressed: () {},
       ),
       body:
           _isLoading
@@ -267,13 +266,10 @@ class _StylesheetPageState extends State<StylesheetPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: SizedBox(
-                width: 200,
-                child: PrimaryButton(
-                  text: "Regenerate Stylesheet",
-                  iconPath: 'assets/icons/generate_icon.svg',
-                  onPressed: _generateStylesheet,
-                ),
+              child: PrimaryButton(
+                text: "Regenerate Stylesheet",
+                iconPath: 'assets/icons/generate_icon.svg',
+                onPressed: _generateStylesheet,
               ),
             ),
             const SizedBox(height: 24),

@@ -282,7 +282,7 @@ class _ShareToFilePageState extends State<ShareToFilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Variables.surfaceBackground,
-      appBar: CustomAppBar(
+      appBar: CommonAppBar(
         title: 'Files',
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Variables.textPrimary),

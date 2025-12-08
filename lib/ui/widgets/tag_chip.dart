@@ -3,15 +3,10 @@ import 'package:creekui/ui/styles/variables.dart';
 
 class TagChip extends StatelessWidget {
   final String label;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final Widget? icon;
 
-  const TagChip({
-    super.key,
-    required this.label,
-    required this.onDelete,
-    this.icon,
-  });
+  const TagChip({super.key, required this.label, this.onDelete, this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -32,15 +27,17 @@ class TagChip extends StatelessWidget {
               color: Variables.textPrimary,
             ),
           ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: onDelete,
-            child: const Icon(
-              Icons.close,
-              size: 16,
-              color: Variables.textPrimary,
+          if (onDelete != null) ...[
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onDelete,
+              child: const Icon(
+                Icons.close,
+                size: 16,
+                color: Variables.textPrimary,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

@@ -369,7 +369,7 @@ class _HomePageState extends State<HomePage> {
             : _allProjects;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: Variables.background,
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -411,7 +411,7 @@ class _HomePageState extends State<HomePage> {
                                     color: theme.colorScheme.primaryContainer,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: theme.scaffoldBackgroundColor,
+                                      color: Variables.background,
                                       width: 1.25,
                                     ),
                                   ),
@@ -887,10 +887,11 @@ class _SeeAllPageState extends State<_SeeAllPage> {
             color: theme.colorScheme.onSurface,
           ),
         ),
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Variables.background,
         elevation: 0,
         iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
       ),
+      backgroundColor: Variables.background,
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())

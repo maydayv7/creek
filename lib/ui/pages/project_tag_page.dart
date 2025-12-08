@@ -133,7 +133,7 @@ class _ProjectTagPageState extends State<ProjectTagPage> {
     }
 
     return Scaffold(
-      backgroundColor: Variables.surfaceBackground,
+      backgroundColor: Variables.background,
       appBar: TopBar(
         currentProjectId: widget.projectId,
         titleOverride: widget.tag.toUpperCase(),

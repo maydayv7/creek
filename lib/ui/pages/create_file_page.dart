@@ -184,7 +184,7 @@ class _CreateFilePageState extends State<CreateFilePage> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: CustomAppBar(
+      appBar: CommonAppBar(
         title: 'Create Files',
         showBack: true,
         leading: IconButton(

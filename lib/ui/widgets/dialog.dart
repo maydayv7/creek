@@ -11,8 +11,7 @@ class ShowDialog extends StatelessWidget {
   final VoidCallback onPrimaryPressed;
   final String secondaryButtonText;
   final VoidCallback? onSecondaryPressed;
-  final bool
-  isDestructive; // Makes primary button red if true (future enhancement)
+  final bool isDestructive;
   final bool isLoading;
 
   const ShowDialog({
@@ -97,6 +96,7 @@ class ShowDialog extends StatelessWidget {
                   text: primaryButtonText,
                   onPressed: onPrimaryPressed,
                   isLoading: isLoading,
+                  backgroundColor: isDestructive ? Colors.red : null,
                 ),
               ),
             ],

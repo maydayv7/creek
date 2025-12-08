@@ -9,7 +9,7 @@ import 'package:creekui/services/project_service.dart';
 import 'package:creekui/ui/styles/variables.dart';
 import 'package:creekui/ui/widgets/empty_state.dart';
 import 'package:creekui/ui/widgets/section_header.dart';
-import 'package:creekui/ui/widgets/app_bar.dart';
+import 'package:creekui/ui/widgets/top_bar.dart';
 import 'package:creekui/ui/widgets/dialog.dart';
 import 'package:creekui/ui/widgets/text_field.dart';
 import 'package:creekui/ui/pages/settings_page.dart';
@@ -160,7 +160,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Variables.surfaceBackground,
+        backgroundColor: Variables.background,
         body: Center(child: CircularProgressIndicator()),
       );
     }
@@ -168,46 +168,23 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     if (_project == null) return const Scaffold(body: SizedBox());
 
     return Scaffold(
-      backgroundColor: Variables.surfaceBackground,
-      appBar: CustomAppBar(
-        title: _project!.title,
-        showBack: true,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            size: 20,
-            color: Variables.textPrimary,
-          ),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const HomePage()),
-              );
-            }
-          },
-        ),
-        actions: [
-          IconButton(
-            icon: SvgPicture.asset(
-              'assets/icons/settings-line.svg',
-              width: 24,
-              height: 24,
-              colorFilter: const ColorFilter.mode(
-                Variables.textPrimary,
-                BlendMode.srcIn,
-              ),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsPage()),
-              );
-            },
-          ),
-        ],
+      backgroundColor: Variables.background,
+      appBar: TopBar(
+        currentProjectId: widget.projectId,
+        titleOverride: _project!.title,
+        hideSecondRow: true,
+        hideSelector: true,
+        showSettings: true,
+        onBack: () {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const HomePage()),
+            );
+          }
+        },
       ),
       body: RefreshIndicator(
         onRefresh: _loadData,

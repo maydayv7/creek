@@ -143,7 +143,7 @@ class _DefineBrandPageState extends State<DefineBrandPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Variables.background,
-      appBar: CustomAppBar(
+      appBar: CommonAppBar(
         title: "",
         showBack: true,
         leading: IconButton(

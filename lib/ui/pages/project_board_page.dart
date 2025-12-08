@@ -158,18 +158,17 @@ class _ProjectBoardPageState extends State<ProjectBoardPage> {
   Widget build(BuildContext context) {
     if (_currentProject == null) {
       return const Scaffold(
-        backgroundColor: Variables.surfaceBackground,
+        backgroundColor: Variables.background,
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      backgroundColor: Variables.surfaceBackground,
+      backgroundColor: Variables.background,
       appBar: TopBar(
         currentProjectId: _currentProject!.id!,
         onBack: () => Navigator.pop(context),
         onProjectChanged: _onProjectChanged,
-        onSettingsPressed: () {},
         isAlternateView: _showAlternateView,
         onLayoutToggle: () {
           setState(() {

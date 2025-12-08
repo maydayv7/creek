@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:creekui/ui/styles/variables.dart';
 
-class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
+class CommonAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String? title;
   final Widget? titleWidget;
   final bool showBack;
@@ -11,7 +11,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final double? leadingWidth;
   final bool centerTitle;
 
-  const CustomAppBar({
+  const CommonAppBar({
     super.key,
     this.title,
     this.titleWidget,
@@ -29,7 +29,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       title:
           titleWidget ??
           (title != null ? Text(title!, style: Variables.headerStyle) : null),
-      backgroundColor: Variables.surfaceBackground,
+      backgroundColor: Variables.background,
       elevation: 0,
       centerTitle: centerTitle,
       leadingWidth: leadingWidth ?? (showBack ? 50 : 0),

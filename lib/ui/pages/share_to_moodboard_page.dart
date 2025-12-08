@@ -72,7 +72,7 @@ class _ShareToMoodboardPageState extends State<ShareToMoodboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Variables.surfaceBackground,
-      appBar: CustomAppBar(
+      appBar: CommonAppBar(
         title: "MoodBoards",
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Variables.textPrimary),

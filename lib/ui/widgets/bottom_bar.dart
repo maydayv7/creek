@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:creekui/ui/styles/variables.dart';
@@ -17,26 +18,26 @@ class BottomBar extends StatelessWidget {
     required this.projectId,
   });
 
-  void _onItemTapped(BuildContext context, BottomBarItem item) {
+  void _onTap(BuildContext context, BottomBarItem item) {
     if (item == currentTab) return;
 
-    Widget page;
+    Widget nextPage;
     switch (item) {
       case BottomBarItem.moodboard:
-        page = ProjectBoardPage(projectId: projectId);
+        nextPage = ProjectBoardPage(projectId: projectId);
         break;
       case BottomBarItem.stylesheet:
-        page = StylesheetPage(projectId: projectId);
+        nextPage = StylesheetPage(projectId: projectId);
         break;
       case BottomBarItem.files:
-        page = ProjectFilePage(projectId: projectId);
+        nextPage = ProjectFilePage(projectId: projectId);
         break;
     }
 
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => page,
+        pageBuilder: (context, anim1, anim2) => nextPage,
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,
       ),
@@ -45,78 +46,82 @@ class BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Safe Area Padding
+    final double safeBottom = MediaQuery.of(context).padding.bottom;
+    final double effectiveBottomPadding = max(safeBottom, 24.0);
+
     return Container(
-      height: 80, // Fixed height for consistency
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Variables.background,
-        border: Border(top: BorderSide(color: Variables.borderSubtle)),
+        border: Border(
+          top: BorderSide(color: Variables.borderSubtle, width: 1),
+        ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _NavBarItem(
-            iconPath: 'assets/icons/moodboard_icon.svg',
-            label: 'Moodboard',
-            isActive: currentTab == BottomBarItem.moodboard,
-            onTap: () => _onItemTapped(context, BottomBarItem.moodboard),
-          ),
-          _NavBarItem(
-            iconPath: 'assets/icons/stylesheet.svg',
-            label: 'Stylesheet',
-            isActive: currentTab == BottomBarItem.stylesheet,
-            onTap: () => _onItemTapped(context, BottomBarItem.stylesheet),
-          ),
-          _NavBarItem(
-            iconPath: 'assets/icons/files_icon.svg',
-            label: 'Files',
-            isActive: currentTab == BottomBarItem.files,
-            onTap: () => _onItemTapped(context, BottomBarItem.files),
-          ),
-        ],
+      padding: EdgeInsets.only(bottom: effectiveBottomPadding, top: 12),
+      child: SizedBox(
+        height: 54,
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildNavItem(
+                context,
+                BottomBarItem.moodboard,
+                "Moodboard",
+                "assets/icons/moodboard_icon.svg",
+              ),
+            ),
+            Expanded(
+              child: _buildNavItem(
+                context,
+                BottomBarItem.stylesheet,
+                "Stylesheet",
+                "assets/icons/stylesheet_icon.svg",
+              ),
+            ),
+            Expanded(
+              child: _buildNavItem(
+                context,
+                BottomBarItem.files,
+                "Files",
+                "assets/icons/files_icon.svg",
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-}
 
-class _NavBarItem extends StatelessWidget {
-  final String iconPath;
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
+  Widget _buildNavItem(
+    BuildContext context,
+    BottomBarItem item,
+    String label,
+    String assetPath,
+  ) {
+    final bool isSelected = item == currentTab;
+    final Color color =
+        isSelected ? Variables.textPrimary : Variables.textDisabled;
 
-  const _NavBarItem({
-    required this.iconPath,
-    required this.label,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isActive ? Variables.iconActive : Variables.iconInactive;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return GestureDetector(
+      onTap: () => _onTap(context, item),
+      behavior: HitTestBehavior.opaque,
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
           children: [
             SvgPicture.asset(
-              iconPath,
+              assetPath,
               width: 24,
               height: 24,
               colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               label,
               style: Variables.captionStyle.copyWith(
                 color: color,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                fontSize: 10,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ],

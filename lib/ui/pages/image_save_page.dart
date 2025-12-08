@@ -434,7 +434,7 @@ class _ImageSavePageState extends State<ImageSavePage> {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: Variables.surfaceBackground,
-      appBar: CustomAppBar(
+      appBar: CommonAppBar(
         title: titleText,
         leading: IconButton(
           icon: const Icon(

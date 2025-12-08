@@ -149,7 +149,7 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: Variables.surfaceBackground,
-      appBar: CustomAppBar(
+      appBar: CommonAppBar(
         title: "Image Analysis",
         showBack: true,
         leading: IconButton(
@@ -259,7 +259,6 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
                                   color: Variables.chipText,
                                 )
                                 : null,
-                        onDelete: () {},
                       ),
                     );
                   }).toList(),
@@ -304,8 +303,8 @@ class _ImageAnalysisPageState extends State<ImageAnalysisPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showSourceSelector,
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
+        backgroundColor: Colors.grey[900],
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add_photo_alternate),
         label: Text(
           _selectedImage == null ? "Select Image" : "Change Image",
