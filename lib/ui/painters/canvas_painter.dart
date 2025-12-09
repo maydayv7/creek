@@ -4,45 +4,44 @@ import 'package:creekui/data/models/canvas_models.dart';
 
 class CanvasPainter extends CustomPainter {
   final List<DrawingPath> paths;
-  final List<DrawingPath> magicPaths;
   final List<DrawingPoint> currentPoints;
   final Color currentColor;
   final double currentWidth;
   final bool isEraser;
 
+  // Visual highlight/flash
+  final Color? overrideColor;
+
   CanvasPainter({
     required this.paths,
-    this.magicPaths = const [],
     required this.currentPoints,
     required this.currentColor,
     required this.currentWidth,
     required this.isEraser,
+    this.overrideColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
 
-    // Draw normal paths
+    // Draw saved paths
     for (final path in paths) {
       _drawPath(canvas, path);
     }
 
-    // Draw magic paths (unless hidden by empty list passed in)
-    for (final path in magicPaths) {
-      _drawPath(canvas, path);
-    }
-
-    // Draw current points
+    // Draw active stroke
     if (currentPoints.isNotEmpty) {
       final paint =
           Paint()
-            ..color = isEraser ? Colors.transparent : currentColor
+            ..color =
+                isEraser ? Colors.transparent : (overrideColor ?? currentColor)
             ..blendMode = isEraser ? BlendMode.clear : BlendMode.srcOver
             ..strokeWidth = currentWidth
             ..strokeCap = StrokeCap.round
             ..strokeJoin = StrokeJoin.round
             ..style = PaintingStyle.stroke;
+
       final Path p = Path();
       p.moveTo(currentPoints.first.offset.dx, currentPoints.first.offset.dy);
       for (int i = 1; i < currentPoints.length; i++) {
@@ -56,7 +55,8 @@ class CanvasPainter extends CustomPainter {
   void _drawPath(Canvas canvas, DrawingPath path) {
     final paint =
         Paint()
-          ..color = path.isEraser ? Colors.transparent : path.color
+          ..color =
+              path.isEraser ? Colors.transparent : (overrideColor ?? path.color)
           ..blendMode = path.isEraser ? BlendMode.clear : BlendMode.srcOver
           ..strokeWidth = path.strokeWidth
           ..strokeCap = StrokeCap.round

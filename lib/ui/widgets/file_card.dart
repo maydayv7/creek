@@ -11,7 +11,7 @@ class FileCard extends StatelessWidget {
   final String timeAgo;
   final VoidCallback onTap;
 
-  // Optional actions for the context menu.
+  // Optional actions for the context menu
   final Function(String)? onMenuAction;
 
   const FileCard({

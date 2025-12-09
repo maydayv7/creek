@@ -13,6 +13,7 @@ class ManipulatingBox extends StatefulWidget {
   final Map<String, dynamic> styleData;
   final bool isSelected;
   final bool isEditing;
+  final bool isFlashing;
   final double viewScale;
   final TransformationController transformationController;
   final VoidCallback onTap;
@@ -34,6 +35,7 @@ class ManipulatingBox extends StatefulWidget {
     required this.styleData,
     required this.isSelected,
     required this.isEditing,
+    this.isFlashing = false,
     required this.viewScale,
     required this.transformationController,
     required this.onTap,
@@ -168,15 +170,20 @@ class _ManipulatingBoxState extends State<ManipulatingBox> {
                   child: Container(
                     width: _size.width,
                     height: _size.height,
-                    decoration:
-                        widget.isSelected
-                            ? BoxDecoration(
-                              border: Border.all(
-                                color: Variables.selectionBorder,
-                                width: 2 * handleScale,
-                              ),
-                            )
-                            : null,
+                    decoration: BoxDecoration(
+                      border:
+                          widget.isFlashing
+                              ? Border.all(
+                                color: Colors.greenAccent,
+                                width: 4 * handleScale,
+                              )
+                              : (widget.isSelected
+                                  ? Border.all(
+                                    color: Variables.selectionBorder,
+                                    width: 2 * handleScale,
+                                  )
+                                  : null),
+                    ),
                     child:
                         widget.type == "file_image"
                             ? Image.file(
@@ -187,106 +194,98 @@ class _ManipulatingBoxState extends State<ManipulatingBox> {
                   ),
                 ),
 
-                // RESIZE Edges
-
-                // Right edge
-                if (widget.isSelected && !widget.isEditing)
-                  Positioned(
+                if (widget.isSelected &&
+                    !widget.isEditing &&
+                    !widget.isFlashing) ...[
+                  _buildEdgeHandle(
+                    top: 0,
+                    bottom: 0,
                     right: -edgeThickness / 2,
+                    width: edgeThickness,
+                    onUpdate:
+                        (d) => setState(
+                          () =>
+                              _size = Size(
+                                _size.width + d.delta.dx,
+                                _size.height,
+                              ),
+                        ),
+                  ),
+                  _buildEdgeHandle(
                     top: 0,
                     bottom: 0,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onPanUpdate: (d) {
-                        setState(() {
-                          _size = Size(_size.width + d.delta.dx, _size.height);
-                        });
-                        widget.onUpdate(_pos, _size, _rot);
-                      },
-                      onPanStart: (_) => widget.onDragStart(),
-                      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
-                      child: Container(
-                        width: edgeThickness,
-                        color: Colors.transparent,
-                      ),
-                    ),
-                  ),
-
-                // Left edge
-                if (widget.isSelected && !widget.isEditing)
-                  Positioned(
                     left: -edgeThickness / 2,
-                    top: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onPanUpdate: (d) {
-                        setState(() {
-                          _pos += Offset(d.delta.dx, 0);
-                          _size = Size(_size.width - d.delta.dx, _size.height);
-                        });
-                        widget.onUpdate(_pos, _size, _rot);
-                      },
-                      onPanStart: (_) => widget.onDragStart(),
-                      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
-                      child: Container(
-                        width: edgeThickness,
-                        color: Colors.transparent,
-                      ),
-                    ),
+                    width: edgeThickness,
+                    onUpdate: (d) {
+                      setState(() {
+                        _pos += Offset(d.delta.dx, 0);
+                        _size = Size(_size.width - d.delta.dx, _size.height);
+                      });
+                    },
                   ),
-
-                // Top edge
-                if (widget.isSelected && !widget.isEditing)
-                  Positioned(
+                  _buildEdgeHandle(
+                    left: 0,
+                    right: 0,
                     top: -edgeThickness / 2,
+                    height: edgeThickness,
+                    onUpdate: (d) {
+                      setState(() {
+                        _pos += Offset(0, d.delta.dy);
+                        _size = Size(_size.width, _size.height - d.delta.dy);
+                      });
+                    },
+                  ),
+                  _buildEdgeHandle(
                     left: 0,
                     right: 0,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onPanUpdate: (d) {
-                        setState(() {
-                          _pos += Offset(0, d.delta.dy);
-                          _size = Size(_size.width, _size.height - d.delta.dy);
-                        });
-                        widget.onUpdate(_pos, _size, _rot);
-                      },
-                      onPanStart: (_) => widget.onDragStart(),
-                      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
-                      child: Container(
-                        height: edgeThickness,
-                        color: Colors.transparent,
-                      ),
-                    ),
-                  ),
-
-                // Bottom edge
-                if (widget.isSelected && !widget.isEditing)
-                  Positioned(
                     bottom: -edgeThickness / 2,
-                    left: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onPanUpdate: (d) {
-                        setState(() {
-                          _size = Size(_size.width, _size.height + d.delta.dy);
-                        });
-                        widget.onUpdate(_pos, _size, _rot);
-                      },
-                      onPanStart: (_) => widget.onDragStart(),
-                      onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
-                      child: Container(
-                        height: edgeThickness,
-                        color: Colors.transparent,
-                      ),
-                    ),
+                    height: edgeThickness,
+                    onUpdate:
+                        (d) => setState(
+                          () =>
+                              _size = Size(
+                                _size.width,
+                                _size.height + d.delta.dy,
+                              ),
+                        ),
                   ),
+                ],
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildEdgeHandle({
+    double? top,
+    double? bottom,
+    double? left,
+    double? right,
+    double? width,
+    double? height,
+    required Function(DragUpdateDetails) onUpdate,
+  }) {
+    return Positioned(
+      top: top,
+      bottom: bottom,
+      left: left,
+      right: right,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onPanUpdate: (d) {
+          onUpdate(d);
+          widget.onUpdate(_pos, _size, _rot);
+        },
+        onPanStart: (_) => widget.onDragStart(),
+        onPanEnd: (_) => widget.onDragEnd(_pos, _size, _rot),
+        child: Container(
+          width: width,
+          height: height,
+          color: Colors.transparent,
+        ),
+      ),
     );
   }
 
@@ -321,9 +320,7 @@ class _ManipulatingBoxState extends State<ManipulatingBox> {
                 textDirection: TextDirection.ltr,
               );
               tp.layout(maxWidth: 10000);
-              setState(() {
-                _size = Size(tp.width + 40, tp.height + 40);
-              });
+              setState(() => _size = Size(tp.width + 40, tp.height + 40));
               widget.onUpdate(_pos, _size, _rot);
             },
           ),

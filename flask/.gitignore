@@ -1,4 +1,5 @@
 .env
+input_data
 
 # Models
 BiRefNet

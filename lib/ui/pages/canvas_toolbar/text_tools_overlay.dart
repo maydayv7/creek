@@ -63,7 +63,6 @@ class TextToolsOverlay extends StatelessWidget {
                 ),
                 Container(width: 1, height: 20, color: Variables.borderSubtle),
                 const SizedBox(width: 8),
-
                 IconButton(
                   icon: const Icon(
                     Icons.add_circle_outline,
@@ -81,7 +80,6 @@ class TextToolsOverlay extends StatelessWidget {
                     color: Variables.borderSubtle,
                   ),
                   const SizedBox(width: 12),
-
                   const Icon(
                     Icons.text_fields,
                     size: 18,
@@ -108,9 +106,7 @@ class TextToolsOverlay extends StatelessWidget {
                       ),
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
                   GestureDetector(
                     onTap: () => _showColorPicker(context),
                     child: Container(
@@ -125,13 +121,6 @@ class TextToolsOverlay extends StatelessWidget {
                         ),
                       ),
                     ),
-                  ),
-
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 1,
-                    height: 20,
-                    color: Variables.borderSubtle,
                   ),
                   const SizedBox(width: 8),
                 ],
