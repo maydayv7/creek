@@ -66,6 +66,8 @@ class _CanvasPageState extends State<CanvasPage> {
   final ChangeStack _magicDrawChangeStack = ChangeStack();
 
   bool _hasUnsavedChanges = false;
+  bool _canPop = false;
+  String? _currentFileId;
 
   // Layer state
   // Bottom-most layer is at index 0
@@ -129,6 +131,8 @@ class _CanvasPageState extends State<CanvasPage> {
   void initState() {
     super.initState();
     _canvasSize = Size(widget.width, widget.height);
+    _currentFileId = widget.existingFile?.id;
+
     _fetchBrandColors();
 
     if (widget.existingFile != null) {
@@ -185,8 +189,9 @@ class _CanvasPageState extends State<CanvasPage> {
   // Handle inactivity timer logic
   void _resetInactivityTimer() {
     _inactivityTimer?.cancel();
-    _inactivityTimer = Timer(const Duration(seconds: 2), () {
-      _analyzeCanvas();
+    // Only analyze if changes happened
+    _inactivityTimer = Timer(const Duration(seconds: 3), () {
+      if (_hasUnsavedChanges) _analyzeCanvas();
     });
   }
 
@@ -437,8 +442,9 @@ class _CanvasPageState extends State<CanvasPage> {
             prompt: prompt,
           );
         }
-      } else {
+      } else
       // Case 2: Sketch to Image
+      {
         if (modelId == 'sketch_fusion') {
           newImageUrl = await FlaskService().sketchToImage(
             projectId: widget.projectId,
@@ -514,7 +520,7 @@ class _CanvasPageState extends State<CanvasPage> {
     final bool showTextOverlay = _isTextToolsActive || isTextSelected;
 
     return PopScope(
-      canPop: false,
+      canPop: _canPop,
       onPopInvoked: (didPop) {
         if (didPop) return;
         _handleBackNavigation();
@@ -884,26 +890,30 @@ class _CanvasPageState extends State<CanvasPage> {
                   ),
 
                 // Layers Panel
-                Positioned(
-                  right: 16,
-                  top:
-                      SafeArea(child: Container()).minimum.top +
-                      (_isMagicDrawActive ? 80 : 10), // Prevent overlap with description overlay
-                  child: LayersPanel(
-                    layers: _layers,
-                    activeLayerId: _activeLayerId,
-                    isOpen: _showLayersPanel,
-                    onToggle:
-                        () => setState(
-                          () => _showLayersPanel = !_showLayersPanel,
-                        ),
-                    onReorder: _handleLayerReorder,
-                    onDelete: _handleLayerDelete,
-                    onToggleVisibility: _handleLayerVisibility,
-                    onLayerTap: _setActiveLayer,
-                    onAddLayer: _isMagicDrawActive ? _addNewMagicLayer : null,
+                if (!(_isMagicDrawActive && _isDescriptionExpanded))
+                  Positioned(
+                    right: 16,
+                    // Prevent overlap with description overlay
+                    top:
+                        SafeArea(child: Container()).minimum.top +
+                        ((_isMagicDrawActive && _aiDescription != null)
+                            ? 80
+                            : 10),
+                    child: LayersPanel(
+                      layers: _layers,
+                      activeLayerId: _activeLayerId,
+                      isOpen: _showLayersPanel,
+                      onToggle:
+                          () => setState(
+                            () => _showLayersPanel = !_showLayersPanel,
+                          ),
+                      onReorder: _handleLayerReorder,
+                      onDelete: _handleLayerDelete,
+                      onToggleVisibility: _handleLayerVisibility,
+                      onLayerTap: _setActiveLayer,
+                      onAddLayer: _isMagicDrawActive ? _addNewMagicLayer : null,
+                    ),
                   ),
-                ),
 
                 Positioned(
                   bottom: 0,
@@ -1431,8 +1441,12 @@ class _CanvasPageState extends State<CanvasPage> {
       _handleMagicDrawExit();
       return;
     }
-    if (!_hasUnsavedChanges && widget.existingFile != null) {
-      Navigator.pop(context);
+    // If no changes, allow pop
+    if (!_hasUnsavedChanges && _currentFileId != null) {
+      setState(() => _canPop = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.pop(context);
+      });
       return;
     }
     ShowDialog.show(
@@ -1443,12 +1457,18 @@ class _CanvasPageState extends State<CanvasPage> {
       onPrimaryPressed: () async {
         Navigator.pop(context);
         await _saveCanvas();
-        if (mounted && widget.existingFile != null) Navigator.pop(context);
+        setState(() => _canPop = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Navigator.pop(context);
+        });
       },
       secondaryButtonText: "Discard",
       onSecondaryPressed: () {
         Navigator.pop(context);
-        Navigator.pop(context);
+        setState(() => _canPop = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Navigator.pop(context);
+        });
       },
     );
   }
@@ -1506,13 +1526,18 @@ class _CanvasPageState extends State<CanvasPage> {
   Future<void> _saveCanvas() async {
     try {
       String fileName = "Canvas ${DateTime.now().toString().split(' ')[0]}";
-      if (widget.existingFile == null) {
+      // If new file, ask for name
+      if (_currentFileId == null) {
         final userFileName = await _showNameDialog();
         if (userFileName == null || userFileName.isEmpty) return;
         fileName = userFileName;
       }
       final String? previewPath = await _generatePreviewImage();
-      final layersJson = _layers.map((l) => l.toMap()).toList();
+      final layersJson =
+          _layers
+              .where((l) => !(l is SketchLayer && l.isMagicDraw))
+              .map((l) => l.toMap())
+              .toList();
       final canvasData = {
         'version': 2,
         'layers': layersJson,
@@ -1520,27 +1545,32 @@ class _CanvasPageState extends State<CanvasPage> {
         'height': _canvasSize.height,
         'preview_path': previewPath,
       };
-      await _fileService.saveCanvasFile(
+      // Pass current ID and capture returned ID
+      final savedId = await _fileService.saveCanvasFile(
         projectId: widget.projectId,
         canvasData: canvasData,
-        fileId: widget.existingFile?.id,
-        fileName: widget.existingFile == null ? fileName : null,
+        fileId: _currentFileId,
+        fileName: _currentFileId == null ? fileName : null,
       );
-      setState(() => _hasUnsavedChanges = false);
       if (mounted) {
+        setState(() {
+          _currentFileId = savedId;
+          _hasUnsavedChanges = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Canvas Saved Successfully")),
         );
-        if (widget.existingFile == null)
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ProjectFilePage(projectId: widget.projectId),
-            ),
-          );
       }
     } catch (e) {
       debugPrint("Save Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to save: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

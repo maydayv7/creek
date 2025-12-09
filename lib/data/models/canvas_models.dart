@@ -112,17 +112,40 @@ class ImageLayer extends CanvasLayer {
 
   @override
   Map<String, dynamic> toMap() {
-    return {'id': id, 'type': 'image', 'data': data, 'isVisible': isVisible};
+    final encodableData = Map<String, dynamic>.from(data);
+
+    if (encodableData['position'] is Offset) {
+      final pos = encodableData['position'] as Offset;
+      encodableData['position'] = {'dx': pos.dx, 'dy': pos.dy};
+    }
+
+    if (encodableData['size'] is Size) {
+      final size = encodableData['size'] as Size;
+      encodableData['size'] = {'width': size.width, 'height': size.height};
+    }
+
+    return {
+      'id': id,
+      'type': 'image',
+      'data': encodableData,
+      'isVisible': isVisible,
+    };
   }
 
   factory ImageLayer.fromMap(Map<String, dynamic> map) {
     final data = Map<String, dynamic>.from(map['data']);
     // Restore Offset/Size objects
     if (data['position'] is Map) {
-      data['position'] = Offset(data['position']['dx'], data['position']['dy']);
+      data['position'] = Offset(
+        (data['position']['dx'] as num).toDouble(),
+        (data['position']['dy'] as num).toDouble(),
+      );
     }
     if (data['size'] is Map) {
-      data['size'] = Size(data['size']['width'], data['size']['height']);
+      data['size'] = Size(
+        (data['size']['width'] as num).toDouble(),
+        (data['size']['height'] as num).toDouble(),
+      );
     }
 
     return ImageLayer(

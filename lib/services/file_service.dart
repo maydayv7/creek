@@ -89,7 +89,7 @@ class FileService {
   }
 
   // Saves canvas JSON structure to a file
-  Future<void> saveCanvasFile({
+  Future<String> saveCanvasFile({
     required int projectId,
     required Map<String, dynamic> canvasData,
     String? fileId,
@@ -105,6 +105,7 @@ class FileService {
         await file.writeAsString(jsonString);
         await _repo.touchFile(fileId); // Update last modified
       }
+      return fileId;
     } else {
       // Create new file via temporary storage
       final directory = await getTemporaryDirectory();
@@ -113,7 +114,7 @@ class FileService {
       );
       await tempFile.writeAsString(jsonString);
 
-      await saveFile(
+      final newId = await saveFile(
         tempFile,
         projectId,
         name: fileName ?? "Untitled Canvas",
@@ -122,6 +123,7 @@ class FileService {
 
       // Cleanup temp file
       if (await tempFile.exists()) await tempFile.delete();
+      return newId;
     }
   }
 
