@@ -9,15 +9,16 @@
 │   └── Editing Ecosystem Analysis
 │
 └── (C) Task 3
-    ├── Technical Report (containing documentation and model/dataset details)
-    └── Demo Video -> https://drive.google.com/file/d/1bvroGCCosPUEP54q06nFWq1LhNB4PiAf/view?usp=sharing
+    └── Technical Report (containing documentation and model/dataset details)
 ```
 
-Optional Creative Artefacts -> https://drive.google.com/file/d/1kSpf-y0LhQCn9-fF2gMLyodV8R3NkQeR/view?usp=sharing
+- [Presentation](./Presentation.pdf)
+- [Demo Video](https://drive.google.com/file/d/1bvroGCCosPUEP54q06nFWq1LhNB4PiAf/view?usp=sharing)
+- [Optional Creative Artefacts](https://drive.google.com/file/d/1kSpf-y0LhQCn9-fF2gMLyodV8R3NkQeR/view?usp=sharing)
 
 # Problem Statement
 
-> **Inter IIT Tech Meet 14.0 - Adobe Mid Prep**
+> **Inter IIT Tech Meet 14.0 - Adobe PS (Mid Prep)**
 
 Design and prototype a lightweight, mobile-first AI image editor for 2030 that demonstrates how creative editing can become faster, more intuitive, and energy-efficient on low-compute devices.
 Your solution should combine design thinking, market research, and AI engineering across three integrated tracks:

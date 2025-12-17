@@ -4,7 +4,7 @@ CreekUI is a lightweight, intent-driven mobile image editor designed to shift th
 
 This repository contains the full analysis pipeline, style synthesis logic, and generation workflow that together simulate how a future (circa 2030) mobile NPU might function in creative applications.
 
-### See the [Demo Video](https://drive.google.com/file/d/1bvroGCCosPUEP54q06nFWq1LhNB4PiAf/view?usp=sharing)
+### See the [Demo Video](https://drive.google.com/file/d/1bvroGCCosPUEP54q06nFWq1LhNB4PiAf/view?usp=sharing) and the [Presentation](./Deliverables/Presentation.pdf)
 
 > [!NOTE]
 >
