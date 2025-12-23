@@ -1,6 +1,6 @@
 # Binary
 
-The pre-built APK file can be downloaded from [here](https://drive.google.com/file/d/1JnLvXiOlkQzK2VtBG40WsiTq1eKGJF5F/view) to experience the app on your Android phone without any hassle (uses a deployed [Modal.com](https://modal.com) backend).  
+The pre-built APK file can be downloaded from [here](https://github.com/maydayv7/creek/releases/latest/download/app-release.apk) to experience the app on your Android phone without any hassle (uses a pre-deployed [Modal.com](https://modal.com) backend).  
 To build the app from source, read the rest of this document.
 
 # Prerequisites
