@@ -3,7 +3,7 @@ name: Release Android Build
 on:
   push:
     tags:
-      - "v*" # Triggers the workflow on tags like v1.0.0, v1.0.1, etc.
+      - "v*"
 
 permissions:
   contents: write
@@ -14,13 +14,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout Code (with LFS)
-      - name: Checkout code
+      # 1. Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
-      # 2. Setup Java (Required for Android Build)
+      # 2. Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -42,7 +40,6 @@ jobs:
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
@@ -54,15 +51,23 @@ jobs:
         with:
           python-version: "3.8"
 
-      # 7. Install Dependencies
-      - name: Install dependencies
+      # 7. Download Assets (Models)
+      - name: Download Assets
+        run: |
+          pip install gdown
+          gdown "https://drive.google.com/drive/folders/1b2cEsZao5miX7WxYmp160XkKd_lfBmPN" -O downloaded_models --folder
+          mv downloaded_models/* assets/
+          rm -rf downloaded_models
+
+      # 8. Install Flutter Dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
-      # 8. Build APK
-      - name: Build Release APK
+      # 9. Build Release APK
+      - name: Build APK
         run: flutter build apk --release
 
-      # 9. Create GitHub Release
+      # 10. Create GitHub Release
       - name: Create Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
