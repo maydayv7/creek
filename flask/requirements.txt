@@ -20,4 +20,4 @@ timm
 toml
 torch
 torchvision
-transformers==4.57.3
+transformers==5.5.0
